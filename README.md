@@ -102,7 +102,7 @@ Note:
 
 ### Verify tag mode
 
-* Verigy whether tags are duplicated or isolated.
+* Verify whether tags are duplicated or isolated.
 
 <details>
 <summary>Duplicated</summary>
