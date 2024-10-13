@@ -73,32 +73,36 @@ chmod +x ./shtracer
 
 ## 🚀 Usage
 
-```
+```text
 Usage: shtracer <configfile> [options]
 
 Options:
-  -c <before_tag> <after_tag> ...   Change mode: swap or rename trace target tags
+  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
   -v                               Verify mode: detect duplicate or isolated tags
   -h, --help                       Show this help message
 
 Examples:
-  1. Change mode (swap or rename tags):
-     $ shtracer trace_config.txt -c old_tag new_tag
+  1. Change mode (swap or rename tags).
+     $ shtracer sample/config.md
 
-  2. Verify mode (check for duplicate or isolated tags):
-     $ shtracer trace_config.txt -v
+  2. Change mode (swap or rename tags)
+     $ shtracer sample/config.md -c old_tag new_tag.
 
-  3. Display help message:
-     $ shtracer -h
+  3. Verify mode (check for duplicate or isolated tags).
+     $ shtracer sample/config.md -v
 
 Note:
   - The <configfile> argument must always be specified before options.
+  - The -o option is optional and can be used with both change mode and verify mode.
+
+Version:
+      - 0.0.1
 ```
 
 ### Change tag mode
 
 * Change tags written in all trace targets.
-* This function is useful when requiremnts are refreshed.
+* This function is useful when requirements are updated or revised.
 
 ### Verify tag mode
 
