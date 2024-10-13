@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>shtracer output</title>
+  <link rel="stylesheet" href="./assets/template.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <h1>shtracer output</h1>
+      <h2>Trace targets</h2>
+        <!-- INSERT INFORMATION -->
+      <h2>UML</h2>
+      <pre class="mermaid">
+        <!-- INSERT MERMAID -->
+      </pre>
+      <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true });
+      </script>
+      <h2>Requirement traceability matrix</h2>
+      <table id="tag-table">
+        <!-- INSERT TABLE -->
+      </table>
+    </div>
+
+    <div class="right">
+      <div id="file-information"></div>
+      <pre id="text-container"></pre>
+    </div>
+  </div>
+  <script src="./assets/show_text.js"></script>
+</body>
+</html>
