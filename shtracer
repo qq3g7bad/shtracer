@@ -1,0 +1,157 @@
+#!/bin/sh
+
+##
+# @defgroup Global variables
+# @{
+
+CONFIG_PATH=''
+SHTRACER_MODE='NORMAL'
+BEFORE_TAG=''
+AFTER_TAG=''
+OUTPUT_DIR='./output/'
+SHTRACER_SEPARATOR="<shtracer_separator>"
+NODATA_STRING="NONE"
+
+##
+# @}
+#
+
+##
+# @brief  Initialize environment
+# @tag    @IMP1.1@ (FROM: @ARC1.2@)
+init_environment() {
+	set -u
+	umask 0022
+	export LC_ALL=C
+
+	PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
+	export PATH
+	case $PATH in :*) PATH=${PATH#?} ;; esac
+	IFS='
+'
+}
+
+##
+# @brief  Load helper functions
+# @tag    @IMP1.2@ (FROM: @ARC1.2@)
+load_functions() {
+	. ./scripts/main/shtracer_func.sh
+	. ./scripts/main/shtracer_uml.sh
+}
+
+##
+# @brief  Print usage
+# @tag    @IMP1.3@ (FROM: @ARC1.2@)
+print_usage() {
+	cat <<-USAGE 1>&2
+		Usage: shtracer <configfile> [options]
+
+		Options:
+		  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
+		  -v                               Verify mode: detect duplicate or isolated tags
+		  -h, --help                       Show this help message
+
+		Examples:
+		  1. Change mode (swap or rename tags).
+		     $ shtracer sample/config.md
+
+		  2. Change mode (swap or rename tags)
+		     $ shtracer sample/config.md -c old_tag new_tag.
+
+		  3. Verify mode (check for duplicate or isolated tags).
+		     $ shtracer sample/config.md -v
+
+		Note:
+		  - The <configfile> argument must always be specified before options.
+		  - The -o option is optional and can be used with both change mode and verify mode.
+
+		Version:
+		      - 0.0.1
+
+	USAGE
+	exit 1
+}
+
+##
+# @brief  Echo error message and exit
+# @param  $1 : Error code
+# @param  $2 : Error message
+# @tag    @IMP1.4@ (FROM: @ARC1.2@)
+error_exit() {
+	if [ -n "$2" ]; then
+		echo "${0##*/}: $2" 1>&2
+	fi
+	exit "$1"
+}
+
+##
+# @brief  Parse arguments
+# @tag    @IMP1.5@ (FROM: @ARC1.2@)
+# @TODO   change output location
+parse_arguments() {
+	case "$#${1:-}" in
+	1-h | 1-v | 1--help | 1--version)
+		print_usage
+		;;
+	esac
+
+	if [ $# -eq 1 ]; then
+		SHTRACER_MODE='NORMAL'
+	elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
+		SHTRACER_MODE='VERIFY'
+	elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
+		SHTRACER_MODE='CHANGE_TAGS'
+		BEFORE_TAG="$3"
+		AFTER_TAG="$4"
+	else
+		error_exit 1 'Invalid argument'
+	fi
+
+	# Check if config file exists
+	if [ ! -r "$1" ]; then
+		error_exit 1 "$1 does not exist"
+	fi
+
+	CONFIG_PATH="$1"
+	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
+  OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+}
+
+##
+# @brief  Main routine
+# @tag    @IMP1.6@ (FROM: @ARC1.1@)
+main_routine() {
+	(
+		init_environment
+		load_functions
+		parse_arguments "$@"
+
+		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+
+		# Tag change mode
+		if [ "$SHTRACER_MODE" = 'CHANGE_TAGS' ]; then
+			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+		# Verify mode
+		elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+			TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
+			TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
+			verify_tags "$TAG_FOR_VERIFY"
+		# Normal mode
+		else
+			TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"
+			JOINED_TAG_TABLE="$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
+			sort <"$JOINED_TAG_TABLE" -k1,1
+			make_target_flowchart "$CONFIG_OUTPUT"
+		fi
+
+	)
+}
+
+case "$0" in
+*shtracer)
+	main_routine "$@"
+	;;
+*)
+	:
+	;;
+esac
