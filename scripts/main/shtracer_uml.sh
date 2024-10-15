@@ -14,6 +14,7 @@ make_target_flowchart() {
 		_UML_OUTPUT_DECLARATION="${_UML_OUTPUT_DIR%/}/declaration"
 		_UML_OUTPUT_RELATIONSHIPS="${_UML_OUTPUT_DIR%/}/relationships"
 		_UML_OUTPUT_LEVEL2="${_UML_OUTPUT_DIR%/}/2"
+    _UML_OUTPUT_FILE="${_UML_OUTPUT_DIR%/}/uml.md"
 
 		mkdir -p "$_UML_OUTPUT_DIR"
 
@@ -159,6 +160,8 @@ make_target_flowchart() {
 			sed "/@state_relationships@/r $_UML_OUTPUT_RELATIONSHIPS" |
 			sed '/@state_relationships@/d' |
 			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_LEVEL2"
+
+    mv "$_UML_OUTPUT_LEVEL2" "$_UML_OUTPUT_FILE"
 	)
 }
 
