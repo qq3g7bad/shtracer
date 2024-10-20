@@ -4,20 +4,16 @@ Open source traceability matrix generator written in shell scripts.
 
 ## 🚩 About
 
-ShellTracer (**shtracer**) is a project for creating the [requirements traceability matrix](https://en.wikipedia.org/wiki/Traceability_matrix) (RTM) easily.
+ShellTracer (**shtracer**) is a project for creating a [requirements traceability matrix](https://en.wikipedia.org/wiki/Traceability_matrix) (RTM) easily.
 
 * For maximum extensibility and easy version control, simplify the input/output files as text files.
-* For portability, use only shell scripts to create the RTM.
+* For portability, use only shell scripts to create RTMs.
 
 ```mermaid
 stateDiagram
 
-rtm:Requirements traceability matrix (RTM)
-uml:UML
-
 input:Input
 opt_input:Optional input files
-opt_output:Optional output files
 
 state input {
   targetfiles:Trace target files
@@ -27,30 +23,36 @@ state opt_input {
   wordinput:Word files
   excelinput:Excel files
 }
-state opt_output {
-  exceloutput:Excel files
-}
-
 note left of input
   Markdown files
 end note
 
-note right of uml
-  Text based
-  (Mermaid or plantuml)
+note left of uml
+  Mermaid
 end note
 
 [*] --> input
 [*] --> opt_input
+
 opt_input --> targetfiles : optional scripts
 
-input --> rtm : shtracer
-input --> uml : shtracer
+state output {
+  txt_output: Text based files
+  opt_output:Optional output files
+}
 
-rtm --> [*]
-uml --> [*]
+state txt_output {
+  rtm:Requirements traceability matrix (RTM)
+  uml:UML
+}
+
+state opt_output {
+  exceloutput:Excel files
+}
+
+input --> output : shtracer
 rtm --> opt_output : optional scripts
-opt_output --> [*]
+
 ```
 
 ## 📷 Screenshots
@@ -122,17 +124,21 @@ Usage: shtracer <configfile> [options]
 Options:
   -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
   -v                               Verify mode: detect duplicate or isolated tags
+  -t                               Test mode: execute unit tests
   -h, --help                       Show this help message
 
 Examples:
-  1. Change mode (swap or rename tags).
-     $ shtracer sample/config.md
+  1. Normal mode
+     $ ./shtracer ./sample/config.md
 
-  2. Change mode (swap or rename tags)
-     $ shtracer sample/config.md -c old_tag new_tag.
+  2. Change mode (swap or rename tags).
+     $ ./shtracer ./sample/config.md -c old_tag new_tag.
 
   3. Verify mode (check for duplicate or isolated tags).
-     $ shtracer sample/config.md -v
+     $ ./shtracer ./sample/config.md -v
+
+  4. Test mode
+     $ ./shtracer -t
 
 Note:
   - The <configfile> argument must always be specified before options.
