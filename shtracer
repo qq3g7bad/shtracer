@@ -50,17 +50,21 @@ print_usage() {
 		Options:
 		  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
 		  -v                               Verify mode: detect duplicate or isolated tags
+		  -t                               Test mode: execute unit tests
 		  -h, --help                       Show this help message
 
 		Examples:
-		  1. Change mode (swap or rename tags).
-		     $ shtracer sample/config.md
+      1. Normal mode
+         $ ./shtracer ./sample/config.md
 
-		  2. Change mode (swap or rename tags)
-		     $ shtracer sample/config.md -c old_tag new_tag.
+		  2. Change mode (swap or rename tags).
+		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
 
 		  3. Verify mode (check for duplicate or isolated tags).
-		     $ shtracer sample/config.md -v
+		     $ ./shtracer ./sample/config.md -v
+
+		  4. Test mode
+		     $ ./shtracer -t
 
 		Note:
 		  - The <configfile> argument must always be specified before options.
@@ -96,7 +100,9 @@ parse_arguments() {
 		;;
 	esac
 
-	if [ $# -eq 1 ]; then
+	if [ $# -eq 1 ] && [ "_$1" = '_-t' ]; then
+		SHTRACER_MODE='TEST'
+	elif [ $# -eq 1 ]; then
 		SHTRACER_MODE='NORMAL'
 	elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
 		SHTRACER_MODE='VERIFY'
@@ -109,13 +115,16 @@ parse_arguments() {
 	fi
 
 	# Check if config file exists
-	if [ ! -r "$1" ]; then
-		error_exit 1 "$1 does not exist"
-	fi
+	if [ "$SHTRACER_MODE" != 'TEST' ]; then
+		if [ ! -r "$1" ]; then
+			error_exit 1 "$1 does not exist"
+		fi
 
-	CONFIG_PATH="$1"
-	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
-  OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+		CONFIG_PATH="$1"
+		CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
+		OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+	fi
 }
 
 ##
@@ -127,8 +136,6 @@ main_routine() {
 		load_functions
 		parse_arguments "$@"
 
-		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
-
 		# Tag change mode
 		if [ "$SHTRACER_MODE" = 'CHANGE_TAGS' ]; then
 			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
@@ -137,6 +144,9 @@ main_routine() {
 			TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
 			TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
 			verify_tags "$TAG_FOR_VERIFY"
+		# Test mode
+		elif [ "$SHTRACER_MODE" = 'TEST' ]; then
+			sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
 		# Normal mode
 		else
 			TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"

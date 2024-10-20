@@ -1,9 +1,10 @@
 #!/bin/sh
 
-. ./shtracer
+. "../../shtracer"
 
+echo "$0"
 test_global_constant() {
-  assertEquals 0 "${TAG_CHANGE_MODE}"
+	assertEquals "NONE" "${NODATA_STRING}"
 }
 
-. ./scripts/test/shunit2/shunit2
+. "./shunit2/shunit2"

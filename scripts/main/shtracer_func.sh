@@ -1,5 +1,15 @@
 #!/bin/sh
 
+case "$0" in
+  *shtracer)
+    : # Successfully sourced from shtracer.
+    ;;
+  *)
+    echo "This script should only be sourced, not executed directly."
+    exit 1
+    ;;
+esac
+
 ##
 # @brief
 # @param  $1 : CONFIG_MARKDOWN_PATH
