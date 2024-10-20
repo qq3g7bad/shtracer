@@ -3,7 +3,7 @@
 ## 📃 1. Use `config.md` for configuration
 
 <!-- @REQ1.1@ -->
-### To make a requirement traceablity matrix, use a configuration file.
+### To make a requirements traceablity matrix, use a configuration file.
 
 * This file is written in markdown format.
   * e.g. `../sample/config.md`.

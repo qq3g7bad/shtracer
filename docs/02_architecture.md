@@ -18,7 +18,7 @@
 ```mermaid
 stateDiagram
 
-rtm:Requirement traceability matrix (RTM)
+rtm:Requirements traceability matrix (RTM)
 
 input:Input
 opt_input:Optional input files
