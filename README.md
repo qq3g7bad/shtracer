@@ -4,7 +4,7 @@ Open source traceability matrix generator written in shell scripts.
 
 ## 🚩 About
 
-ShellTracer (**shtracer**) is a project for creating the [requirement traceability matrix](https://en.wikipedia.org/wiki/Traceability_matrix) (RTM) easily.
+ShellTracer (**shtracer**) is a project for creating the [requirements traceability matrix](https://en.wikipedia.org/wiki/Traceability_matrix) (RTM) easily.
 
 * For maximum extensibility and easy version control, simplify the input/output files as text files.
 * For portability, use only shell scripts to create the RTM.
@@ -12,7 +12,7 @@ ShellTracer (**shtracer**) is a project for creating the [requirement traceabili
 ```mermaid
 stateDiagram
 
-rtm:Requirement traceability matrix (RTM)
+rtm:Requirements traceability matrix (RTM)
 uml:UML
 
 input:Input
@@ -97,7 +97,7 @@ id4 --> stop
 
 ## 🥅 Goal
 
-* Make the requirement traceability matrix (RTM) through markdown formatted text files.
+* Make the requirements traceability matrix (RTM) through markdown formatted text files.
 * Use only normal shell scripts and no other programs.
 
 ## ⚽ Getting started
