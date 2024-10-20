@@ -11,6 +11,7 @@ AFTER_TAG=''
 OUTPUT_DIR='./output/'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 NODATA_STRING="NONE"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 ##
 # @}
@@ -35,8 +36,8 @@ init_environment() {
 # @brief  Load helper functions
 # @tag    @IMP1.2@ (FROM: @ARC1.2@)
 load_functions() {
-	. ./scripts/main/shtracer_func.sh
-	. ./scripts/main/shtracer_uml.sh
+	. "${SCRIPT_DIR%/}/scripts/main/shtracer_func.sh"
+	. "${SCRIPT_DIR%/}/scripts/main/shtracer_uml.sh"
 }
 
 ##
