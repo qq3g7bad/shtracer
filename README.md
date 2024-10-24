@@ -213,3 +213,9 @@ For details, see documents in `./docs/` directory.
 
 * RTM is important not only in software field but also in other fields, so that contributions from other fields are welcomed.
 * Consider using [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) rules for creating explicit and meaningful commit messages.
+
+## ✅ TODO
+
+* Unit testing
+* Trace not only by tags but filenames
+* Set hyperlinks to trace targets from RTM.
