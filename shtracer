@@ -93,26 +93,28 @@ error_exit() {
 # @brief  Parse arguments
 # @tag    @IMP1.5@ (FROM: @ARC1.2@)
 parse_arguments() {
-	case "$#${1:-}" in
+	case "$#${1:-}${2:-}" in
 	1-h | 1-v | 1--help | 1--version)
 		print_usage
 		;;
 	1-t)
-    # Test mode
+		# Test mode
 		SHTRACER_MODE='TEST'
 		;;
 	1-*)
-    # Undefined option
+		# Undefined option
 		error_exit 1 'Invalid argument'
 		;;
 	1*)
-    # Normal mode
+		# Normal mode
 		SHTRACER_MODE='NORMAL'
 		;;
+	2*-v)
+    # Verify mode
+		SHTRACER_MODE='VERIFY'
+		;;
 	*)
-		if [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
-			SHTRACER_MODE='VERIFY'
-		elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
+		if [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
 			SHTRACER_MODE='CHANGE_TAGS'
 			BEFORE_TAG="$3"
 			AFTER_TAG="$4"

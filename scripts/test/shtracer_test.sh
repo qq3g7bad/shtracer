@@ -251,4 +251,5 @@ test_parse_arguments_verify_mode() {
   # Assert ----------
   assertEquals "$SHTRACER_MODE" "VERIFY"
 }
+
 . "./shunit2/shunit2"
