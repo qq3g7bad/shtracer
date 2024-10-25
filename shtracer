@@ -98,15 +98,19 @@ parse_arguments() {
 		print_usage
 		;;
 	1-t)
+    # Test mode
 		SHTRACER_MODE='TEST'
 		;;
 	1-*)
+    # Undefined option
 		error_exit 1 'Invalid argument'
 		;;
+	1*)
+    # Normal mode
+		SHTRACER_MODE='NORMAL'
+		;;
 	*)
-		if [ $# -eq 1 ]; then
-			SHTRACER_MODE='NORMAL'
-		elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
+		if [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
 			SHTRACER_MODE='VERIFY'
 		elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
 			SHTRACER_MODE='CHANGE_TAGS'

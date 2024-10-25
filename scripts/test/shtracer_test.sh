@@ -240,4 +240,5 @@ test_parse_arguments_normal_mode() {
   # Assert ----------
   assertEquals "$SHTRACER_MODE" "NORMAL"
 }
+
 . "./shunit2/shunit2"
