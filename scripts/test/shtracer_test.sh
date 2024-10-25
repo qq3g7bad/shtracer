@@ -77,12 +77,12 @@ test_load_functions() {
 
 	# Assert ----------
 	(
-		echo "$_SHTRACER_FUNC_SH"
+		echo "$_SHTRACER_FUNC_SH" >/dev/null
 	) 2>/dev/null
 	assertEquals 0 "$?"
 
 	(
-		echo "$_SHTRACER_UML_SH"
+		echo "$_SHTRACER_UML_SH" >/dev/null
 	) 2>/dev/null
 	assertEquals 0 "$?"
 }
@@ -91,15 +91,29 @@ test_load_functions() {
 # @brief  Test for print_usage
 # @tag    @UT1.3@ (FROM: @IMP1.3@)
 test_print_usage() {
-  # Arrange ---------
-  # Act -------------
-  _STDOUT=$(print_usage 2>/dev/null)  # Capture stdout
-  _ERROUT=$(print_usage 2>&1)  # Capture stderr
+	# Arrange ---------
+	# Act -------------
+	_STDOUT=$(print_usage 2>/dev/null) # Capture stdout
+	_ERROUT=$(print_usage 2>&1)        # Capture stderr
 
-  # Assert ----------
-  assertEquals "" "$_STDOUT"
-  assertNotEquals "" "$_ERROUT"
-  # assertEquals "" "$_ERROUT"
+	# Assert ----------
+	assertEquals "" "$_STDOUT"
+	assertNotEquals "" "$_ERROUT"
+}
+
+##
+# @brief  Test for error_exit
+# @tag    @UT1.4@ (FROM: @IMP1.4@)
+test_error_exit() {
+	# Arrange ---------
+	# Act -------------
+	a="$(
+		error_exit 2 "test_error" 2>&1
+	)"
+	# Assert ----------
+	assertEquals 2 "$?"
+	assertEquals "shtracer_test.sh: test_error" "$a"
+
 }
 
 . "./shunit2/shunit2"

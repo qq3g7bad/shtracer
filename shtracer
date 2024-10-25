@@ -92,7 +92,6 @@ error_exit() {
 ##
 # @brief  Parse arguments
 # @tag    @IMP1.5@ (FROM: @ARC1.2@)
-# @TODO   change output location
 parse_arguments() {
 	case "$#${1:-}" in
 	1-h | 1-v | 1--help | 1--version)
