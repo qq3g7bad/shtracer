@@ -176,4 +176,19 @@ test_parse_arguments_h() {
 	assertEquals "$_USAGE" "$_RETURN_VALUE"
 }
 
+##
+# @brief  Test for parse_arguments with --help
+# @tag    @UT1.9@ (FROM: @IMP1.5@)
+test_parse_arguments_help() {
+	# Arrange ---------
+	# Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "--help" 2>&1
+	)"
+	_USAGE="$(print_usage 2>&1)"
+
+	# Assert ----------
+	assertEquals "$_USAGE" "$_RETURN_VALUE"
+}
+
 . "./shunit2/shunit2"
