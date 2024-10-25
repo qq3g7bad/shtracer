@@ -8,6 +8,7 @@
 #
 setUp() {
 	set +u
+	SCRIPT_DIR="../../"
 }
 
 ##
@@ -35,18 +36,18 @@ test_default_global_constant() {
 # @tag    @UT1.1@ (FROM: @IMP1.1@)
 test_init_environment() {
 
-  # Arrange ---------
-  _TMP_PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
+	# Arrange ---------
+	_TMP_PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
 
-  # Act -------------
+	# Act -------------
 	init_environment
 
-  # Assert ----------
+	# Assert ----------
 
-  # IFS='\n'
-  IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
+	# IFS='\n'
+	IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 	IFS=' '
-  assertEquals "0a" "$IFS_HEX"
+	assertEquals "0a" "$IFS_HEX"
 
 	# set -u : ERROR for _UNDEFINED_VAR
 	(
@@ -54,14 +55,36 @@ test_init_environment() {
 	) 2>/dev/null
 	assertNotEquals 0 "$?"
 
-  # umask 0022
-  assertEquals 0022 "$(umask)"
+	# umask 0022
+	assertEquals 0022 "$(umask)"
 
 	# export LC_ALL=C
 	assertEquals "C" "$LC_ALL"
 
-  # PATH
-  assertEquals "$PATH" "$_TMP_PATH"
+	# PATH
+	assertEquals "$PATH" "$_TMP_PATH"
+}
+
+##
+# @brief  Test for load functions
+# @tag    @UT1.2@ (FROM: @IMP1.2@)
+test_load_functions() {
+	# Arrange ---------
+	set -u
+
+	# Act -------------
+	load_functions
+
+	# Assert ----------
+	(
+		echo "$_SHTRACER_FUNC_SH"
+	) 2>/dev/null
+	assertEquals 0 "$?"
+
+	(
+		echo "$_SHTRACER_UML_SH"
+	) 2>/dev/null
+	assertEquals 0 "$?"
 }
 
 . "./shunit2/shunit2"

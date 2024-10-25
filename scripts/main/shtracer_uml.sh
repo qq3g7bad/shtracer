@@ -1,7 +1,13 @@
 #!/bin/sh
 
+# For unit test
+_SHTRACER_UML_SH=""
+
 case "$0" in
   *shtracer)
+    : # Successfully sourced from shtracer.
+    ;;
+  *shtracer*test*)
     : # Successfully sourced from shtracer.
     ;;
   *)
@@ -175,14 +181,3 @@ make_target_flowchart() {
 	)
 }
 
-case "$0" in
-*shtracer)
-	:
-	;;
-*)
-	(
-		echo "shtracer: Do not use source/dot commands."
-		echo "shtracer: Use source/dot commands for unit tests. "
-	)
-	;;
-esac
