@@ -54,8 +54,8 @@ print_usage() {
 		  -h, --help                       Show this help message
 
 		Examples:
-      1. Normal mode
-         $ ./shtracer ./sample/config.md
+		      1. Normal mode
+		         $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
 		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
@@ -99,24 +99,23 @@ parse_arguments() {
 		;;
 	1-t)
 		SHTRACER_MODE='TEST'
-    ;;
+		;;
+	*)
+		if [ $# -eq 1 ] && [ "_${1#-}" != "_$1" ]; then
+			error_exit 1 'Invalid argument'
+		elif [ $# -eq 1 ]; then
+			SHTRACER_MODE='NORMAL'
+		elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
+			SHTRACER_MODE='VERIFY'
+		elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
+			SHTRACER_MODE='CHANGE_TAGS'
+			BEFORE_TAG="$3"
+			AFTER_TAG="$4"
+		else
+			error_exit 1 'Invalid argument'
+		fi
+		;;
 	esac
-
-	if [ $# -eq 1 ] && [ "_$1" = '_-t' ]; then
-    :
-	elif [ $# -eq 1 ] && [ "_${1#-}" != "_$1" ] ; then
-		error_exit 1 'Invalid argument'
-	elif [ $# -eq 1 ]; then
-		SHTRACER_MODE='NORMAL'
-	elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
-		SHTRACER_MODE='VERIFY'
-	elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
-		SHTRACER_MODE='CHANGE_TAGS'
-		BEFORE_TAG="$3"
-		AFTER_TAG="$4"
-	else
-		error_exit 1 'Invalid argument'
-	fi
 
 	# Check if config file exists
 	if [ "$SHTRACER_MODE" != 'TEST' ]; then
