@@ -236,7 +236,7 @@ test_parse_arguments_undefined_option() {
 test_parse_arguments_normal_mode() {
   # Arrange ---------
   # Act -------------
-  parse_arguments "./shtracer_test.sh"
+  parse_arguments "$0"
   # Assert ----------
   assertEquals "$SHTRACER_MODE" "NORMAL"
 }
