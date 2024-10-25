@@ -155,7 +155,6 @@ test_parse_arguments_version3() {
 	_RETURN_VALUE="$(
 		parse_arguments "--varsion" 2>&1
 	)"
-	_USAGE="$(print_usage 2>&1)"
 
 	# Assert ----------
 	assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
@@ -215,6 +214,20 @@ test_parse_arguments_test() {
   parse_arguments "-t"
   # Assert ----------
   assertEquals "$SHTRACER_MODE" "TEST"
+}
+
+##
+# @brief  Test for parse_arguments with undefined option
+# @tag    @UT1.12@ (FROM: @IMP1.5@)
+test_parse_arguments_undefined_option() {
+  # Arrange ---------
+  # Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "-T" 2>&1
+	)"
+
+	# Assert ----------
+	assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
 }
 
 . "./shunit2/shunit2"
