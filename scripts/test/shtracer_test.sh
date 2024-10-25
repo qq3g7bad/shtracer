@@ -252,4 +252,14 @@ test_parse_arguments_verify_mode() {
   assertEquals "$SHTRACER_MODE" "VERIFY"
 }
 
+##
+# @brief  Test for parse_arguments with -v
+# @tag    @UT1.15@ (FROM: @IMP1.5@)
+test_parse_arguments_change_tags_mode() {
+  # Arrange ---------
+  # Act -------------
+  parse_arguments "$0" "-c" "old_tag" "new_tag"
+  # Assert ----------
+  assertEquals "$SHTRACER_MODE" "CHANGE_TAGS"
+}
 . "./shunit2/shunit2"
