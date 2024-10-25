@@ -87,4 +87,19 @@ test_load_functions() {
 	assertEquals 0 "$?"
 }
 
+##
+# @brief  Test for print_usage
+# @tag    @UT1.3@ (FROM: @IMP1.3@)
+test_print_usage() {
+  # Arrange ---------
+  # Act -------------
+  _STDOUT=$(print_usage 2>/dev/null)  # Capture stdout
+  _ERROUT=$(print_usage 2>&1)  # Capture stderr
+
+  # Assert ----------
+  assertEquals "" "$_STDOUT"
+  assertNotEquals "" "$_ERROUT"
+  # assertEquals "" "$_ERROUT"
+}
+
 . "./shunit2/shunit2"
