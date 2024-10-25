@@ -31,11 +31,17 @@ test_default_global_constant() {
 }
 
 ##
-# @brief
+# @brief  Test for init_environment
+# @tag    @UT1.1@ (FROM: @IMP1.1@)
 test_init_environment() {
+
+  # Arrange ---------
   _TMP_PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
 
+  # Act -------------
 	init_environment
+
+  # Assert ----------
 
   # IFS='\n'
   IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
@@ -57,4 +63,5 @@ test_init_environment() {
   # PATH
   assertEquals "$PATH" "$_TMP_PATH"
 }
+
 . "./shunit2/shunit2"
