@@ -118,7 +118,7 @@ test_error_exit() {
 
 ##
 # @brief  Test for parse_arguments with -v
-# @tag    @UT1.5@ (FROM: @IMP1.6@)
+# @tag    @UT1.5@ (FROM: @IMP1.5@)
 test_parse_arguments_version1() {
 	# Arrange ---------
 	# Act -------------
@@ -133,7 +133,7 @@ test_parse_arguments_version1() {
 
 ##
 # @brief  Test for parse_arguments with --version
-# @tag    @UT1.6@ (FROM: @IMP1.6@)
+# @tag    @UT1.6@ (FROM: @IMP1.5@)
 test_parse_arguments_version2() {
 	# Arrange ---------
 	# Act -------------
@@ -148,7 +148,7 @@ test_parse_arguments_version2() {
 
 ##
 # @brief  Test for parse_arguments with --varsion
-# @tag    @UT1.7@ (FROM: @IMP1.6@)
+# @tag    @UT1.7@ (FROM: @IMP1.5@)
 test_parse_arguments_version3() {
 	# Arrange ---------
 	# Act -------------
@@ -159,6 +159,21 @@ test_parse_arguments_version3() {
 
 	# Assert ----------
 	assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
+}
+
+##
+# @brief  Test for parse_arguments with -h
+# @tag    @UT1.8@ (FROM: @IMP1.5@)
+test_parse_arguments_h() {
+	# Arrange ---------
+	# Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "-h" 2>&1
+	)"
+	_USAGE="$(print_usage 2>&1)"
+
+	# Assert ----------
+	assertEquals "$_USAGE" "$_RETURN_VALUE"
 }
 
 . "./shunit2/shunit2"
