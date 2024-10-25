@@ -140,6 +140,7 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 
 * Check if there are invalid config/tag information.
 
+<!-- @REQ5.1@ -->
 ## ⭕ 5. Nice-to-have requirements
 
 * Must-have-requirements (these are written above) have their own tags for trace.

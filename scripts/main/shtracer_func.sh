@@ -319,6 +319,7 @@ join_tag_table() {
 ##
 # @brief
 # @param  $1 : DOWNSTREAM_TAG_TABLE
+# @tag    @IMP2.5@ (FROM: )
 verify_tags() {
 	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
@@ -341,7 +342,7 @@ verify_tags() {
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
-# @tag    @IMP3.1@ (FROM: @ARC2.4@)
+# @tag    @IMP2.6@ (FROM: )
 swap_tags() {
 	(
 		# Read config parse results (tag information are included in one line)

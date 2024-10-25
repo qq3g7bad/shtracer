@@ -241,4 +241,14 @@ test_parse_arguments_normal_mode() {
   assertEquals "$SHTRACER_MODE" "NORMAL"
 }
 
+##
+# @brief  Test for parse_arguments with -v
+# @tag    @UT1.14@ (FROM: @IMP1.5@)
+test_parse_arguments_verify_mode() {
+  # Arrange ---------
+  # Act -------------
+  parse_arguments "$0" "-v"
+  # Assert ----------
+  assertEquals "$SHTRACER_MODE" "VERIFY"
+}
 . "./shunit2/shunit2"
