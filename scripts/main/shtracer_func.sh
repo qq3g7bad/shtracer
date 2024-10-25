@@ -202,7 +202,7 @@ make_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.3@ (FRO: @ARC2.2@)
+# @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ -e "$1" ]; then
 		:
