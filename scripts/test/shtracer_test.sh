@@ -107,13 +107,58 @@ test_print_usage() {
 test_error_exit() {
 	# Arrange ---------
 	# Act -------------
-	a="$(
+	_RETURN_VALUE="$(
 		error_exit 2 "test_error" 2>&1
 	)"
 	# Assert ----------
 	assertEquals 2 "$?"
-	assertEquals "shtracer_test.sh: test_error" "$a"
+	assertEquals "shtracer_test.sh: test_error" "$_RETURN_VALUE"
 
+}
+
+##
+# @brief  Test for parse_arguments with -v
+# @tag    @UT1.5@ (FROM: @IMP1.6@)
+test_parse_arguments_version1() {
+	# Arrange ---------
+	# Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "-v" 2>&1
+	)"
+	_USAGE="$(print_usage 2>&1)"
+
+	# Assert ----------
+	assertEquals "$_USAGE" "$_RETURN_VALUE"
+}
+
+##
+# @brief  Test for parse_arguments with --version
+# @tag    @UT1.6@ (FROM: @IMP1.6@)
+test_parse_arguments_version2() {
+	# Arrange ---------
+	# Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "--version" 2>&1
+	)"
+	_USAGE="$(print_usage 2>&1)"
+
+	# Assert ----------
+	assertEquals "$_USAGE" "$_RETURN_VALUE"
+}
+
+##
+# @brief  Test for parse_arguments with --varsion
+# @tag    @UT1.7@ (FROM: @IMP1.6@)
+test_parse_arguments_version3() {
+	# Arrange ---------
+	# Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "--varsion" 2>&1
+	)"
+	_USAGE="$(print_usage 2>&1)"
+
+	# Assert ----------
+	assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
 }
 
 . "./shunit2/shunit2"

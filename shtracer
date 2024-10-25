@@ -101,6 +101,8 @@ parse_arguments() {
 
 	if [ $# -eq 1 ] && [ "_$1" = '_-t' ]; then
 		SHTRACER_MODE='TEST'
+	elif [ $# -eq 1 ] && [ "_${1#-}" != "_$1" ] ; then
+		error_exit 1 'Invalid argument'
 	elif [ $# -eq 1 ]; then
 		SHTRACER_MODE='NORMAL'
 	elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
