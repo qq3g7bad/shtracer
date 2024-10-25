@@ -93,34 +93,29 @@ error_exit() {
 # @brief  Parse arguments
 # @tag    @IMP1.5@ (FROM: @ARC1.2@)
 parse_arguments() {
-	case "$#${1:-}${2:-}" in
-	1-h | 1-v | 1--help | 1--version)
+	case "$#${1:-}${2:-}${3:-}${4:-}" in
+	1-h | 1-v | 1--help | 1--version) # Print usage
 		print_usage
 		;;
-	1-t)
-		# Test mode
+	1-t) # Test mode
 		SHTRACER_MODE='TEST'
 		;;
-	1-*)
-		# Undefined option
+	1-*) # Undefined option
 		error_exit 1 'Invalid argument'
 		;;
-	1*)
-		# Normal mode
+	1*) # Normal mode
 		SHTRACER_MODE='NORMAL'
 		;;
-	2*-v)
-    # Verify mode
+	2*-v)	# Verify mode
 		SHTRACER_MODE='VERIFY'
 		;;
+	4*-c*) # Change mode
+		SHTRACER_MODE='CHANGE'
+		BEFORE_TAG="$3"
+		AFTER_TAG="$4"
+		;;
 	*)
-		if [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
-			SHTRACER_MODE='CHANGE_TAGS'
-			BEFORE_TAG="$3"
-			AFTER_TAG="$4"
-		else
-			error_exit 1 'Invalid argument'
-		fi
+		error_exit 1 'Invalid argument'
 		;;
 	esac
 
@@ -147,7 +142,7 @@ main_routine() {
 		parse_arguments "$@"
 
 		# Tag change mode
-		if [ "$SHTRACER_MODE" = 'CHANGE_TAGS' ]; then
+		if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
 			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
 		# Verify mode
 		elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
