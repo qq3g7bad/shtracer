@@ -206,4 +206,15 @@ test_parse_arguments_help2() {
 	assertEquals "$_USAGE" "$_RETURN_VALUE"
 }
 
+##
+# @brief  Test for parse_arguments with -t
+# @tag    @UT1.11@ (FROM: @IMP1.5@)
+test_parse_arguments_test() {
+  # Arrange ---------
+  # Act -------------
+  parse_arguments "-t"
+  # Assert ----------
+  assertEquals "$SHTRACER_MODE" "TEST"
+}
+
 . "./shunit2/shunit2"
