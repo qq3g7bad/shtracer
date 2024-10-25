@@ -230,4 +230,14 @@ test_parse_arguments_undefined_option() {
 	assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
 }
 
+##
+# @brief  Test for parse_arguments with normal mode
+# @tag    @UT1.13@ (FROM: @IMP1.5@)
+test_parse_arguments_normal_mode() {
+  # Arrange ---------
+  # Act -------------
+  parse_arguments "./shtracer_test.sh"
+  # Assert ----------
+  assertEquals "$SHTRACER_MODE" "NORMAL"
+}
 . "./shunit2/shunit2"
