@@ -253,7 +253,7 @@ test_parse_arguments_verify_mode() {
 }
 
 ##
-# @brief  Test for parse_arguments with -v
+# @brief  Test for parse_arguments in change mode
 # @tag    @UT1.15@ (FROM: @IMP1.5@)
 test_parse_arguments_change_mode() {
   # Arrange ---------
@@ -262,4 +262,18 @@ test_parse_arguments_change_mode() {
   # Assert ----------
   assertEquals "$SHTRACER_MODE" "CHANGE"
 }
+
+##
+# @brief  Test for parse_arguments with non-existent config file
+# @tag    @UT1.16@ (FROM: @IMP1.5@)
+test_parse_arguments_with_non_existent_config_file() {
+  # Arrange ---------
+  # Act -------------
+	_RETURN_VALUE="$(
+		parse_arguments "non_existent_file" 2>&1
+	)"
+	# Assert ----------
+	assertEquals "shtracer_test.sh: non_existent_file does not exist" "$_RETURN_VALUE"
+}
+
 . "./shunit2/shunit2"
