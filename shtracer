@@ -135,31 +135,28 @@ parse_arguments() {
 # @brief  Main routine
 # @tag    @IMP1.6@ (FROM: @ARC1.1@)
 main_routine() {
-	(
-		init_environment
-		load_functions
-		parse_arguments "$@"
+	init_environment
+	load_functions
+	parse_arguments "$@"
 
-		# Tag change mode
-		if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
-			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
-		# Verify mode
-		elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-			TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
-			TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
-			verify_tags "$TAG_FOR_VERIFY"
-		# Test mode
-		elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-			sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
-		# Normal mode
-		else
-			TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"
-			JOINED_TAG_TABLE="$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
-			sort <"$JOINED_TAG_TABLE" -k1,1
-			make_target_flowchart "$CONFIG_OUTPUT"
-		fi
-
-	)
+	# Tag change mode
+	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
+		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+	# Verify mode
+	elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+		TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
+		TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
+		verify_tags "$TAG_FOR_VERIFY"
+	# Test mode
+	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
+		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+	# Normal mode
+	else
+		TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"
+		JOINED_TAG_TABLE="$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
+		sort <"$JOINED_TAG_TABLE" -k1,1
+		make_target_flowchart "$CONFIG_OUTPUT"
+	fi
 }
 
 case "$0" in

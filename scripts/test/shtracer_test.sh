@@ -209,19 +209,19 @@ test_parse_arguments_help2() {
 # @brief  Test for parse_arguments with -t
 # @tag    @UT1.11@ (FROM: @IMP1.5@)
 test_parse_arguments_test() {
-  # Arrange ---------
-  # Act -------------
-  parse_arguments "-t"
-  # Assert ----------
-  assertEquals "$SHTRACER_MODE" "TEST"
+	# Arrange ---------
+	# Act -------------
+	parse_arguments "-t"
+	# Assert ----------
+	assertEquals "$SHTRACER_MODE" "TEST"
 }
 
 ##
 # @brief  Test for parse_arguments with undefined option
 # @tag    @UT1.12@ (FROM: @IMP1.5@)
 test_parse_arguments_undefined_option() {
-  # Arrange ---------
-  # Act -------------
+	# Arrange ---------
+	# Act -------------
 	_RETURN_VALUE="$(
 		parse_arguments "-T" 2>&1
 	)"
@@ -234,41 +234,41 @@ test_parse_arguments_undefined_option() {
 # @brief  Test for parse_arguments with normal mode
 # @tag    @UT1.13@ (FROM: @IMP1.5@)
 test_parse_arguments_normal_mode() {
-  # Arrange ---------
-  # Act -------------
-  parse_arguments "$0"
-  # Assert ----------
-  assertEquals "$SHTRACER_MODE" "NORMAL"
+	# Arrange ---------
+	# Act -------------
+	parse_arguments "$0"
+	# Assert ----------
+	assertEquals "$SHTRACER_MODE" "NORMAL"
 }
 
 ##
 # @brief  Test for parse_arguments with -v
 # @tag    @UT1.14@ (FROM: @IMP1.5@)
 test_parse_arguments_verify_mode() {
-  # Arrange ---------
-  # Act -------------
-  parse_arguments "$0" "-v"
-  # Assert ----------
-  assertEquals "$SHTRACER_MODE" "VERIFY"
+	# Arrange ---------
+	# Act -------------
+	parse_arguments "$0" "-v"
+	# Assert ----------
+	assertEquals "$SHTRACER_MODE" "VERIFY"
 }
 
 ##
 # @brief  Test for parse_arguments in change mode
 # @tag    @UT1.15@ (FROM: @IMP1.5@)
 test_parse_arguments_change_mode() {
-  # Arrange ---------
-  # Act -------------
-  parse_arguments "$0" "-c" "old_tag" "new_tag"
-  # Assert ----------
-  assertEquals "$SHTRACER_MODE" "CHANGE"
+	# Arrange ---------
+	# Act -------------
+	parse_arguments "$0" "-c" "old_tag" "new_tag"
+	# Assert ----------
+	assertEquals "$SHTRACER_MODE" "CHANGE"
 }
 
 ##
 # @brief  Test for parse_arguments with non-existent config file
 # @tag    @UT1.16@ (FROM: @IMP1.5@)
 test_parse_arguments_with_non_existent_config_file() {
-  # Arrange ---------
-  # Act -------------
+	# Arrange ---------
+	# Act -------------
 	_RETURN_VALUE="$(
 		parse_arguments "non_existent_file" 2>&1
 	)"
@@ -276,17 +276,48 @@ test_parse_arguments_with_non_existent_config_file() {
 	assertEquals "shtracer_test.sh: non_existent_file does not exist" "$_RETURN_VALUE"
 }
 
+##
 # @brief  Test for parse_arguments with config file
 # @tag    @UT1.17@ (FROM: @IMP1.5@)
 test_parse_arguments_with_config_file() {
-  # Arrange ---------
-  # Act -------------
-  parse_arguments "$0"
+	# Arrange ---------
+	# Act -------------
+	parse_arguments "$0"
 	# Assert ----------
 	assertEquals "$0" "$CONFIG_PATH"
-  assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
-  assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
-  assertNotEquals "" "$CONFIG_OUTPUT"
+	assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
+	assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
+	assertNotEquals "" "$CONFIG_OUTPUT"
+}
+
+##
+# @brief  Test for main_routine
+# @tag    @UT1.1@ (FROM: @IMP1.1@)
+test_main_routine() {
+	# Arrange ---------
+	set -u
+
+	# Act -------------
+  main_routine "../../sample/config.md" > /dev/null
+	IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
+	IFS=' '
+
+  # Assert ----------
+
+  # main_routine returned value
+	assertEquals "$?" "0"
+
+  # init_environment
+	assertEquals "0a" "$IFS_HEX"
+
+  # load_functions
+	(
+		echo "$_SHTRACER_FUNC_SH" >/dev/null
+	) 2>/dev/null
+	assertEquals 0 "$?"
+
+  # parse_arguments
+	assertEquals "$SHTRACER_MODE" "NORMAL"
 }
 
 . "./shunit2/shunit2"
