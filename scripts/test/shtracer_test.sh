@@ -276,4 +276,17 @@ test_parse_arguments_with_non_existent_config_file() {
 	assertEquals "shtracer_test.sh: non_existent_file does not exist" "$_RETURN_VALUE"
 }
 
+# @brief  Test for parse_arguments with config file
+# @tag    @UT1.17@ (FROM: @IMP1.5@)
+test_parse_arguments_with_config_file() {
+  # Arrange ---------
+  # Act -------------
+  parse_arguments "$0"
+	# Assert ----------
+	assertEquals "$0" "$CONFIG_PATH"
+  assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
+  assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
+  assertNotEquals "" "$CONFIG_OUTPUT"
+}
+
 . "./shunit2/shunit2"
