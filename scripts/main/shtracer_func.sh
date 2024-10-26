@@ -291,9 +291,12 @@ make_tag_table() {
 # @param  $1 : JOINED_TAG_TABLE
 # @param  $2 : TAG_TABLE
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
-# @ATTENTION   When not acceptable data is passed, this function repeat infinitely...
 join_tag_table() {
 	(
+		if [ ! -r "$1" ]; then
+			error_exit 111 "JOINED_TAG_TABLE (\"$1\") is not existed"
+		fi
+
 		_JOINED_TAG_TABLE="$1"
 		_TAG_TABLE_DOWNSTREAM="$2"
 

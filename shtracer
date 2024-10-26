@@ -19,24 +19,10 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 #
 
 ##
-# @brief  Initialize environment
-# @tag    @IMP1.1@ (FROM: @ARC1.2@)
-init_environment() {
-	set -u
-	umask 0022
-	export LC_ALL=C
-
-	PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
-	export PATH
-	case $PATH in :*) PATH=${PATH#?} ;; esac
-	IFS='
-'
-}
-
-##
 # @brief  Load helper functions
 # @tag    @IMP1.2@ (FROM: @ARC1.2@)
 load_functions() {
+	. "${SCRIPT_DIR%/}/scripts/main/shtracer_util.sh"
 	. "${SCRIPT_DIR%/}/scripts/main/shtracer_func.sh"
 	. "${SCRIPT_DIR%/}/scripts/main/shtracer_uml.sh"
 }
@@ -76,18 +62,6 @@ print_usage() {
 
 	USAGE
 	exit 1
-}
-
-##
-# @brief  Echo error message and exit
-# @param  $1 : Error code
-# @param  $2 : Error message
-# @tag    @IMP1.4@ (FROM: @ARC1.2@)
-error_exit() {
-	if [ -n "$2" ]; then
-		echo "${0##*/}: $2" 1>&2
-	fi
-	exit "$1"
 }
 
 ##
@@ -140,8 +114,8 @@ parse_arguments() {
 # @brief  Main routine
 # @tag    @IMP1.6@ (FROM: @ARC1.1@)
 main_routine() {
-	init_environment
 	load_functions
+	init_environment
 	parse_arguments "$@"
 
 	_OUTPUT_STRING="$(

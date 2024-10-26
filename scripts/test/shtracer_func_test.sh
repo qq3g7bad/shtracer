@@ -2,6 +2,7 @@
 
 # Source test target
 . "../main/shtracer_func.sh"
+. "../main/shtracer_util.sh"
 
 ##
 # @brief  SetUp function for each test
@@ -87,4 +88,16 @@ test_make_tags() {
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
 }
+
+##
+# @brief  Test for join_tag_table
+# @tag    @UT1.1@ (FROM: @IMP1.1@)
+test_join_tag_table() {
+	# Arrange ---------
+	# Act -------------
+	join_tag_table
+	# Assert ----------
+	assertEquals 0 "$?"
+}
+
 . "./shunit2/shunit2"

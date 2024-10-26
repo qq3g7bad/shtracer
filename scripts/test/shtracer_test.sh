@@ -2,6 +2,7 @@
 
 # Source test target
 . "../../shtracer"
+. "../main/shtracer_util.sh"
 
 sh -c "./shtracer_func_test.sh"
 
