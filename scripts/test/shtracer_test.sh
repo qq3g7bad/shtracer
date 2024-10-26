@@ -4,7 +4,7 @@
 . "../../shtracer"
 
 ##
-# @brief
+# @brief  SetUp function for each test
 #
 setUp() {
 	set +u
@@ -12,7 +12,7 @@ setUp() {
 }
 
 ##
-# @brief
+# @brief TearDown function for each test
 #
 tearDown() {
 	:
