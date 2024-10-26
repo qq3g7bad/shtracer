@@ -3,6 +3,8 @@
 # Source test target
 . "../../shtracer"
 
+sh -c "./shtracer_func_test.sh"
+
 ##
 # @brief  SetUp function for each test
 #
@@ -318,6 +320,8 @@ test_main_routine() {
 
   # parse_arguments
 	assertEquals "$SHTRACER_MODE" "NORMAL"
+
+  # TODO: add tests if functions of each mode are called
 }
 
 . "./shunit2/shunit2"
