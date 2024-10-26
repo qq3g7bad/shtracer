@@ -4,16 +4,16 @@
 _SHTRACER_FUNC_SH=""
 
 case "$0" in
-  *shtracer)
-    : # Successfully sourced from shtracer.
-    ;;
-  *shtracer*test*)
-    : # Successfully sourced from shtracer.
-    ;;
-  *)
-    echo "This script should only be sourced, not executed directly."
-    exit 1
-    ;;
+*shtracer)
+	: # Successfully sourced from shtracer.
+	;;
+*shtracer*test*)
+	: # Successfully sourced from shtracer.
+	;;
+*)
+	echo "This script should only be sourced, not executed directly."
+	exit 1
+	;;
 esac
 
 ##
@@ -291,6 +291,7 @@ make_tag_table() {
 # @param  $1 : JOINED_TAG_TABLE
 # @param  $2 : TAG_TABLE
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
+# @ATTENTION   When not acceptable data is passed, this function repeat infinitely...
 join_tag_table() {
 	(
 		_JOINED_TAG_TABLE="$1"
@@ -342,7 +343,7 @@ verify_tags() {
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
-# @tag    @IMP2.6@ (FROM: )
+# @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
 	(
 		# Read config parse results (tag information are included in one line)
@@ -379,4 +380,3 @@ swap_tags() {
 			done
 	)
 }
-

@@ -8,8 +8,11 @@
 #
 setUp() {
 	set +u
-	SCRIPT_DIR="../../"
+	# SCRIPT_DIR="../../"
+	SHTRACER_SEPARATOR="<shtracer_separator>"
+	NODATA_STRING="NONE"
 	OUTPUT_DIR="./output/"
+	CONFIG_DIR="./testdata/"
 	rm -rf "$OUTPUT_DIR"
 }
 
@@ -30,14 +33,14 @@ test_check_configfile() {
 		# Act -------------
 
 		_RETURN_VALUE="$(check_configfile "./testdata/config.md")"
-		# cat ./output/config/1 > "${OUTPUT_DIR%/}/config/check_configfile_output1"
-		# cat ./output/config/2 > "${OUTPUT_DIR%/}/config/check_configfile_output2"
+		# cat "${OUTPUT_DIR%/}/config/1" > "${CONFIG_DIR%/}/answer/check_configfile_output1"
+		# cat "${OUTPUT_DIR%/}/config/2" >"${CONFIG_DIR%/}/answer/check_configfile_output2"
 
 		# Assert ----------
 
 		# mkdir
 		assertEquals 0 "$(
-			[ -d ./output/config/ ]
+			[ -d "${OUTPUT_DIR%/}/config/" ]
 			echo "$?"
 		)"
 
@@ -46,14 +49,42 @@ test_check_configfile() {
 
 		# Level1
 		_ANSWER="$(cat ./testdata/answer/check_configfile_output1)"
-		_TEST_DATA="$(cat ./output/config/1)"
+		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/1")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 
 		# Level2
 		_ANSWER="$(cat ./testdata/answer/check_configfile_output2)"
-		_TEST_DATA="$(cat ./output/config/2)"
+		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/2")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
 }
 
+##
+# @brief  Test for make_tags
+# @tag    @UT2.2@ (FROM: @IMP2.2@)
+test_make_tags() {
+	(
+		# Arrange ---------
+		# Act -------------
+
+		_RETURN_VALUE="$(make_tags "./testdata/answer/check_configfile_output2")"
+		cat ./output/tags/1 >"${CONFIG_DIR%/}/answer/check_make_tags_output1"
+
+		# Assert ----------
+
+		# mkdir
+		assertEquals 0 "$(
+			[ -d "${OUTPUT_DIR%/}/tags/" ]
+			echo "$?"
+		)"
+
+		# output filename
+		assertEquals 1 "${_RETURN_VALUE##*/}"
+
+		# Level1
+		_ANSWER="$(cat ./testdata/answer/check_make_tags_output1)"
+		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/1")"
+		assertEquals "$_ANSWER" "$_TEST_DATA"
+	)
+}
 . "./shunit2/shunit2"

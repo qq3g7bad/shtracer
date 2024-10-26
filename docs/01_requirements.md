@@ -43,7 +43,15 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 * **TAG-TITLE OFFSET**: 2
 ```
 
-* Tags are searched by the combination `TAG FORMAT` and `TAG LINE FORMAT`. So that this `@REQ1.1.1@` will not be extracted by shtracer. This pseudo-tag (`@REQ1.1.1@`) has `TAG FORMAT` but has no `TAG LINE FORMAT`.
+* Tags are searched by the combination `TAG FORMAT` and `TAG LINE FORMAT`.
+  * So that this `@REQ1.1.1@` will not be extracted by shtracer.
+  * This pseudo-tag (`@REQ1.1.1@`) has `TAG FORMAT` but has no `TAG LINE FORMAT`.
+
+<!-- @REQ1.2.1@ -->
+#### Tracing Tags by Content vs. Filename
+
+* If `TAG_FORMAT` is not empty, shtracer open filename.
+* If `TAG_FORMAT` is empty, shtracer trace only by filename.
 
 <!-- @REQ1.3@ -->
 ### The file structure can be convert to UML format by executing scripts.
