@@ -26,12 +26,15 @@ tearDown() {
 test_check_configfile() {
 	(
 		# Arrange ---------
+
 		# Act -------------
+
 		_RETURN_VALUE="$(check_configfile "./testdata/config.md")"
 		# cat ./output/config/1 > "${OUTPUT_DIR%/}/config/check_configfile_output1"
 		# cat ./output/config/2 > "${OUTPUT_DIR%/}/config/check_configfile_output2"
 
 		# Assert ----------
+
 		# mkdir
 		assertEquals 0 "$(
 			[ -d ./output/config/ ]
