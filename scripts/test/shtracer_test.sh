@@ -37,56 +37,59 @@ test_default_global_constant() {
 # @brief  Test for init_environment
 # @tag    @UT1.1@ (FROM: @IMP1.1@)
 test_init_environment() {
-
-	# Arrange ---------
-	_TMP_PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
-
-	# Act -------------
-	init_environment
-
-	# Assert ----------
-
-	# IFS='\n'
-	IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
-	IFS=' '
-	assertEquals "0a" "$IFS_HEX"
-
-	# set -u : ERROR for _UNDEFINED_VAR
 	(
-		echo "$_UNDEFINED_VAR"
-	) 2>/dev/null
-	assertNotEquals 0 "$?"
+		# Arrange ---------
+		_TMP_PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
 
-	# umask 0022
-	assertEquals 0022 "$(umask)"
+		# Act -------------
+		init_environment
 
-	# export LC_ALL=C
-	assertEquals "C" "$LC_ALL"
+		# Assert ----------
 
-	# PATH
-	assertEquals "$PATH" "$_TMP_PATH"
+		# IFS='\n'
+		IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
+		IFS=' '
+		assertEquals "0a" "$IFS_HEX"
+
+		# set -u : ERROR for _UNDEFINED_VAR
+		(
+			echo "$_UNDEFINED_VAR"
+		) 2>/dev/null
+		assertNotEquals 0 "$?"
+
+		# umask 0022
+		assertEquals 0022 "$(umask)"
+
+		# export LC_ALL=C
+		assertEquals "C" "$LC_ALL"
+
+		# PATH
+		assertEquals "$PATH" "$_TMP_PATH"
+	)
 }
 
 ##
 # @brief  Test for load functions
 # @tag    @UT1.2@ (FROM: @IMP1.2@)
 test_load_functions() {
-	# Arrange ---------
-	set -u
-
-	# Act -------------
-	load_functions
-
-	# Assert ----------
 	(
-		echo "$_SHTRACER_FUNC_SH" >/dev/null
-	) 2>/dev/null
-	assertEquals 0 "$?"
+		# Arrange ---------
+		set -u
 
-	(
-		echo "$_SHTRACER_UML_SH" >/dev/null
-	) 2>/dev/null
-	assertEquals 0 "$?"
+		# Act -------------
+		load_functions
+
+		# Assert ----------
+		(
+			echo "$_SHTRACER_FUNC_SH" >/dev/null
+		) 2>/dev/null
+		assertEquals 0 "$?"
+
+		(
+			echo "$_SHTRACER_UML_SH" >/dev/null
+		) 2>/dev/null
+		assertEquals 0 "$?"
+	)
 }
 
 ##
@@ -212,6 +215,7 @@ test_parse_arguments_help2() {
 # @tag    @UT1.11@ (FROM: @IMP1.5@)
 test_parse_arguments_test() {
 	# Arrange ---------
+	load_functions
 	# Act -------------
 	parse_arguments "-t"
 	# Assert ----------
@@ -237,6 +241,7 @@ test_parse_arguments_undefined_option() {
 # @tag    @UT1.13@ (FROM: @IMP1.5@)
 test_parse_arguments_normal_mode() {
 	# Arrange ---------
+	load_functions
 	# Act -------------
 	parse_arguments "$0"
 	# Assert ----------
@@ -248,6 +253,7 @@ test_parse_arguments_normal_mode() {
 # @tag    @UT1.14@ (FROM: @IMP1.5@)
 test_parse_arguments_verify_mode() {
 	# Arrange ---------
+	load_functions
 	# Act -------------
 	parse_arguments "$0" "-v"
 	# Assert ----------
@@ -259,6 +265,7 @@ test_parse_arguments_verify_mode() {
 # @tag    @UT1.15@ (FROM: @IMP1.5@)
 test_parse_arguments_change_mode() {
 	# Arrange ---------
+	load_functions
 	# Act -------------
 	parse_arguments "$0" "-c" "old_tag" "new_tag"
 	# Assert ----------
@@ -283,6 +290,7 @@ test_parse_arguments_with_non_existent_config_file() {
 # @tag    @UT1.17@ (FROM: @IMP1.5@)
 test_parse_arguments_with_config_file() {
 	# Arrange ---------
+	load_functions
 	# Act -------------
 	parse_arguments "$0"
 	# Assert ----------
@@ -300,28 +308,28 @@ test_main_routine() {
 	set -u
 
 	# Act -------------
-  main_routine "../../sample/config.md" > /dev/null
+	main_routine "../../sample/config.md" >/dev/null
 	IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 	IFS=' '
 
-  # Assert ----------
+	# Assert ----------
 
-  # main_routine returned value
+	# main_routine returned value
 	assertEquals "$?" "0"
 
-  # init_environment
+	# init_environment
 	assertEquals "0a" "$IFS_HEX"
 
-  # load_functions
+	# load_functions
 	(
 		echo "$_SHTRACER_FUNC_SH" >/dev/null
 	) 2>/dev/null
 	assertEquals 0 "$?"
 
-  # parse_arguments
+	# parse_arguments
 	assertEquals "$SHTRACER_MODE" "NORMAL"
 
-  # TODO: add tests if functions of each mode are called
+	# TODO: add tests if functions of each mode are called
 }
 
 . "./shunit2/shunit2"
