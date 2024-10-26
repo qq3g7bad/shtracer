@@ -54,8 +54,8 @@ print_usage() {
 		  -h, --help                       Show this help message
 
 		Examples:
-      1. Normal mode
-         $ ./shtracer ./sample/config.md
+		      1. Normal mode
+		         $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
 		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
@@ -71,7 +71,7 @@ print_usage() {
 		  - The -o option is optional and can be used with both change mode and verify mode.
 
 		Version:
-		      - 0.0.1
+		  - 0.0.1
 
 	USAGE
 	exit 1
@@ -92,70 +92,71 @@ error_exit() {
 ##
 # @brief  Parse arguments
 # @tag    @IMP1.5@ (FROM: @ARC1.2@)
-# @TODO   change output location
 parse_arguments() {
-	case "$#${1:-}" in
-	1-h | 1-v | 1--help | 1--version)
+	case "$#${1:-}${2:-}${3:-}${4:-}" in
+	1-h | 1-v | 1--help | 1--version) # Print usage
 		print_usage
+		;;
+	1-t) # Test mode
+		SHTRACER_MODE='TEST'
+		return
+		;;
+	1-*) # Undefined option
+		error_exit 1 'Invalid argument'
+		;;
+	1*) # Normal mode
+		SHTRACER_MODE='NORMAL'
+		;;
+	2*-v) # Verify mode
+		SHTRACER_MODE='VERIFY'
+		;;
+	4*-c*) # Change mode
+		SHTRACER_MODE='CHANGE'
+		BEFORE_TAG="$3"
+		AFTER_TAG="$4"
+		;;
+	*)
+		error_exit 1 'Invalid argument'
 		;;
 	esac
 
-	if [ $# -eq 1 ] && [ "_$1" = '_-t' ]; then
-		SHTRACER_MODE='TEST'
-	elif [ $# -eq 1 ]; then
-		SHTRACER_MODE='NORMAL'
-	elif [ $# -eq 2 ] && [ "_$2" = '_-v' ]; then
-		SHTRACER_MODE='VERIFY'
-	elif [ $# -eq 4 ] && [ "_$2" = '_-c' ]; then
-		SHTRACER_MODE='CHANGE_TAGS'
-		BEFORE_TAG="$3"
-		AFTER_TAG="$4"
-	else
-		error_exit 1 'Invalid argument'
-	fi
-
 	# Check if config file exists
-	if [ "$SHTRACER_MODE" != 'TEST' ]; then
-		if [ ! -r "$1" ]; then
-			error_exit 1 "$1 does not exist"
-		fi
-
-		CONFIG_PATH="$1"
-		CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
-		OUTPUT_DIR="${CONFIG_DIR%/}/output/"
-		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+	if [ ! -r "$1" ]; then
+		error_exit 1 "$1 does not exist"
 	fi
+
+	CONFIG_PATH="$1"
+	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
+	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+	CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
 }
 
 ##
 # @brief  Main routine
 # @tag    @IMP1.6@ (FROM: @ARC1.1@)
 main_routine() {
-	(
-		init_environment
-		load_functions
-		parse_arguments "$@"
+	init_environment
+	load_functions
+	parse_arguments "$@"
 
-		# Tag change mode
-		if [ "$SHTRACER_MODE" = 'CHANGE_TAGS' ]; then
-			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
-		# Verify mode
-		elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-			TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
-			TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
-			verify_tags "$TAG_FOR_VERIFY"
-		# Test mode
-		elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-			sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
-		# Normal mode
-		else
-			TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"
-			JOINED_TAG_TABLE="$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
-			sort <"$JOINED_TAG_TABLE" -k1,1
-			make_target_flowchart "$CONFIG_OUTPUT"
-		fi
-
-	)
+	# Tag change mode
+	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
+		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+	# Verify mode
+	elif [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+		TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
+		TAG_FOR_VERIFY=$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')
+		verify_tags "$TAG_FOR_VERIFY"
+	# Test mode
+	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
+		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+	# Normal mode
+	else
+		TAG_OUTPUT="$(make_tags "$CONFIG_OUTPUT")"
+		JOINED_TAG_TABLE="$(make_tag_table "$TAG_OUTPUT" | awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
+		sort <"$JOINED_TAG_TABLE" -k1,1
+		make_target_flowchart "$CONFIG_OUTPUT"
+	fi
 }
 
 case "$0" in

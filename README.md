@@ -145,7 +145,7 @@ Note:
   - The -o option is optional and can be used with both change mode and verify mode.
 
 Version:
-      - 0.0.1
+  - 0.0.1
 ```
 
 ### Change tag mode

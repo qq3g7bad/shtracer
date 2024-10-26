@@ -42,8 +42,11 @@
 <!-- IF THERE ARE TOO MANY TRACE TARGET LIKE SOFTWARE REPOSITORY, -->
 <!-- USE DIRECTORY PATHS TO TRACE. -->
 
-* **PATH**: "../scripts/test/main/"
+* **PATH**: "../scripts/test/"
   * **BRIEF**: "All files are shell scripts."
+  * **EXTENSION FILTER**: "*.sh"
+  * **TAG FORMAT**: `@UT[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
 
 ### Optional scripts
 

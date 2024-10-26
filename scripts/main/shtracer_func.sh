@@ -1,7 +1,13 @@
 #!/bin/sh
 
+# For unit test
+_SHTRACER_FUNC_SH=""
+
 case "$0" in
   *shtracer)
+    : # Successfully sourced from shtracer.
+    ;;
+  *shtracer*test*)
     : # Successfully sourced from shtracer.
     ;;
   *)
@@ -196,7 +202,7 @@ make_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.3@ (FRO: @ARC2.2@)
+# @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ -e "$1" ]; then
 		:
@@ -313,6 +319,7 @@ join_tag_table() {
 ##
 # @brief
 # @param  $1 : DOWNSTREAM_TAG_TABLE
+# @tag    @IMP2.5@ (FROM: )
 verify_tags() {
 	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
@@ -335,7 +342,7 @@ verify_tags() {
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
-# @tag    @IMP3.1@ (FROM: @ARC2.4@)
+# @tag    @IMP2.6@ (FROM: )
 swap_tags() {
 	(
 		# Read config parse results (tag information are included in one line)
@@ -373,14 +380,3 @@ swap_tags() {
 	)
 }
 
-case "$0" in
-*shtracer)
-	:
-	;;
-*)
-	(
-		echo "shtracer: Do not use source/dot commands."
-		echo "shtracer: Use source/dot commands for unit tests. "
-	)
-	;;
-esac
