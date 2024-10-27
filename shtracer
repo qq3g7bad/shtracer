@@ -20,11 +20,14 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 ##
 # @brief  Load helper functions
-# @tag    @IMP1.2@ (FROM: @ARC1.2@)
+# @tag    @IMP1.1@ (FROM: @ARC1.2@)
 load_functions() {
-	. "${SCRIPT_DIR%/}/scripts/main/shtracer_util.sh"
-	. "${SCRIPT_DIR%/}/scripts/main/shtracer_func.sh"
-	. "${SCRIPT_DIR%/}/scripts/main/shtracer_uml.sh"
+	_PREVIOUS_DIR="$(pwd)"
+	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
+	. "./scripts/main/shtracer_util.sh"
+	. "./scripts/main/shtracer_func.sh"
+	. "./scripts/main/shtracer_uml.sh"
+	cd "${_PREVIOUS_DIR}" || error_exit 1 "cannot change current directory"
 }
 
 ##
@@ -148,6 +151,7 @@ main_routine() {
 
 case "$0" in
 *shtracer)
+	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
 	main_routine "$@"
 	;;
 *)

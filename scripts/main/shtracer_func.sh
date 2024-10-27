@@ -294,7 +294,7 @@ make_tag_table() {
 join_tag_table() {
 	(
 		if [ ! -r "$1" ]; then
-			error_exit 111 "JOINED_TAG_TABLE (\"$1\") is not existed"
+			error_exit 1 "JOINED_TAG_TABLE (\"$1\") is not existed"
 		fi
 
 		_JOINED_TAG_TABLE="$1"

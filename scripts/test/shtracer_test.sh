@@ -36,7 +36,7 @@ test_default_global_constant() {
 
 ##
 # @brief  Test for init_environment
-# @tag    @UT1.1@ (FROM: @IMP1.1@)
+# @tag    @UT1.1@ (FROM: @IMP4.1@)
 test_init_environment() {
 	(
 		# Arrange ---------
@@ -71,11 +71,10 @@ test_init_environment() {
 
 ##
 # @brief  Test for load functions
-# @tag    @UT1.2@ (FROM: @IMP1.2@)
+# @tag    @UT1.2@ (FROM: @IMP1.1@)
 test_load_functions() {
 	(
 		# Arrange ---------
-		set -u
 
 		# Act -------------
 		load_functions
@@ -111,7 +110,7 @@ test_print_usage() {
 
 ##
 # @brief  Test for error_exit
-# @tag    @UT1.4@ (FROM: @IMP1.4@)
+# @tag    @UT1.4@ (FROM: @IMP4.2@)
 test_error_exit() {
 	(
 		# Arrange ---------
@@ -332,7 +331,7 @@ test_parse_arguments_with_config_file() {
 
 ##
 # @brief  Test for main_routine
-# @tag    @UT1.1@ (FROM: @IMP1.1@)
+# @tag    @UT1.1@ (FROM: @IMP4.1@)
 test_main_routine() {
 	(
 		# Arrange ---------

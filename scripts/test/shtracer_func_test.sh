@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # Source test target
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+cd "${SCRIPT_DIR}" || exit 1
+
 . "../main/shtracer_func.sh"
 . "../main/shtracer_util.sh"
 
@@ -9,7 +12,6 @@
 #
 setUp() {
 	set +u
-	# SCRIPT_DIR="../../"
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	NODATA_STRING="NONE"
 	OUTPUT_DIR="./output/"
@@ -91,13 +93,13 @@ test_make_tags() {
 
 ##
 # @brief  Test for join_tag_table
-# @tag    @UT1.1@ (FROM: @IMP1.1@)
-test_join_tag_table() {
+# @tag    @UT2.3@ (FROM: @IMP2.4@)
+test_join_tag_table_without_argument() {
 	# Arrange ---------
 	# Act -------------
-	join_tag_table
+	join_tag_table >/dev/null 2>&1
 	# Assert ----------
-	assertEquals 0 "$?"
+	assertEquals 1 "$?"
 }
 
 . "./shunit2/shunit2"

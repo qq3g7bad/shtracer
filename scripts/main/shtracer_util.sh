@@ -2,7 +2,7 @@
 
 ##
 # @brief  Initialize environment
-# @tag    @IMP1.1@ (FROM: @ARC1.2@)
+# @tag    @IMP4.1@ (FROM: @ARC1.2@)
 init_environment() {
 	set -u
 	umask 0022
@@ -19,11 +19,10 @@ init_environment() {
 # @brief  Echo error message and exit
 # @param  $1 : Error code
 # @param  $2 : Error message
-# @tag    @IMP1.4@ (FROM: @ARC1.2@)
+# @tag    @IMP4.2@ (FROM: @ARC1.2@)
 error_exit() {
 	if [ -n "$2" ]; then
 		echo "${0##*/}: $2" 1>&2
 	fi
 	exit "$1"
 }
-
