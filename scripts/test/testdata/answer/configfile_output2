@@ -1,0 +1,1 @@
+:Requirement<shtracer_separator>"./testdata1.md"<shtracer_separator><shtracer_separator>"Describes requirements as specifications."<shtracer_separator>`@TD[0-9\.]+@`<shtracer_separator>`<!--.*-->`<shtracer_separator>1
