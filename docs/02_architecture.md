@@ -18,7 +18,7 @@
 ```mermaid
 stateDiagram
 
-rtm:Requirement traceability matrix (RTM)
+rtm:Requirements traceability matrix (RTM)
 
 input:Input
 opt_input:Optional input files
@@ -114,7 +114,7 @@ NONE @REQ1.2@
 NONE @REQ1.3@
 @REQ1.2@ @ARC2.1@
 @REQ1.4@ @ARC2.1@
-@ARC2.1@ @IMP1.1@
+@ARC2.1@ @IMP4.1@
 ```
 
 <!-- @ARC2.3@ (FROM: @REQ2.1@, @REQ3.2.1@, @REQ6.1@) -->

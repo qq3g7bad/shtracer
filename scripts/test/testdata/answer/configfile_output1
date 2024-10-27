@@ -1,0 +1,7 @@
+# config.md
+## Requirement
+PATH: "./testdata1.md"
+BRIEF: "Describes requirements as specifications."
+TAG FORMAT: `@TD[0-9\.]+@`
+TAG LINE FORMAT: `<!--.*-->`
+TAG-TITLE OFFSET: 1

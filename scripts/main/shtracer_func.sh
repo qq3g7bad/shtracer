@@ -1,5 +1,21 @@
 #!/bin/sh
 
+# For unit test
+_SHTRACER_FUNC_SH=""
+
+case "$0" in
+*shtracer)
+	: # Successfully sourced from shtracer.
+	;;
+*shtracer*test*)
+	: # Successfully sourced from shtracer.
+	;;
+*)
+	echo "This script should only be sourced, not executed directly."
+	exit 1
+	;;
+esac
+
 ##
 # @brief
 # @param  $1 : CONFIG_MARKDOWN_PATH
@@ -84,8 +100,15 @@ check_configfile() {
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
 make_tags() {
-	(
 
+	if [ -e "$1" ]; then
+		:
+	else
+		error_exit 1 "cannot find a config output data."
+		return
+	fi
+
+	(
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/1"
 
@@ -186,12 +209,10 @@ make_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.3@ (FRO: @ARC2.2@)
+# @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
-	if [ -e "$1" ]; then
-		:
-	else
-		error_exit 1 "Can't find a tag table."
+	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
+		error_exit 1 "incorrect argument."
 	fi
 
 	(
@@ -264,7 +285,11 @@ make_tag_table() {
 			uniq -u >"$_TAG_TABLE_UNIQ"
 
 		# Make joined tag table (each row has a single trace tag chain)
-		join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+		if [ "$(wc -l <"$_TAG_TABLE_DOWNSTREAM")" -ge 1 ]; then
+			join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+		else
+			error_exit 1 "tag data is empty"
+		fi
 
 		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_UNIQ$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
@@ -277,6 +302,10 @@ make_tag_table() {
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
 join_tag_table() {
 	(
+		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
+			error_exit 1 "incorrect argument."
+		fi
+
 		_JOINED_TAG_TABLE="$1"
 		_TAG_TABLE_DOWNSTREAM="$2"
 
@@ -303,6 +332,7 @@ join_tag_table() {
 ##
 # @brief
 # @param  $1 : DOWNSTREAM_TAG_TABLE
+# @tag    @IMP2.5@ (FROM: @ARC2.5@)
 verify_tags() {
 	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
@@ -325,7 +355,7 @@ verify_tags() {
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
-# @tag    @IMP3.1@ (FROM: @ARC2.4@)
+# @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
 	(
 		# Read config parse results (tag information are included in one line)
@@ -333,7 +363,7 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		echo "$_TARGET_DATA" |
+		_FILE_LIST="$(echo "$_TARGET_DATA" |
 			while read -r _DATA; do
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
@@ -352,25 +382,18 @@ swap_tags() {
 						return # There are no files to match specified extension.
 					fi
 				fi
+				echo "$_FILE"
+			done)"
 
-				echo "$_FILE" |
-					while read -r t; do
-						sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
-						sed -i "s/${3}/${2}/g" "$t"
-						sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
-					done
-			done
+		(
+			cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+			echo "$_FILE_LIST" |
+				sort -u |
+				while read -r t; do
+					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
+					sed -i "s/${3}/${2}/g" "$t"
+					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
+				done
+		)
 	)
 }
-
-case "$0" in
-*shtracer)
-	:
-	;;
-*)
-	(
-		echo "shtracer: Do not use source/dot commands."
-		echo "shtracer: Use source/dot commands for unit tests. "
-	)
-	;;
-esac
