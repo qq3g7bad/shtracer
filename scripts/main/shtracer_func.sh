@@ -104,7 +104,8 @@ make_tags() {
 	if [ -e "$1" ]; then
 		:
 	else
-		error_exit 1 "Can't find a tag table."
+		error_exit 1 "cannot find a config output data."
+		return
 	fi
 
 	(
@@ -210,10 +211,8 @@ make_tags() {
 # @return TAG_MATRIX
 # @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
-	if [ -e "$1" ]; then
-		:
-	else
-		error_exit 1 "Can't find a tag table."
+	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
+		error_exit 1 "incorrect argument."
 	fi
 
 	(
@@ -286,7 +285,11 @@ make_tag_table() {
 			uniq -u >"$_TAG_TABLE_UNIQ"
 
 		# Make joined tag table (each row has a single trace tag chain)
-		join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+		if [ "$(wc -l <"$_TAG_TABLE_DOWNSTREAM")" -ge 1 ]; then
+			join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+		else
+			error_exit 1 "tag data is empty"
+		fi
 
 		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_UNIQ$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
@@ -299,8 +302,8 @@ make_tag_table() {
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
 join_tag_table() {
 	(
-		if [ ! -r "$1" ]; then
-			error_exit 1 "JOINED_TAG_TABLE (\"$1\") is not existed"
+		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
+			error_exit 1 "incorrect argument."
 		fi
 
 		_JOINED_TAG_TABLE="$1"

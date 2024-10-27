@@ -51,12 +51,12 @@ test_check_configfile() {
 		assertEquals 2 "${_RETURN_VALUE##*/}"
 
 		# Level1
-		_ANSWER="$(cat ./testdata/answer/check_configfile_output1)"
+		_ANSWER="$(cat ./testdata/answer/configfile_output1)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/1")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 
 		# Level2
-		_ANSWER="$(cat ./testdata/answer/check_configfile_output2)"
+		_ANSWER="$(cat ./testdata/answer/configfile_output2)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/2")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
@@ -70,9 +70,10 @@ test_make_tags_without_argument() {
 		# Arrange ---------
 		# Act -------------
 
-		_RETURN_VALUE="$(make_tags)"
+		_RETURN_VALUE="$(make_tags 2>&1)"
 
 		# Assert ----------
+		assertEquals 1 "$?"
 
 		# mkdir
 		assertEquals 0 "$(
@@ -81,7 +82,7 @@ test_make_tags_without_argument() {
 		)"
 
 		# output filename
-		assertNull "${_RETURN_VALUE##*/}"
+		assertEquals "shtracer_func_test.sh: cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 ##
@@ -92,8 +93,8 @@ test_make_tags() {
 		# Arrange ---------
 		# Act -------------
 
-		_RETURN_VALUE="$(make_tags "./testdata/answer/check_configfile_output2")"
-		cat ./output/tags/1 >"${CONFIG_DIR%/}/answer/check_make_tags_output1"
+		_RETURN_VALUE="$(make_tags "./testdata/answer/configfile_output2")"
+		# cat ./output/tags/1 >"${CONFIG_DIR%/}/answer/make_tags_output1"
 
 		# Assert ----------
 
@@ -107,7 +108,7 @@ test_make_tags() {
 		assertEquals 1 "${_RETURN_VALUE##*/}"
 
 		# Level1
-		_ANSWER="$(cat ./testdata/answer/check_make_tags_output1)"
+		_ANSWER="$(cat ./testdata/answer/make_tags_output1)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/1")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
@@ -122,6 +123,51 @@ test_join_tag_table_without_argument() {
 	join_tag_table >/dev/null 2>&1
 	# Assert ----------
 	assertEquals 1 "$?"
+}
+
+##
+# @brief  Test for join_tag_table
+# @tag    @UT2.5@ (FROM: @IMP2.3@)
+test_make_tag_table() {
+	(
+		# Arrange ---------
+		# Act -------------
+		make_tag_table "./testdata/answer/make_tags_output1" >/dev/null
+
+		# Assert ----------
+		assertEquals 0 "$?"
+
+		_ANSWER="$(cat ./testdata/answer/make_tag_table_joined)"
+		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/joined")"
+	)
+}
+
+##
+# @brief  Test for join_tag_table
+# @tag    @UT2.6@ (FROM: @IMP2.3@)
+test_make_tag_table_without_argument() {
+	(
+		# Arrange ---------
+		# Act -------------
+		(make_tag_table >/dev/null 2>&1)
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
+}
+
+##
+# @brief  Test for join_tag_table
+# @tag    @UT2.7@ (FROM: @IMP2.3@)
+test_make_tag_table_with_empty_file() {
+	(
+		# Arrange ---------
+		# Act -------------
+		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
 }
 
 . "./shunit2/shunit2"
