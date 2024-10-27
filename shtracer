@@ -32,7 +32,7 @@ load_functions() {
 
 ##
 # @brief  Print usage
-# @tag    @IMP1.3@ (FROM: @ARC1.2@)
+# @tag    @IMP1.2@ (FROM: @ARC1.2@)
 print_usage() {
 	cat <<-USAGE 1>&2
 		Usage: shtracer <configfile> [options]
@@ -69,7 +69,7 @@ print_usage() {
 
 ##
 # @brief  Parse arguments
-# @tag    @IMP1.5@ (FROM: @ARC1.2@)
+# @tag    @IMP1.3@ (FROM: @ARC1.2@)
 parse_arguments() {
 	case "$#${1:-}${2:-}${3:-}${4:-}" in
 	1-h | 1-v | 1--help | 1--version) # Print usage
@@ -115,7 +115,7 @@ parse_arguments() {
 
 ##
 # @brief  Main routine
-# @tag    @IMP1.6@ (FROM: @ARC1.1@)
+# @tag    @IMP1.4@ (FROM: @ARC1.1@)
 main_routine() {
 	load_functions
 	init_environment

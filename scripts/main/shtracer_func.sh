@@ -354,7 +354,7 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		echo "$_TARGET_DATA" |
+		_FILE_LIST="$(echo "$_TARGET_DATA" |
 			while read -r _DATA; do
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
@@ -373,13 +373,18 @@ swap_tags() {
 						return # There are no files to match specified extension.
 					fi
 				fi
+				echo "$_FILE"
+			done)"
 
-				echo "$_FILE" |
-					while read -r t; do
-						sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
-						sed -i "s/${3}/${2}/g" "$t"
-						sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
-					done
-			done
+		(
+			cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+			echo "$_FILE_LIST" |
+				sort -u |
+				while read -r t; do
+					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
+					sed -i "s/${3}/${2}/g" "$t"
+					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
+				done
+		)
 	)
 }

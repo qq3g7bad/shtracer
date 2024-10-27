@@ -94,7 +94,7 @@ test_load_functions() {
 
 ##
 # @brief  Test for print_usage
-# @tag    @UT1.3@ (FROM: @IMP1.3@)
+# @tag    @UT1.3@ (FROM: @IMP1.2@)
 test_print_usage() {
 	(
 		# Arrange ---------
@@ -126,7 +126,7 @@ test_error_exit() {
 
 ##
 # @brief  Test for parse_arguments with -v
-# @tag    @UT1.5@ (FROM: @IMP1.5@)
+# @tag    @UT1.5@ (FROM: @IMP1.3@)
 test_parse_arguments_version1() {
 	(
 		# Arrange ---------
@@ -143,7 +143,7 @@ test_parse_arguments_version1() {
 
 ##
 # @brief  Test for parse_arguments with --version
-# @tag    @UT1.6@ (FROM: @IMP1.5@)
+# @tag    @UT1.6@ (FROM: @IMP1.3@)
 test_parse_arguments_version2() {
 	(
 		# Arrange ---------
@@ -160,7 +160,7 @@ test_parse_arguments_version2() {
 
 ##
 # @brief  Test for parse_arguments with --varsion
-# @tag    @UT1.7@ (FROM: @IMP1.5@)
+# @tag    @UT1.7@ (FROM: @IMP1.3@)
 test_parse_arguments_version3() {
 	(
 		# Arrange ---------
@@ -176,7 +176,7 @@ test_parse_arguments_version3() {
 
 ##
 # @brief  Test for parse_arguments with -h
-# @tag    @UT1.8@ (FROM: @IMP1.5@)
+# @tag    @UT1.8@ (FROM: @IMP1.3@)
 test_parse_arguments_h() {
 	(
 		# Arrange ---------
@@ -193,7 +193,7 @@ test_parse_arguments_h() {
 
 ##
 # @brief  Test for parse_arguments with --help
-# @tag    @UT1.9@ (FROM: @IMP1.5@)
+# @tag    @UT1.9@ (FROM: @IMP1.3@)
 test_parse_arguments_help1() {
 	(
 		# Arrange ---------
@@ -210,7 +210,7 @@ test_parse_arguments_help1() {
 
 ##
 # @brief  Test for parse_arguments with -h
-# @tag    @UT1.10@ (FROM: @IMP1.5@)
+# @tag    @UT1.10@ (FROM: @IMP1.3@)
 test_parse_arguments_help2() {
 	(
 		# Arrange ---------
@@ -227,7 +227,7 @@ test_parse_arguments_help2() {
 
 ##
 # @brief  Test for parse_arguments with -t
-# @tag    @UT1.11@ (FROM: @IMP1.5@)
+# @tag    @UT1.11@ (FROM: @IMP1.3@)
 test_parse_arguments_test() {
 	(
 		# Arrange ---------
@@ -241,7 +241,7 @@ test_parse_arguments_test() {
 
 ##
 # @brief  Test for parse_arguments with undefined option
-# @tag    @UT1.12@ (FROM: @IMP1.5@)
+# @tag    @UT1.12@ (FROM: @IMP1.3@)
 test_parse_arguments_undefined_option() {
 	(
 		# Arrange ---------
@@ -257,7 +257,7 @@ test_parse_arguments_undefined_option() {
 
 ##
 # @brief  Test for parse_arguments with normal mode
-# @tag    @UT1.13@ (FROM: @IMP1.5@)
+# @tag    @UT1.13@ (FROM: @IMP1.3@)
 test_parse_arguments_normal_mode() {
 	(
 		# Arrange ---------
@@ -271,7 +271,7 @@ test_parse_arguments_normal_mode() {
 
 ##
 # @brief  Test for parse_arguments with -v
-# @tag    @UT1.14@ (FROM: @IMP1.5@)
+# @tag    @UT1.14@ (FROM: @IMP1.3@)
 test_parse_arguments_verify_mode() {
 	(
 		# Arrange ---------
@@ -285,7 +285,7 @@ test_parse_arguments_verify_mode() {
 
 ##
 # @brief  Test for parse_arguments in change mode
-# @tag    @UT1.15@ (FROM: @IMP1.5@)
+# @tag    @UT1.15@ (FROM: @IMP1.3@)
 test_parse_arguments_change_mode() {
 	(
 		# Arrange ---------
@@ -299,7 +299,7 @@ test_parse_arguments_change_mode() {
 
 ##
 # @brief  Test for parse_arguments with non-existent config file
-# @tag    @UT1.16@ (FROM: @IMP1.5@)
+# @tag    @UT1.16@ (FROM: @IMP1.3@)
 test_parse_arguments_with_non_existent_config_file() {
 	(
 		# Arrange ---------
@@ -314,7 +314,7 @@ test_parse_arguments_with_non_existent_config_file() {
 
 ##
 # @brief  Test for parse_arguments with config file
-# @tag    @UT1.17@ (FROM: @IMP1.5@)
+# @tag    @UT1.17@ (FROM: @IMP1.3@)
 test_parse_arguments_with_config_file() {
 	(
 		# Arrange ---------
