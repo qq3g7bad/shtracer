@@ -100,8 +100,14 @@ check_configfile() {
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
 make_tags() {
-	(
 
+	if [ -e "$1" ]; then
+		:
+	else
+		error_exit 1 "Can't find a tag table."
+	fi
+
+	(
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/1"
 
@@ -323,7 +329,7 @@ join_tag_table() {
 ##
 # @brief
 # @param  $1 : DOWNSTREAM_TAG_TABLE
-# @tag    @IMP2.5@ (FROM: )
+# @tag    @IMP2.5@ (FROM: @ARC2.5@)
 verify_tags() {
 	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"

@@ -65,6 +65,28 @@ test_check_configfile() {
 ##
 # @brief  Test for make_tags
 # @tag    @UT2.2@ (FROM: @IMP2.2@)
+test_make_tags_without_argument() {
+	(
+		# Arrange ---------
+		# Act -------------
+
+		_RETURN_VALUE="$(make_tags)"
+
+		# Assert ----------
+
+		# mkdir
+		assertEquals 0 "$(
+			[ ! -d "${OUTPUT_DIR%/}/tags/" ]
+			echo "$?"
+		)"
+
+		# output filename
+		assertNull "${_RETURN_VALUE##*/}"
+	)
+}
+##
+# @brief  Test for make_tags
+# @tag    @UT2.3@ (FROM: @IMP2.2@)
 test_make_tags() {
 	(
 		# Arrange ---------
@@ -93,7 +115,7 @@ test_make_tags() {
 
 ##
 # @brief  Test for join_tag_table
-# @tag    @UT2.3@ (FROM: @IMP2.4@)
+# @tag    @UT2.4@ (FROM: @IMP2.4@)
 test_join_tag_table_without_argument() {
 	# Arrange ---------
 	# Act -------------
