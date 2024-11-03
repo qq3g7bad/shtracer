@@ -214,7 +214,7 @@ make_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.3@ (FROM: @ARC2.2@)
+# @tag    @IMP2.30@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
 		error_exit 1 "incorrect argument."
@@ -226,6 +226,8 @@ make_tag_table() {
 		_TAG_TABLE_UPSTREAM="${_TAG_OUTPUT_DIR%/}/upstream"
 		_TAG_TABLE_DOWNSTREAM="${_TAG_OUTPUT_DIR%/}/downstream"
 		_TAG_TABLE_UNIQ="${_TAG_OUTPUT_DIR%/}/uniq"
+		_TAG_TABLE_ISOLATED_FROM_TAG="${_TAG_OUTPUT_DIR%/}/isolated_fromtag"
+		_TAG_TABLE_ISOLATED_TAG="${_TAG_OUTPUT_DIR%/}/isolated_tag"
 		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_DIR%/}/duplicated"
 		_JOINED_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/joined"
 
@@ -241,36 +243,17 @@ make_tag_table() {
 				}
 		 }' >"$_TAG_TABLE"
 
-		# [Verify] Duplicated tags
-		awk <"$1" \
-			-F"$SHTRACER_SEPARATOR" \
-			'{
-				print $2
-			 }' |
-			sort |
-			uniq -d >"$_TAG_TABLE_DUPLICATED"
-
-		# Detect isolated items
-		_TAG_TABLE_ISOLATED="$(awk <"$_TAG_TABLE" '{print $1; print $2; print $2}' |
-			sort |
-			uniq -u |
-			sed 's/^/'"$NODATA_STRING"' /')"
-		echo "$_TAG_TABLE_ISOLATED" >>"$_TAG_TABLE"
-		echo "$_TAG_TABLE_ISOLATED" >"$_TAG_TABLE_UNIQ"
-
 		# Prepare upstream table (starting point)
 		grep "^$NODATA_STRING" "$_TAG_TABLE" |
 			sort |
 			awk '{$1=""; print $0}' |
 			sed 's/^[[:space:]]*//' |
-			sed '/^$/d' >"$_TAG_TABLE_UPSTREAM"
+			sed '/^$/d' >"$_JOINED_TAG_TABLE"
 
 		# Prepare downstream tag table
 		grep -v "^$NODATA_STRING" "$_TAG_TABLE" |
 			sort |
 			sed '/^$/d' >"$_TAG_TABLE_DOWNSTREAM"
-
-		cat "$_TAG_TABLE_UPSTREAM" >"$_JOINED_TAG_TABLE"
 
 		# [Verify] From tags that have no upstream tags.
 		_UPSTREAM_UNIQ="$(awk <"$_TAG_TABLE_DOWNSTREAM" '{
@@ -296,7 +279,24 @@ make_tag_table() {
 			error_exit 1 "tag data is empty"
 		fi
 
-		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_UNIQ$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
+		# [Verify] Duplicated tags
+		awk <"$1" \
+			-F"$SHTRACER_SEPARATOR" \
+			'{
+				print $2
+			 }' |
+			sort |
+			uniq -d >"$_TAG_TABLE_DUPLICATED"
+
+		# [Verify] Detect isolated FROM_TAG
+		awk <"$_TAG_TABLE" '{print $1; print $2; print $2}' |
+			sort |
+			uniq -u |
+			sed 's/^/'"$NODATA_STRING"' /' |
+      sed '/^$/d' |
+      awk '{print $2}' >"$_TAG_TABLE_ISOLATED_FROM_TAG"
+
+		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
 }
 
@@ -304,7 +304,7 @@ make_tag_table() {
 # @brief
 # @param  $1 : JOINED_TAG_TABLE
 # @param  $2 : TAG_TABLE
-# @tag    @IMP2.4@ (FROM: @ARC2.3@)
+# @tag    @IMP2.4@ (FROM: @ARC2.300@)
 join_tag_table() {
 	(
 		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
@@ -340,16 +340,16 @@ join_tag_table() {
 # @param  $2 : DUPLICATED_TAGS_PATH
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 verify_tags() {
-	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
+	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
 
-	if [ "$(wc <"$_TAG_TABLE_UNIQ" -l)" -ne 0 ]; then
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
-		sed <"$_TAG_TABLE_UNIQ" 1>&2
+		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
-		sed <"$_TAG_TABLE_DUPLICATED" 1>&2
+		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
 	fi
 
 }
