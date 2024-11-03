@@ -331,7 +331,8 @@ join_tag_table() {
 
 ##
 # @brief
-# @param  $1 : DOWNSTREAM_TAG_TABLE
+# @param  $1 : ISOLATED_TAGS_PATH
+# @param  $2 : DUPLICATED_TAGS_PATH
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 verify_tags() {
 	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"

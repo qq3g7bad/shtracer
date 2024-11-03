@@ -331,7 +331,7 @@ test_parse_arguments_with_config_file() {
 
 ##
 # @brief  Test for main_routine
-# @tag    @UT1.1@ (FROM: @IMP4.1@)
+# @tag    @UT1.18@ (FROM: @IMP4.1@)
 test_main_routine() {
 	(
 		# Arrange ---------
