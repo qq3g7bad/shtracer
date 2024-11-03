@@ -135,6 +135,11 @@ make_tags() {
 				_TITLE_SEPARATOR="--"
 				_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 
+        # Check if TAG_FORMAT is empty
+        if [ "$_TAG_FORMAT" = "" ]; then
+          continue
+        fi
+
 				# Check if TARGET_PATH is file or direcrory
 				if [ -f "$_PATH" ]; then # File
 					_FILE="$_PATH"
