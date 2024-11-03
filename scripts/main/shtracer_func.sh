@@ -33,15 +33,15 @@ check_configfile() {
 		# Level1: Delete comment blocks from the confiuration markdown file
 		awk <"$1" \
 			'
-      /`.*<!--.*-->.*`/   { match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
-                            print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-                            next;}
-                          { sub(/<!--.*-->/, "") }
-      /<!--/              { in_comment=1 }
-      /-->/ && in_comment { in_comment=0; next }
-      /<!--/,/-->/        { if (in_comment) next }
-      !in_comment         { print }
-      ' |
+			/`.*<!--.*-->.*`/	 { match($0, /`.*<!--.*-->.*`/);							 # Exception for comment blocks that is surrounded by backquotes.
+														print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
+														next;}
+													{ sub(/<!--.*-->/, "") }
+			/<!--/							{ in_comment=1 }
+			/-->/ && in_comment { in_comment=0; next }
+			/<!--/,/-->/				{ if (in_comment) next }
+			!in_comment					{ print }
+			' |
 			sed '/^[[:space:]]*$/d' |    # Delete empty lines
 			sed 's/^[[:space:]]*\* //' | # Delete start spaces
 			sed 's/[[:space:]]*$//' |    # Delete end spaces
@@ -52,42 +52,42 @@ check_configfile() {
 			's/:/'"$SHTRACER_SEPARATOR"'/' | # Separator
 			sed 's/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
 			awk -F "$SHTRACER_SEPARATOR" '\
-        function print_data() {
-          print \
-            a["title"] '"\"$SHTRACER_SEPARATOR\""'\
-            a["PATH"]  '"\"$SHTRACER_SEPARATOR\""'\
-            a["EXTENSION FILTER"] '"\"$SHTRACER_SEPARATOR\""'\
-            a["BRIEF"] '"\"$SHTRACER_SEPARATOR\""'\
-            a["TAG FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
-            a["TAG LINE FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
-            a["TAG-TITLE OFFSET"];
-        }
+				function print_data() {
+					print \
+						a["title"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["PATH"]	'"\"$SHTRACER_SEPARATOR\""'\
+						a["EXTENSION FILTER"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["BRIEF"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["TAG FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["TAG LINE FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["TAG-TITLE OFFSET"];
+				}
 
-        BEGIN { precount=1; count=1; }
-        /^#/ {
-          match($0, /^#+/)
-          gsub(/^#+ */, "", $0)
-          t[RLENGTH]=$0
-          title="";
-          for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
-        }
+				BEGIN { precount=1; count=1; }
+				/^#/ {
+					match($0, /^#+/)
+					gsub(/^#+ */, "", $0)
+					t[RLENGTH]=$0
+					title="";
+					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
+				}
 
-        /^PATH'"$SHTRACER_SEPARATOR"'/  {
-          if (a["title"] != "") {
-            print_data()
-          }
-          for(i in a){a[i]=""}
-          a["title"]=title
-        }
+				/^PATH'"$SHTRACER_SEPARATOR"'/	{
+					if (a["title"] != "") {
+						print_data()
+					}
+					for(i in a){a[i]=""}
+					a["title"]=title
+				}
 
-        {
-          a[$1]=$2
-        }
+				{
+					a[$1]=$2
+				}
 
-        END {
-          print_data()
-        }
-      ' >"$_CONFIG_OUTPUT_LEVEL2"
+				END {
+					print_data()
+				}
+			' >"$_CONFIG_OUTPUT_LEVEL2"
 
 		# echo the output file location
 		echo "$_CONFIG_OUTPUT_LEVEL2"
@@ -135,6 +135,11 @@ make_tags() {
 				_TITLE_SEPARATOR="--"
 				_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 
+				# Check if TAG_FORMAT is empty
+				if [ "$_TAG_FORMAT" = "" ]; then
+					continue
+				fi
+
 				# Check if TARGET_PATH is file or direcrory
 				if [ -f "$_PATH" ]; then # File
 					_FILE="$_PATH"
@@ -153,47 +158,47 @@ make_tags() {
 					while read -r t; do
 						awk <"$t" \
 							' # For title offset, extract only the offset line
-              BEGIN {
-                counter = -1
-              }
+							BEGIN {
+								counter = -1
+							}
 
-              # 1) Print tag column
-              /'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
-                counter='"$_TAG_TITLE_OFFSET"';
-                print "'"$_TITLE"'"                      # column 1: trace target
+							# 1) Print tag column
+							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
+								counter='"$_TAG_TITLE_OFFSET"';
+								print "'"$_TITLE"'"											# column 1: trace target
 
-                match($0, /'"$_TAG_FORMAT"'/)
-                tag=substr($0, RSTART, RLENGTH)
-                print tag;                               # column 2: tag
+								match($0, /'"$_TAG_FORMAT"'/)
+								tag=substr($0, RSTART, RLENGTH)
+								print tag;															 # column 2: tag
 
-                match($0, /'"$_FROM_TAG_REGEX"'/)
-                if (RSTART == 0) {                       # no from tag
-                  from_tag="'"$NODATA_STRING"'"
-                }
-                else{
-                  from_tag=substr($0, RSTART+1, RLENGTH-2)
-                  sub(/'"$_FROM_TAG_START"'/, "", from_tag)
-                  sub(/^[[:space:]]*/, "", from_tag)
-                  sub(/[[:space:]]$/, "", from_tag)
-                }
-                print from_tag;                          # column 3: from tag
-              }
+								match($0, /'"$_FROM_TAG_REGEX"'/)
+								if (RSTART == 0) {											 # no from tag
+									from_tag="'"$NODATA_STRING"'"
+								}
+								else{
+									from_tag=substr($0, RSTART+1, RLENGTH-2)
+									sub(/'"$_FROM_TAG_START"'/, "", from_tag)
+									sub(/^[[:space:]]*/, "", from_tag)
+									sub(/[[:space:]]$/, "", from_tag)
+								}
+								print from_tag;													# column 3: from tag
+							}
 
-              # 2) Print the offset line
-              {
-                if (counter == 0) {
-                  sub(/^#+[[:space:]]*/, "", $0)
-                  print;                                 # column 4: title
-                  print "'"$t"'"                         # column 5: filename
-                  print NR                               # column 6: line including title
-                  print'"\"$_TITLE_SEPARATOR"\"'
-                }
-                if (counter >= 0) {
-                  counter--;
-                }
-              }
+							# 2) Print the offset line
+							{
+								if (counter == 0) {
+									sub(/^#+[[:space:]]*/, "", $0)
+									print;																 # column 4: title
+									print "'"$t"'"												 # column 5: filename
+									print NR															 # column 6: line including title
+									print'"\"$_TITLE_SEPARATOR"\"'
+								}
+								if (counter >= 0) {
+									counter--;
+								}
+							}
 
-              ' |
+							' |
 							sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
 							tr -d '\n' |
 							sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g'
@@ -209,7 +214,7 @@ make_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.3@ (FROM: @ARC2.2@)
+# @tag    @IMP2.30@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
 		error_exit 1 "incorrect argument."
@@ -221,6 +226,8 @@ make_tag_table() {
 		_TAG_TABLE_UPSTREAM="${_TAG_OUTPUT_DIR%/}/upstream"
 		_TAG_TABLE_DOWNSTREAM="${_TAG_OUTPUT_DIR%/}/downstream"
 		_TAG_TABLE_UNIQ="${_TAG_OUTPUT_DIR%/}/uniq"
+		_TAG_TABLE_ISOLATED_FROM_TAG="${_TAG_OUTPUT_DIR%/}/isolated_fromtag"
+		_TAG_TABLE_ISOLATED_TAG="${_TAG_OUTPUT_DIR%/}/isolated_tag"
 		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_DIR%/}/duplicated"
 		_JOINED_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/joined"
 
@@ -229,54 +236,35 @@ make_tag_table() {
 		awk <"$1" \
 			-F"$SHTRACER_SEPARATOR" \
 			'{
-        # OFS="'"$SHTRACER_SEPARATOR"'"
-        split($3, parent, /[ ]*,[ ]*/);
-        for (i=1; i<=length(parent); i++){
-          print(parent[i], $2);
-        }
-     }' >"$_TAG_TABLE"
-
-		# [Verify] Duplicated tags
-		awk <"$1" \
-			-F"$SHTRACER_SEPARATOR" \
-			'{
-        print $2
-       }' |
-			sort |
-			uniq -d >"$_TAG_TABLE_DUPLICATED"
-
-		# Detect isolated items
-		_TAG_TABLE_ISOLATED="$(awk <"$_TAG_TABLE" '{print $1; print $2; print $2}' |
-			sort |
-			uniq -u |
-			sed 's/^/'"$NODATA_STRING"' /')"
-		echo "$_TAG_TABLE_ISOLATED" >>"$_TAG_TABLE"
-		echo "$_TAG_TABLE_ISOLATED" >"$_TAG_TABLE_UNIQ"
+				# OFS="'"$SHTRACER_SEPARATOR"'"
+				split($3, parent, /[ ]*,[ ]*/);
+				for (i=1; i<=length(parent); i++){
+					print(parent[i], $2);
+				}
+		 }' >"$_TAG_TABLE"
 
 		# Prepare upstream table (starting point)
 		grep "^$NODATA_STRING" "$_TAG_TABLE" |
 			sort |
 			awk '{$1=""; print $0}' |
 			sed 's/^[[:space:]]*//' |
-			sed '/^$/d' >"$_TAG_TABLE_UPSTREAM"
+			sed '/^$/d' >"$_JOINED_TAG_TABLE"
 
 		# Prepare downstream tag table
 		grep -v "^$NODATA_STRING" "$_TAG_TABLE" |
 			sort |
 			sed '/^$/d' >"$_TAG_TABLE_DOWNSTREAM"
 
-		cat "$_TAG_TABLE_UPSTREAM" >"$_JOINED_TAG_TABLE"
-
 		# [Verify] From tags that have no upstream tags.
 		_UPSTREAM_UNIQ="$(awk <"$_TAG_TABLE_DOWNSTREAM" '{
-       print $1;
-    }' |
+				print $1;
+			}' |
 			sort |
 			uniq -u)"
 
 		_DOWNSTREAM_UNIQ="$(awk <"$_TAG_TABLE_DOWNSTREAM" '{
-       print $2;
-    }' |
+				print $2;
+			}' |
 			sort |
 			uniq -u)"
 
@@ -291,7 +279,24 @@ make_tag_table() {
 			error_exit 1 "tag data is empty"
 		fi
 
-		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_UNIQ$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
+		# [Verify] Duplicated tags
+		awk <"$1" \
+			-F"$SHTRACER_SEPARATOR" \
+			'{
+				print $2
+			 }' |
+			sort |
+			uniq -d >"$_TAG_TABLE_DUPLICATED"
+
+		# [Verify] Detect isolated FROM_TAG
+		awk <"$_TAG_TABLE" '{print $1; print $2; print $2}' |
+			sort |
+			uniq -u |
+			sed 's/^/'"$NODATA_STRING"' /' |
+      sed '/^$/d' |
+      awk '{print $2}' >"$_TAG_TABLE_ISOLATED_FROM_TAG"
+
+		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
 }
 
@@ -299,7 +304,7 @@ make_tag_table() {
 # @brief
 # @param  $1 : JOINED_TAG_TABLE
 # @param  $2 : TAG_TABLE
-# @tag    @IMP2.4@ (FROM: @ARC2.3@)
+# @tag    @IMP2.4@ (FROM: @ARC2.300@)
 join_tag_table() {
 	(
 		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
@@ -331,21 +336,20 @@ join_tag_table() {
 
 ##
 # @brief
-# @param  $1 : DOWNSTREAM_TAG_TABLE
+# @param  $1 : ISOLATED_TAGS_PATH
+# @param  $2 : DUPLICATED_TAGS_PATH
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 verify_tags() {
-	_TAG_TABLE_UNIQ="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
+	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
 
-	if [ "$(wc <"$_TAG_TABLE_UNIQ" -l)" -ne 0 ]; then
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
-		sed <"$_TAG_TABLE_UNIQ" \
-			's/^/ /' 1>&2
+		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
-		sed <"$_TAG_TABLE_DUPLICATED" \
-			's/^/ /' 1>&2
+		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
 	fi
 
 }
