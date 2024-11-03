@@ -340,13 +340,11 @@ verify_tags() {
 
 	if [ "$(wc <"$_TAG_TABLE_UNIQ" -l)" -ne 0 ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
-		sed <"$_TAG_TABLE_UNIQ" \
-			's/^/ /' 1>&2
+		sed <"$_TAG_TABLE_UNIQ" 1>&2
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
-		sed <"$_TAG_TABLE_DUPLICATED" \
-			's/^/ /' 1>&2
+		sed <"$_TAG_TABLE_DUPLICATED" 1>&2
 	fi
 
 }
