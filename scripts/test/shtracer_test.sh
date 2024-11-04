@@ -5,6 +5,16 @@
 . "../main/shtracer_util.sh"
 
 sh -c "./shtracer_func_test.sh"
+sh -c "./shtracer_uml_test.sh"
+
+##
+# @brief
+#
+oneTimeSetUp() {
+  echo "----------------------------------------"
+  echo " TEST : $0"
+  echo "----------------------------------------"
+}
 
 ##
 # @brief  SetUp function for each test
