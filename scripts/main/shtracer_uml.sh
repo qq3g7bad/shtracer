@@ -181,3 +181,8 @@ make_target_flowchart() {
 	)
 }
 
+##
+# @brief
+make_html() {
+  echo "test"
+}

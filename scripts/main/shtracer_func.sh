@@ -293,8 +293,8 @@ make_tag_table() {
 			sort |
 			uniq -u |
 			sed 's/^/'"$NODATA_STRING"' /' |
-      sed '/^$/d' |
-      awk '{print $2}' >"$_TAG_TABLE_ISOLATED_FROM_TAG"
+			sed '/^$/d' |
+			awk '{print $2}' >"$_TAG_TABLE_ISOLATED_FROM_TAG"
 
 		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
@@ -339,7 +339,7 @@ join_tag_table() {
 # @param  $1 : ISOLATED_TAGS_PATH
 # @param  $2 : DUPLICATED_TAGS_PATH
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
-verify_tags() {
+print_verified_result() {
 	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
 

@@ -140,12 +140,12 @@ main_routine() {
 				awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')"
 
 			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-        :
-      else
+				:
+			else
 				make_target_flowchart "$CONFIG_OUTPUT"
-				cat "$JOINED_TAG_TABLE"
+				make_html "$JOINED_TAG_TABLE" "$MAKE_TAG_OUTPUT"
 			fi
-			verify_tags "$VERIFY_FILENAME"  # This is output to stderr
+			print_verified_result "$VERIFY_FILENAME"  # This is output to stderr
 		fi
 	)"
 
