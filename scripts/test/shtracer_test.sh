@@ -11,9 +11,9 @@ sh -c "./shtracer_uml_test.sh"
 # @brief
 #
 oneTimeSetUp() {
-  echo "----------------------------------------"
-  echo " TEST : $0"
-  echo "----------------------------------------"
+	echo "----------------------------------------"
+	echo " TEST : $0"
+	echo "----------------------------------------"
 }
 
 ##
@@ -28,7 +28,7 @@ setUp() {
 # @brief TearDown function for each test
 #
 tearDown() {
-	:
+	rm -rf "$OUTPUT_DIR"
 }
 
 ##
