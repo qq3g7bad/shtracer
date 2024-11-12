@@ -4,16 +4,16 @@
 _SHTRACER_UML_SH=""
 
 case "$0" in
-	*shtracer)
-		: # Successfully sourced from shtracer.
-		;;
-	*shtracer*test*)
-		: # Successfully sourced from shtracer.
-		;;
-	*)
-		echo "This script should only be sourced, not executed directly."
-		exit 1
-		;;
+*shtracer)
+	: # Successfully sourced from shtracer.
+	;;
+*shtracer*test*)
+	: # Successfully sourced from shtracer.
+	;;
+*)
+	echo "This script should only be sourced, not executed directly."
+	exit 1
+	;;
 esac
 
 ##
@@ -184,5 +184,5 @@ make_target_flowchart() {
 ##
 # @brief
 make_html() {
-  echo "test"
+	echo "test"
 }

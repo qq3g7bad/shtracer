@@ -138,21 +138,12 @@ main_routine() {
 			TAGS=$(extract_tags "$CONFIG_OUTPUT")
 			TAG_TABLE_FILENAMES=$(make_tag_table "$TAGS")
 
-			TAG_TABLE_FILENAME="$(echo "$TAG_TABLE_FILENAMES" |
-				awk -F "$SHTRACER_SEPARATOR" '{print $1}')"
-			VERIFICATION_FILENAME="$(echo "$TAG_TABLE_FILENAMES" |
-				awk -F "$SHTRACER_SEPARATOR" '{
-          for(i=2;i<=NF;i++) {
-            printf("%s'"$SHTRACER_SEPARATOR"'", $i)
-          }
-        }')"
+			TAG_TABLE_FILENAME=${TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
+			VERIFICATION_FILENAME=${TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
-			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-				:
-			else
+			if [ "$SHTRACER_MODE" != 'VERIFY' ]; then
 				make_target_flowchart "$CONFIG_OUTPUT"
-				cat "$TAG_TABLE_FILENAME"
-				# make_html "$JOINED_TAG_TABLE" "$TAGS"
+				make_html "$TAG_TABLE_FILENAME" "$TAGS"
 			fi
 			print_verification_result "$VERIFICATION_FILENAME" # This is output to stderr
 		fi
