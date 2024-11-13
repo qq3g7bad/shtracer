@@ -183,6 +183,99 @@ make_target_flowchart() {
 
 ##
 # @brief
+# @param  $1 : TAG_TABLE_FILENAME
+# @param  $2 : TAGS
 make_html() {
-	echo "test"
+	(
+		_TABLE_HTML=""
+		_HTML_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template/"
+		_HTML_ASSETS_DIR="${_HTML_TEMPLATE_DIR%/}/assets/"
+		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
+
+		# Convert a tag table to a html table.
+		while read -r line || [ -n "$line" ]; do
+			_TABLE_HTML="$_TABLE_HTML<tr>"
+			for cell in $(echo "$line" | sed 's/ /\n/g'); do
+				_TABLE_HTML="$_TABLE_HTML<td>$cell</td>"
+			done
+			_TABLE_HTML="$_TABLE_HTML</tr>\n"
+		done <"$1"
+
+		# Convert non-escaped newline to escaped.
+		_HTML_CONTENT="$(
+			sed "s/'\\\\n'/'\\\\\\\\n'/g" <"${_HTML_TEMPLATE_DIR%/}/template.html" |
+				sed "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED TABLE -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED TABLE -->|"
+		)"
+		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
+			awk 'BEGIN {
+		    add_space=0
+		  }
+		  /<!-- SHTRACER INSERTED TABLE -->/{
+		    if (add_space == 0) {
+		      add_space = 1
+          add_space_count = previous_space_count + 2
+		    }
+		    else {
+		      add_space = 0
+		      printf "%*s%s\n", add_space_count, "", $0
+          next
+		    }
+      }
+		  {
+        previous_space_count = space_count
+        match($0, /^[ \t]*/)
+        space_count = RLENGTH
+		    if (add_space == 1) {
+		      printf "%*s%s\n", add_space_count, "", $0
+		    } else {
+          print $0
+        }
+		  }')"
+
+		echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
+
+		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
+				tag = $2;
+        path = $5
+        line = $6
+        print tag, line, path
+      }')"
+
+		_UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u)"
+		_JS_TEMPLATE='
+@TRACE_TARGET_FILENAME@: {content: `
+@TRACE_TARGET_CONTENTS@
+`,
+},
+'
+		_JS_CONTENTS="$(
+			echo "$_UNIQ_FILE" |
+				while read -r s; do
+					_TRACE_TARGET_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
+					_TRACE_TARGET_CONTENTS="$(sed 's/`/\\&/g' <"$s" | sed 's/${/\\${/g')"
+					echo "$_JS_TEMPLATE" |
+						sed 's/@TRACE_TARGET_FILENAME@/'"$_TRACE_TARGET_FILENAME"'/g' |
+						awk -v replacement="$_TRACE_TARGET_CONTENTS" '{ gsub(/@TRACE_TARGET_CONTENTS@/, replacement) }1 '
+				done
+		)"
+
+		mkdir -p "${OUTPUT_DIR%/}/assets/"
+
+		echo "$_TAG_INFO_TABLE" |
+			while read -r s; do
+				_SED_COMMAND="$(echo "$s" | awk '{
+		      cmd = "basename \""$3"\" | sed \"s/\./_/g; s/^/Target_/\""; cmd | getline filename_result; close(cmd)
+          print "s|"$1"|<a href=\"#\" onclick=\"showText(event, '\''"filename_result"'\'', "$2")\">"$1"</a>|g"
+        }')"
+				sed "$_SED_COMMAND" <"${OUTPUT_DIR%/}/output.html" >"${OUTPUT_DIR%/}/output_tmp.html"
+				mv "${OUTPUT_DIR%/}/output_tmp.html" "${OUTPUT_DIR%/}/output.html"
+			done
+
+		# echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
+		awk <"${_HTML_ASSETS_DIR%/}/show_text.js" -v replacement="$_JS_CONTENTS" '{ gsub(/\/\/ js_contents/, replacement) }1 ' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+
+		# cat "${_HTML_ASSETS_DIR%/}/show_text.js" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+		cat "${_HTML_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
+	)
+
 }

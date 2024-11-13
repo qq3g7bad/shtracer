@@ -141,7 +141,11 @@ main_routine() {
 			TAG_TABLE_FILENAME=${TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
 			VERIFICATION_FILENAME=${TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
-			if [ "$SHTRACER_MODE" != 'VERIFY' ]; then
+			# Veify mode
+			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+				:
+			# Normal mode
+			else
 				make_target_flowchart "$CONFIG_OUTPUT"
 				make_html "$TAG_TABLE_FILENAME" "$TAGS"
 			fi
@@ -149,11 +153,7 @@ main_routine() {
 		fi
 	)"
 
-	if [ $OUTPUT_COLORIZE = TRUE ]; then
-		echo "$_OUTPUT_STRING" | sed 's/NONE/\x1b[31m&\x1b[0m/g'
-	else
-		echo "$_OUTPUT_STRING"
-	fi
+	echo "$_OUTPUT_STRING"
 }
 
 case "$0" in

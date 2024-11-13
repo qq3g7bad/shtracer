@@ -164,7 +164,7 @@ extract_tags() {
 							# 1) Print tag column
 							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
 								counter='"$_TAG_TITLE_OFFSET"';
-								print "'"$_TITLE"'"											# column 1: trace target
+								print "'"$_TITLE"'"											 # column 1: trace target
 
 								match($0, /'"$_TAG_FORMAT"'/)
 								tag=substr($0, RSTART, RLENGTH)
@@ -180,7 +180,7 @@ extract_tags() {
 									sub(/^[[:space:]]*/, "", from_tag)
 									sub(/[[:space:]]$/, "", from_tag)
 								}
-								print from_tag;													# column 3: from tag
+								print from_tag;													 # column 3: from tag
 							}
 
 							# 2) Print the offset line
@@ -188,8 +188,16 @@ extract_tags() {
 								if (counter == 0) {
 									sub(/^#+[[:space:]]*/, "", $0)
 									print;																 # column 4: title
-									print "'"$t"'"												 # column 5: filename
-									print NR															 # column 6: line including title
+
+                  cmd = "basename \"'"$t"'\""; cmd | \
+                    getline filename; close(cmd)
+                  cmd = "dirname \"'"$t"'\""; cmd | \
+                    getline dirname_result; close(cmd)
+                  cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
+                     echo \"${PWD%/}/\""; \
+                     cmd | getline absolute_path; close(cmd)
+                  print absolute_path filename           # column 5: file absolute path
+									print NR															 # column 6: line number including title
 									print'"\"$_TITLE_SEPARATOR"\"'
 								}
 								if (counter >= 0) {
