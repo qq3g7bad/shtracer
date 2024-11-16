@@ -25,13 +25,12 @@ check_configfile() {
 	(
 		# Prepare the output directory and filenames
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
-		_CONFIG_OUTPUT_LEVEL1="${_CONFIG_OUTPUT_DIR%/}/1"
-		_CONFIG_OUTPUT_LEVEL2="${_CONFIG_OUTPUT_DIR%/}/2"
+		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
 
 		mkdir -p "$_CONFIG_OUTPUT_DIR"
 
-		# Level1: Delete comment blocks from the confiuration markdown file
-		awk <"$1" \
+		# Delete comment blocks from the confiuration markdown file
+		_CONFIG_FILE_WITHOUT_COMMENT="$(awk <"$1" \
 			'
 			/`.*<!--.*-->.*`/	 { match($0, /`.*<!--.*-->.*`/);							 # Exception for comment blocks that is surrounded by backquotes.
 														print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
@@ -45,11 +44,11 @@ check_configfile() {
 			sed '/^[[:space:]]*$/d' |    # Delete empty lines
 			sed 's/^[[:space:]]*\* //' | # Delete start spaces
 			sed 's/[[:space:]]*$//' |    # Delete end spaces
-			sed 's/\*\*\(.*\)\*\*:/\1:/' >"$_CONFIG_OUTPUT_LEVEL1"
+			sed 's/\*\*\(.*\)\*\*:/\1:/')"
 
-		# Level2: Convert sections to lines
-		sed <"$_CONFIG_OUTPUT_LEVEL1" \
-			's/:/'"$SHTRACER_SEPARATOR"'/' | # Separator
+		# Convert sections to lines
+		echo "$_CONFIG_FILE_WITHOUT_COMMENT" |
+			sed 's/:/'"$SHTRACER_SEPARATOR"'/' | # Separator
 			sed 's/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
 			awk -F "$SHTRACER_SEPARATOR" '\
 				function print_data() {
@@ -87,10 +86,10 @@ check_configfile() {
 				END {
 					print_data()
 				}
-			' >"$_CONFIG_OUTPUT_LEVEL2"
+			' >"$_CONFIG_TABLE"
 
 		# echo the output file location
-		echo "$_CONFIG_OUTPUT_LEVEL2"
+		echo "$_CONFIG_TABLE"
 	)
 }
 
@@ -99,7 +98,7 @@ check_configfile() {
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
-make_tags() {
+extract_tags() {
 
 	if [ -e "$1" ]; then
 		:
@@ -110,7 +109,7 @@ make_tags() {
 
 	(
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
-		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/1"
+		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
 		mkdir -p "$_TAG_OUTPUT_DIR"
 
@@ -165,7 +164,7 @@ make_tags() {
 							# 1) Print tag column
 							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
 								counter='"$_TAG_TITLE_OFFSET"';
-								print "'"$_TITLE"'"											# column 1: trace target
+								print "'"$_TITLE"'"											 # column 1: trace target
 
 								match($0, /'"$_TAG_FORMAT"'/)
 								tag=substr($0, RSTART, RLENGTH)
@@ -181,7 +180,7 @@ make_tags() {
 									sub(/^[[:space:]]*/, "", from_tag)
 									sub(/[[:space:]]$/, "", from_tag)
 								}
-								print from_tag;													# column 3: from tag
+								print from_tag;													 # column 3: from tag
 							}
 
 							# 2) Print the offset line
@@ -189,8 +188,16 @@ make_tags() {
 								if (counter == 0) {
 									sub(/^#+[[:space:]]*/, "", $0)
 									print;																 # column 4: title
-									print "'"$t"'"												 # column 5: filename
-									print NR															 # column 6: line including title
+
+									cmd	=	"basename	\"'"$t"'\"";	cmd	|	\
+											getline	filename;	close(cmd)
+									cmd	=	"dirname	\"'"$t"'\"";	cmd	|	\
+											getline	dirname_result;	close(cmd)
+									cmd	=	"cd	"dirname_result";PWD=\"$(pwd)\";	\
+												echo	\"${PWD%/}/\"";	\
+												cmd	|	getline	absolute_path;	close(cmd)
+									print	absolute_path	filename											#	column	5:	file	absolute	path
+									print NR															 # column 6: line number including title
 									print'"\"$_TITLE_SEPARATOR"\"'
 								}
 								if (counter >= 0) {
@@ -222,16 +229,15 @@ make_tag_table() {
 
 	(
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
-		_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/tagtable"
-		_TAG_TABLE_UPSTREAM="${_TAG_OUTPUT_DIR%/}/upstream"
-		_TAG_TABLE_DOWNSTREAM="${_TAG_OUTPUT_DIR%/}/downstream"
-		_TAG_TABLE_UNIQ="${_TAG_OUTPUT_DIR%/}/uniq"
-		_TAG_TABLE_ISOLATED_FROM_TAG="${_TAG_OUTPUT_DIR%/}/isolated_fromtag"
-		_TAG_TABLE_ISOLATED_TAG="${_TAG_OUTPUT_DIR%/}/isolated_tag"
-		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_DIR%/}/duplicated"
-		_JOINED_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/joined"
+		_TAG_OUTPUT_VERIFIED_DIR="${_TAG_OUTPUT_DIR%/}/verified/"
+		_TAG_PAIRS="${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
+		_TAG_PAIRS_DOWNSTREAM="${_TAG_OUTPUT_DIR%/}/03_tag_pairs_downstream"
+		_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/04_tag_table"
+		_ISOLATED_FROM_TAG="${_TAG_OUTPUT_VERIFIED_DIR%/}/10_isolated_fromtag"
+		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_VERIFIED_DIR%/}/11_duplicated"
 
 		mkdir -p "$_TAG_OUTPUT_DIR"
+		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR"
 
 		awk <"$1" \
 			-F"$SHTRACER_SEPARATOR" \
@@ -241,40 +247,23 @@ make_tag_table() {
 				for (i=1; i<=length(parent); i++){
 					print(parent[i], $2);
 				}
-		 }' >"$_TAG_TABLE"
+		 }' >"$_TAG_PAIRS"
 
 		# Prepare upstream table (starting point)
-		grep "^$NODATA_STRING" "$_TAG_TABLE" |
+		grep "^$NODATA_STRING" "$_TAG_PAIRS" |
 			sort |
 			awk '{$1=""; print $0}' |
 			sed 's/^[[:space:]]*//' |
-			sed '/^$/d' >"$_JOINED_TAG_TABLE"
+			sed '/^$/d' >"$_TAG_TABLE"
 
 		# Prepare downstream tag table
-		grep -v "^$NODATA_STRING" "$_TAG_TABLE" |
+		grep -v "^$NODATA_STRING" "$_TAG_PAIRS" |
 			sort |
-			sed '/^$/d' >"$_TAG_TABLE_DOWNSTREAM"
-
-		# [Verify] From tags that have no upstream tags.
-		_UPSTREAM_UNIQ="$(awk <"$_TAG_TABLE_DOWNSTREAM" '{
-				print $1;
-			}' |
-			sort |
-			uniq -u)"
-
-		_DOWNSTREAM_UNIQ="$(awk <"$_TAG_TABLE_DOWNSTREAM" '{
-				print $2;
-			}' |
-			sort |
-			uniq -u)"
-
-		echo "$_UPSTREAM_UNIQ" "$_UPSTREAM_UNIQ" "$_DOWNSTREAM_UNIQ" |
-			sort |
-			uniq -u >"$_TAG_TABLE_UNIQ"
+			sed '/^$/d' >"$_TAG_PAIRS_DOWNSTREAM"
 
 		# Make joined tag table (each row has a single trace tag chain)
-		if [ "$(wc -l <"$_TAG_TABLE_DOWNSTREAM")" -ge 1 ]; then
-			join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
+			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
 		else
 			error_exit 1 "tag data is empty"
 		fi
@@ -289,35 +278,35 @@ make_tag_table() {
 			uniq -d >"$_TAG_TABLE_DUPLICATED"
 
 		# [Verify] Detect isolated FROM_TAG
-		awk <"$_TAG_TABLE" '{print $1; print $2; print $2}' |
+		awk <"$_TAG_PAIRS" '{print $1; print $2; print $2}' |
 			sort |
 			uniq -u |
 			sed 's/^/'"$NODATA_STRING"' /' |
-      sed '/^$/d' |
-      awk '{print $2}' >"$_TAG_TABLE_ISOLATED_FROM_TAG"
+			sed '/^$/d' |
+			awk '{print $2}' >"$_ISOLATED_FROM_TAG"
 
-		echo "$_JOINED_TAG_TABLE$SHTRACER_SEPARATOR$_TAG_TABLE_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
+		echo "$_TAG_TABLE$SHTRACER_SEPARATOR$_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
 }
 
 ##
 # @brief
-# @param  $1 : JOINED_TAG_TABLE
-# @param  $2 : TAG_TABLE
-# @tag    @IMP2.4@ (FROM: @ARC2.300@)
-join_tag_table() {
+# @param  $1 : filename of the tag table
+# @param  $2 : filename of tag pairs without starting points
+# @tag    @IMP2.4@ (FROM: @ARC2.3@)
+join_tag_pairs() {
 	(
 		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
 			error_exit 1 "incorrect argument."
 		fi
 
-		_JOINED_TAG_TABLE="$1"
+		_TAG_TABLE="$1"
 		_TAG_TABLE_DOWNSTREAM="$2"
 
-		_NF="$(awk <"$_JOINED_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
+		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
 		_NF_PLUS1="$((_NF + 1))"
 
-		_JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM" |
+		_JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM" |
 			awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' |
 			awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' |
 			sort -k$_NF_PLUS1,$_NF_PLUS1)"
@@ -328,18 +317,17 @@ join_tag_table() {
 		if [ "$_IS_LAST" -eq 1 ]; then
 			return
 		else
-			echo "$_JOINED_TMP" >"$_JOINED_TAG_TABLE"
-			join_tag_table "$_JOINED_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+			echo "$_JOINED_TMP" >"$_TAG_TABLE"
+			join_tag_pairs "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
 		fi
 	)
 }
 
 ##
 # @brief
-# @param  $1 : ISOLATED_TAGS_PATH
-# @param  $2 : DUPLICATED_TAGS_PATH
+# @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
-verify_tags() {
+print_verification_result() {
 	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
 

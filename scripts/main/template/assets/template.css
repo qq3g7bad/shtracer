@@ -1,0 +1,37 @@
+ body {
+     margin: 0;
+     font-family: Arial, sans-serif;
+}
+ .container {
+     display: flex;
+     height: 100vh;
+}
+ .left {
+     width: 50%;
+     padding: 20px;
+     box-sizing: border-box;
+     overflow-y: auto;
+}
+ .right {
+     width: 50%;
+     padding: 20px;
+     box-sizing: border-box;
+     display: flex;
+     flex-direction: column;
+     overflow-y: auto;
+     background-color: #f9f9f9;
+}
+ table {
+     width: 100%;
+     border-collapse: collapse;
+}
+ td {
+     border: 1px solid #333;
+     padding: 8px;
+     text-align: center;
+}
+ .highlight-line {
+     background-color: yellow;
+     font-weight: bold;
+}
+

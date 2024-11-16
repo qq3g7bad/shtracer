@@ -117,43 +117,43 @@ parse_arguments() {
 # @brief  Main routine
 # @tag    @IMP1.4@ (FROM: @ARC1.1@)
 main_routine() {
+
 	load_functions
 	init_environment
 	parse_arguments "$@"
 
 	_OUTPUT_STRING="$(
+
 		# Tag change mode
 		if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
 			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+
 		# Test mode
 		elif [ "$SHTRACER_MODE" = 'TEST' ]; then
 			sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+
 		# Normal mode or Verify mode
 		else
-			MAKE_TAG_OUTPUT=$(make_tags "$CONFIG_OUTPUT")
-			MAKE_TAG_TABLE_OUTPUT=$(make_tag_table "$MAKE_TAG_OUTPUT")
 
-			JOINED_TAG_TABLE="$(echo "$MAKE_TAG_TABLE_OUTPUT" |
-				awk -F "$SHTRACER_SEPARATOR" '{print $1}' |
-				sort -k1,1)"
-			VERIFY_FILENAME="$(echo "$MAKE_TAG_TABLE_OUTPUT" |
-				awk -F "$SHTRACER_SEPARATOR" '{for(i=2;i<=NF;i++){printf("%s'"$SHTRACER_SEPARATOR"'", $i)}}')"
+			TAGS=$(extract_tags "$CONFIG_OUTPUT")
+			TAG_TABLE_FILENAMES=$(make_tag_table "$TAGS")
 
+			TAG_TABLE_FILENAME=${TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
+			VERIFICATION_FILENAME=${TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
+
+			# Veify mode
 			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-        :
-      else
+				:
+			# Normal mode
+			else
 				make_target_flowchart "$CONFIG_OUTPUT"
-				cat "$JOINED_TAG_TABLE"
+				make_html "$TAG_TABLE_FILENAME" "$TAGS"
 			fi
-			verify_tags "$VERIFY_FILENAME"  # This is output to stderr
+			print_verification_result "$VERIFICATION_FILENAME" # This is output to stderr
 		fi
 	)"
 
-	if [ $OUTPUT_COLORIZE = TRUE ]; then
-		echo "$_OUTPUT_STRING" | sed 's/NONE/\x1b[31m&\x1b[0m/g'
-	else
-		echo "$_OUTPUT_STRING"
-	fi
+	echo "$_OUTPUT_STRING"
 }
 
 case "$0" in
