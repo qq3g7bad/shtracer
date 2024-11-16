@@ -6,7 +6,6 @@
 
 CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
-OUTPUT_COLORIZE='FALSE'
 BEFORE_TAG=''
 AFTER_TAG=''
 OUTPUT_DIR='./output/'
@@ -87,7 +86,6 @@ parse_arguments() {
 		;;
 	2*-C) # Normal mode with color
 		SHTRACER_MODE='NORMAL'
-		OUTPUT_COLORIZE='TRUE'
 		;;
 	2*-v) # Verify mode
 		SHTRACER_MODE='VERIFY'

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Source test target
+# Source test targets
 . "../../shtracer"
 . "../main/shtracer_util.sh"
 
