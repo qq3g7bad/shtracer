@@ -206,7 +206,15 @@ For details, see documents in `./docs/` directory.
 
 ## 🌏 Requirements
 
-* bash (git-bash for Windows)
+* **POSIX-Compliant Shell**:
+  * shtracer is written in POSIX-compliant shell scripting, ensuring compatibility across a wide range of systems. Although it is commonly used with bash, it should work with any POSIX-compliant shell.
+  * **Linux/macOS**:
+    * A POSIX shell is typically included by default on Linux and macOS systems.
+  * **Windows**:
+    * Windows does not include a POSIX-compliant shell natively. To use shtracer on Windows, you can install one of the following:
+      * Git Bash
+      * MinGW
+      * Cygwin
 * [shUnit2](https://github.com/kward/shunit2) (for unit testing)
 
 ## 📝 Contribution
@@ -216,6 +224,5 @@ For details, see documents in `./docs/` directory.
 
 ## ✅ TODO
 
-* Unit testing
 * Trace not only by tags but filenames
-* Set hyperlinks to trace targets from RTM.
+* Insert Mermaid diagrams in the output html.
