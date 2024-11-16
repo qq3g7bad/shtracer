@@ -218,9 +218,9 @@ extract_tags() {
 }
 
 ##
-# @brief  create the tag table.
-# @param  $1 : extracted tag data (output from extract_tags())
-# @return tag table
+# @brief
+# @param  $1 : TAG_OUTPUT_DATA
+# @return TAG_MATRIX
 # @tag    @IMP2.30@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
@@ -230,11 +230,9 @@ make_tag_table() {
 	(
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_VERIFIED_DIR="${_TAG_OUTPUT_DIR%/}/verified/"
-
 		_TAG_PAIRS="${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
 		_TAG_PAIRS_DOWNSTREAM="${_TAG_OUTPUT_DIR%/}/03_tag_pairs_downstream"
 		_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/04_tag_table"
-
 		_ISOLATED_FROM_TAG="${_TAG_OUTPUT_VERIFIED_DIR%/}/10_isolated_fromtag"
 		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_VERIFIED_DIR%/}/11_duplicated"
 
