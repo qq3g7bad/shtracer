@@ -109,15 +109,15 @@ test_extract_tags() {
 
 		# Level1
 		_ANSWER="$(awk <"./testdata/answer/tags/tags" -F"$SHTRACER_SEPARATOR" '
-		  BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
-		  {
-		    cmd = "basename \""$5"\""; cmd | getline filename_result; close(cmd)
-		    cmd = "dirname \""$5"\""; cmd | getline dirname_result; close(cmd)
-		    cmd = "cd \"'"$CONFIG_DIR"'\";cd "dirname_result";PWD=\"$(pwd)\"; \
-		      echo \"${PWD%/}/\""; cmd | getline absolute_path; close(cmd)
-		    $5 = absolute_path filename_result
-        print $0
-		  }')"
+			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
+			{
+				cmd	=	"basename	\""$5"\"";	cmd	|	getline	filename_result;	close(cmd)
+				cmd	=	"dirname	\""$5"\"";	cmd	|	getline	dirname_result;	close(cmd)
+				cmd	=	"cd	\"'"$CONFIG_DIR"'\";cd	"dirname_result";PWD=\"$(pwd)\";	\
+					echo	\"${PWD%/}/\"";	cmd	|	getline	absolute_path;	close(cmd)
+				$5	=	absolute_path	filename_result
+				print	$0
+			}')"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/01_tags")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)

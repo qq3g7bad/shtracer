@@ -189,14 +189,14 @@ extract_tags() {
 									sub(/^#+[[:space:]]*/, "", $0)
 									print;																 # column 4: title
 
-                  cmd = "basename \"'"$t"'\""; cmd | \
-                    getline filename; close(cmd)
-                  cmd = "dirname \"'"$t"'\""; cmd | \
-                    getline dirname_result; close(cmd)
-                  cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
-                     echo \"${PWD%/}/\""; \
-                     cmd | getline absolute_path; close(cmd)
-                  print absolute_path filename           # column 5: file absolute path
+									cmd	=	"basename	\"'"$t"'\"";	cmd	|	\
+											getline	filename;	close(cmd)
+									cmd	=	"dirname	\"'"$t"'\"";	cmd	|	\
+											getline	dirname_result;	close(cmd)
+									cmd	=	"cd	"dirname_result";PWD=\"$(pwd)\";	\
+												echo	\"${PWD%/}/\"";	\
+												cmd	|	getline	absolute_path;	close(cmd)
+									print	absolute_path	filename											#	column	5:	file	absolute	path
 									print NR															 # column 6: line number including title
 									print'"\"$_TITLE_SEPARATOR"\"'
 								}
