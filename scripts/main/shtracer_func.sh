@@ -267,6 +267,8 @@ make_tag_table() {
 		else
 			error_exit 1 "tag data is empty"
 		fi
+		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
+		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
 
 		# [Verify] Duplicated tags
 		awk <"$1" \
