@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # For unit test
-_SHTRACER_UML_SH=""
+_SHTRACER_HTML_SH=""
 
 case "$0" in
 *shtracer)
@@ -248,11 +248,20 @@ make_html() {
 `,
 },
 '
+
+		# Make a JavaScript file
 		_JS_CONTENTS="$(
 			echo "$_UNIQ_FILE" |
 				while read -r s; do
 					_TRACE_TARGET_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
-					_TRACE_TARGET_CONTENTS="$(sed 's/`/\\&/g' <"$s" | sed 's/${/\\${/g')"
+
+					# for JavaScript escape
+					_TRACE_TARGET_CONTENTS="$(sed 's/\\n/<SHTRACER_NEWLINE>/g' <"$s" |
+						sed 's/`/\\&/g' |
+						sed 's/${/\\${/g' |
+						sed 's/\\\([0-9]\)/\\u005c\1/')"
+
+					# Insert trace target contents to the JavaScript template
 					echo "$_JS_TEMPLATE" |
 						sed 's/@TRACE_TARGET_FILENAME@/'"$_TRACE_TARGET_FILENAME"'/g' |
 						awk -v replacement="$_TRACE_TARGET_CONTENTS" '{ gsub(/@TRACE_TARGET_CONTENTS@/, replacement) }1 '
@@ -272,7 +281,9 @@ make_html() {
 			done
 
 		# echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
-		awk <"${_HTML_ASSETS_DIR%/}/show_text.js" -v replacement="$_JS_CONTENTS" '{ gsub(/\/\/ js_contents/, replacement) }1 ' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+		awk <"${_HTML_ASSETS_DIR%/}/show_text.js" -v replacement="$_JS_CONTENTS" '{ gsub(/\/\/ js_contents/, replacement) }1 ' |
+			sed 's/\\$/\\\\/' |
+			sed 's/<SHTRACER_NEWLINE>/\\\\n/' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 
 		# cat "${_HTML_ASSETS_DIR%/}/show_text.js" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_HTML_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"

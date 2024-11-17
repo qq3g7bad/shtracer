@@ -5,7 +5,7 @@
 . "../main/shtracer_util.sh"
 
 sh -c "./shtracer_func_test.sh"
-sh -c "./shtracer_uml_test.sh"
+sh -c "./shtracer_html_test.sh"
 
 ##
 # @brief

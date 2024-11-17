@@ -221,7 +221,7 @@ extract_tags() {
 # @brief
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
-# @tag    @IMP2.30@ (FROM: @ARC2.2@)
+# @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
 		error_exit 1 "incorrect argument."

@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "${SCRIPT_DIR}" || exit 1
 
-. "../main/shtracer_uml.sh"
+. "../main/shtracer_html.sh"
 . "../main/shtracer_util.sh"
 
 ##

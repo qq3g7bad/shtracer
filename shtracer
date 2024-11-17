@@ -25,7 +25,7 @@ load_functions() {
 	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
 	. "./scripts/main/shtracer_util.sh"
 	. "./scripts/main/shtracer_func.sh"
-	. "./scripts/main/shtracer_uml.sh"
+	. "./scripts/main/shtracer_html.sh"
 	cd "${_PREVIOUS_DIR}" || error_exit 1 "cannot change current directory"
 }
 
