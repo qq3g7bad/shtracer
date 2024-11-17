@@ -133,21 +133,21 @@ main_routine() {
 		# Normal mode or Verify mode
 		else
 
-			TAGS=$(extract_tags "$CONFIG_OUTPUT")
-			TAG_TABLE_FILENAMES=$(make_tag_table "$TAGS")
+			_TAGS=$(extract_tags "$CONFIG_OUTPUT")
+			_TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS")
 
-			TAG_TABLE_FILENAME=${TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
-			VERIFICATION_FILENAME=${TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
+			_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
+			_VERIFICATION_FILENAME=${_TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
 			# Veify mode
 			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
 				:
 			# Normal mode
 			else
-				make_target_flowchart "$CONFIG_OUTPUT"
-				make_html "$TAG_TABLE_FILENAME" "$TAGS"
+				_UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"
+				make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"
 			fi
-			print_verification_result "$VERIFICATION_FILENAME" # This is output to stderr
+			print_verification_result "$_VERIFICATION_FILENAME" # This is output to stderr
 		fi
 	)"
 

@@ -19,6 +19,7 @@ esac
 ##
 # @brief
 # @param	$1 : CONFIG_OUTPUT_DATA
+# @return UML_OUTPUT_FILENAME
 # @tag		@IMP3.1@ (FROM: @ARC3.1@)
 make_target_flowchart() {
 	(
@@ -26,11 +27,10 @@ make_target_flowchart() {
 		_FORK_STRING_BRE="\(fork\)"
 
 		_UML_OUTPUT_DIR="${OUTPUT_DIR%/}/uml/"
-		_UML_OUTPUT_LEVEL1="${_UML_OUTPUT_DIR%/}/1"
-		_UML_OUTPUT_DECLARATION="${_UML_OUTPUT_DIR%/}/declaration"
-		_UML_OUTPUT_RELATIONSHIPS="${_UML_OUTPUT_DIR%/}/relationships"
-		_UML_OUTPUT_LEVEL2="${_UML_OUTPUT_DIR%/}/2"
-		_UML_OUTPUT_FILE="${OUTPUT_DIR%/}/uml.md"
+		_UML_OUTPUT_CONFIG="${_UML_OUTPUT_DIR%/}/01_config"
+		_UML_OUTPUT_DECLARATION="${_UML_OUTPUT_DIR%/}/10_declaration"
+		_UML_OUTPUT_RELATIONSHIPS="${_UML_OUTPUT_DIR%/}/11_relationships"
+		_UML_OUTPUT_FILENAME="${_UML_OUTPUT_DIR%/}/20_uml"
 
 		mkdir -p "$_UML_OUTPUT_DIR"
 
@@ -78,15 +78,15 @@ make_target_flowchart() {
 					print flowchart_idx, $0
 				}' |
 			sed 's/^[^_]*_//' |
-			sed 's/ :/:/' >"$_UML_OUTPUT_LEVEL1"
+			sed 's/ :/:/' >"$_UML_OUTPUT_CONFIG"
 
 		# Prepare declaration for UML
-		awk <"$_UML_OUTPUT_LEVEL1" \
+		awk <"$_UML_OUTPUT_CONFIG" \
 			-F ":" \
 			'{print "id"$1"(["$NF"])"}' >"$_UML_OUTPUT_DECLARATION"
 
 		# Prepare relationships for UML
-		awk <"$_UML_OUTPUT_LEVEL1" \
+		awk <"$_UML_OUTPUT_CONFIG" \
 			-F ":" \
 			'BEGIN{previous="start"}
 			{
@@ -148,26 +148,13 @@ make_target_flowchart() {
 				previous_fork_count=fork_count
 			} END { print "id"$1" --> stop"}' >"$_UML_OUTPUT_RELATIONSHIPS"
 
-		_TEMPLATE_FLOWCHART='
-			# Auto-generated trace flow
-
-			<!-- THE TRACE FLOW HAS THE SAME STRUCTURE AS THE SECTIONS IN THIS CONFIGURATION FILE -->
-
-			<!-- DO NOT EDIT THIS MERMAID BLOCK FROM HERE -->
-			<!-- THIS BLOCK IS AUTO-GENERATED SO THAT TEXTS WILL BE OVERWRITTEN WHEN SHELL SCRIPTS ARE EXECUTED -->
-
-			```mermaid
-			flowchart TB
+		_TEMPLATE_FLOWCHART='flowchart TB
 
 			start[Start]
 			@state_declaration@
 			stop[End]
 
 			@state_relationships@
-			```
-
-			<!-- THIS BLOCK IS AUTO-GENERATED SO THAT TEXTS WILL BE OVERWRITTEN WHEN SHELL SCRIPTS ARE EXECUTED -->
-			<!-- DO NOT EDIT THIS MERMAID BLOCK UNTIL HERE -->
 			'
 
 		echo "$_TEMPLATE_FLOWCHART" |
@@ -175,9 +162,9 @@ make_target_flowchart() {
 			sed '/@state_declaration@/d' |
 			sed "/@state_relationships@/r $_UML_OUTPUT_RELATIONSHIPS" |
 			sed '/@state_relationships@/d' |
-			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_LEVEL2"
+			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
 
-		mv "$_UML_OUTPUT_LEVEL2" "$_UML_OUTPUT_FILE"
+		echo "$_UML_OUTPUT_FILENAME"
 	)
 }
 
@@ -185,14 +172,17 @@ make_target_flowchart() {
 # @brief
 # @param  $1 : TAG_TABLE_FILENAME
 # @param  $2 : TAGS
+# @param  $3 : UML_FILENAME
 make_html() {
 	(
 		_TABLE_HTML=""
+		_MERMAID_SCRIPT=""
+
 		_HTML_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template/"
 		_HTML_ASSETS_DIR="${_HTML_TEMPLATE_DIR%/}/assets/"
 		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
 
-		# Convert a tag table to a html table.
+		# Prepare the tag table : Convert a tag table to a html table.
 		while read -r line || [ -n "$line" ]; do
 			_TABLE_HTML="$_TABLE_HTML<tr>"
 			for cell in $(echo "$line" | sed 's/ /\n/g'); do
@@ -201,19 +191,43 @@ make_html() {
 			_TABLE_HTML="$_TABLE_HTML</tr>\n"
 		done <"$1"
 
-		# Convert non-escaped newline to escaped.
+		# Insert the tag table to a html template.
 		_HTML_CONTENT="$(
 			sed "s/'\\\\n'/'\\\\\\\\n'/g" <"${_HTML_TEMPLATE_DIR%/}/template.html" |
-				sed "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED TABLE -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED TABLE -->|"
+				sed "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED TABLE_UML -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED TABLE_UML -->|"
 		)"
+
+		# Prepare the Mermaid UML
+		_MERMAID_SCRIPT="$(cat "$3")"
+
+		# Insert the Mermaid UML to a html template.
+		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
+			awk -v mermaid_script="${_MERMAID_SCRIPT}" '
+        BEGIN {
+            RS="";
+            ORS="\n\n";
+        }
+        {
+          gsub(/ *<!-- INSERT MERMAID -->/,
+            "<!-- SHTRACER INSERTED TABLE_UML -->\n" mermaid_script "\n<!-- SHTRACER INSERTED TABLE_UML -->");
+          print
+        }')"
+
+		echo "$_HTML_CONTENT" >~/Desktop/test
+
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk 'BEGIN {
 		    add_space=0
 		  }
-		  /<!-- SHTRACER INSERTED TABLE -->/{
+		  /<!-- SHTRACER INSERTED TABLE_UML -->/{
 		    if (add_space == 0) {
 		      add_space = 1
-          add_space_count = previous_space_count + 2
+          if (previous_space_count == space_count) {
+            add_space_count = previous_space_count + 2
+          }
+          else {
+            add_space_count = previous_space_count + 4
+          }
 		    }
 		    else {
 		      add_space = 0
@@ -232,7 +246,8 @@ make_html() {
         }
 		  }')"
 
-		echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
+		echo "$_HTML_CONTENT" |
+			sed '/<!-- SHTRACER INSERTED TABLE_UML -->/d' >"${OUTPUT_DIR%/}/output.html"
 
 		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
 				tag = $2;

@@ -96,7 +96,7 @@ test_load_functions() {
 		assertEquals 0 "$?"
 
 		(
-			echo "$_SHTRACER_UML_SH" >/dev/null
+			echo "$_SHTRACER_HTML_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 	)
