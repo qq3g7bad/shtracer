@@ -183,14 +183,14 @@ make_html() {
 		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
 
 		# Add header row
-		read -r header_line <"$1"
-		_TABLE_HTML="$_TABLE_HTML<thead>\n<tr>"
-		a="0"
-		for _ in $(echo "$header_line" | sed 's/ /\n/g'); do
-			_TABLE_HTML="$_TABLE_HTML<th><a href=\"#\" onclick=\"sortTable($a)\">sort</a></th>"
-			a=$((a + 1))
-		done
-		_TABLE_HTML="$_TABLE_HTML</tr>\n</thead>\n"
+    read -r _HEADER_LINE <"$1"
+    _TABLE_HTML="<thead>\n<tr>"
+    _TABLE_HTML="${_TABLE_HTML}$(echo "$_HEADER_LINE" | awk '{
+      for (i = 1; i <= NF; i++) {
+        printf "<th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>", i - 1;
+      }
+    }')"
+    _TABLE_HTML="${_TABLE_HTML}</tr>\n</thead>\n"
 
 		# Prepare the tag table : Convert a tag table to a html table.
 		_TABLE_HTML="$_TABLE_HTML<tbody>"
