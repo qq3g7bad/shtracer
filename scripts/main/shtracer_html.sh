@@ -183,30 +183,26 @@ make_html() {
 		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
 
 		# Add header row
-    read -r _HEADER_LINE <"$1"
-    _TABLE_HTML="<thead>\n<tr>"
-    _TABLE_HTML="${_TABLE_HTML}$(echo "$_HEADER_LINE" | awk '{
-      for (i = 1; i <= NF; i++) {
-        printf "<th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>", i - 1;
-      }
-    }')"
-    _TABLE_HTML="${_TABLE_HTML}</tr>\n</thead>\n"
+		_TABLE_HTML="<thead>\n<tr>$(awk 'NR == 1 {
+			for (i = 1; i <= NF; i++) {
+				printf "<th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>", i - 1;
+			}
+		}' <"$1")</tr>\n</thead>\n"
 
 		# Prepare the tag table : Convert a tag table to a html table.
-		_TABLE_HTML="$_TABLE_HTML<tbody>"
-		while read -r line || [ -n "$line" ]; do
-			_TABLE_HTML="$_TABLE_HTML<tr>"
-			for cell in $(echo "$line" | sed 's/ /\n/g'); do
-				_TABLE_HTML="$_TABLE_HTML<td>$cell</td>"
-			done
-			_TABLE_HTML="$_TABLE_HTML</tr>\n"
-		done <"$1"
-		_TABLE_HTML="$_TABLE_HTML</tbody>"
+		_TABLE_HTML="$_TABLE_HTML<tbody>\n$(awk '{
+			printf "<tr>"
+				for (i = 1; i <= NF; i++) {
+				printf "<td>"$i"</td>"
+			}
+			printf "</tr>"
+			} ' <"$1")\n</tbody>"
 
 		# Insert the tag table to a html template.
 		_HTML_CONTENT="$(
-			sed "s/'\\\\n'/'\\\\\\\\n'/g" <"${_HTML_TEMPLATE_DIR%/}/template.html" |
-				sed "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED TABLE_UML -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED TABLE_UML -->|"
+			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
+				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED TABLE_UML -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED TABLE_UML -->|" \
+				<"${_HTML_TEMPLATE_DIR%/}/template.html"
 		)"
 
 		# Prepare the Mermaid UML
@@ -214,10 +210,10 @@ make_html() {
 
 		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
 				tag = $2;
-        path = $5
-        line = $6
-        print tag, line, path
-      }')"
+				path = $5
+				line = $6
+				print tag, line, path
+			}')"
 
 		_UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u)\n${CONFIG_PATH}"
 
@@ -227,8 +223,7 @@ make_html() {
 `,
 },
 '
-
-    pattern="@TRACE_TARGET_CONTENTS@"
+		pattern="@TRACE_TARGET_CONTENTS@"
 		# Make a JavaScript file
 		_JS_CONTENTS="$(
 			echo "$_UNIQ_FILE" |
@@ -260,110 +255,111 @@ make_html() {
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
 
 		# [HTML]
-		_HTML_CONTENT="$(echo "$_TAG_INFO_TABLE" |
-      {
-        while read -r s; do
-				  _TAG="$(echo "$s" | awk '{print $1}')"
-				  _LINE="$(echo "$s" | awk '{print $2}')"
-				  _FILE_PATH="$(echo "$s" | awk '{print $3}')"
-				  _FILENAME="$(basename "$_FILE_PATH" | sed 's/\./_/g; s/^/Target_/')"
-				  _EXTENSION=$(basename "$_FILE_PATH" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
-				  _EXTENSION="${_EXTENSION:-sh}"
-				  _SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\', \'""$_FILE_PATH""\')\">""$_TAG""</a>|g";
-          _HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$_SED_COMMAND")"
-			  done
-        echo "$_HTML_CONTENT"
-      }
-    )"
+		_HTML_CONTENT="$(
+			echo "$_TAG_INFO_TABLE" |
+				{
+					while read -r s; do
+						_TAG="$(echo "$s" | awk '{print $1}')"
+						_LINE="$(echo "$s" | awk '{print $2}')"
+						_FILE_PATH="$(echo "$s" | awk '{print $3}')"
+						_FILENAME="$(basename "$_FILE_PATH" | sed 's/\./_/g; s/^/Target_/')"
+						_EXTENSION=$(basename "$_FILE_PATH" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
+						_EXTENSION="${_EXTENSION:-sh}"
+						_SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\', \'""$_FILE_PATH""\')\">""$_TAG""</a>|g"
+						_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$_SED_COMMAND")"
+					done
+					echo "$_HTML_CONTENT"
+				}
+		)"
 
-    # Insert information
+		# Insert information
 		_INFORMATION="$(echo "$_UNIQ_FILE" |
-        while read -r s; do
-				  _FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
-				  _EXTENSION=$(basename "$s" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
-				  _EXTENSION="${_EXTENSION:-sh}"
-          echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""', '""$s""')\">""$(basename "$s")""</a></li>"
-        done)"
+			while read -r s; do
+				_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
+				_EXTENSION=$(basename "$s" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
+				_EXTENSION="${_EXTENSION:-sh}"
+				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""', '""$s""')\">""$(basename "$s")""</a></li>"
+			done)"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk -v information="${_INFORMATION}" '
-        BEGIN {
-          RS="";
-          ORS="\n\n";
-          print "<ul>"
-        }
-        {
-          gsub(/ *<!-- INSERT INFORMATION -->/,
-            "<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
-          print
-        }
-        END {
-          print "</ul>"
-        }')"
+				BEGIN {
+					RS="";
+					ORS="\n\n";
+					print "<ul>"
+				}
+				{
+					gsub(/ *<!-- INSERT INFORMATION -->/,
+					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
+					print
+				}
+				END {
+					print "</ul>"
+				}')"
 
 		# Insert the Mermaid UML to a html template.
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk -v mermaid_script="${_MERMAID_SCRIPT}" '
-        BEGIN {
-            RS="";
-            ORS="\n\n";
-        }
-        {
-          gsub(/ *<!-- INSERT MERMAID -->/,
-            "<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
-          print
-        }')"
+				BEGIN {
+					RS="";
+					ORS="\n\n";
+				}
+				{
+					gsub(/ *<!-- INSERT MERMAID -->/,
+					"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
+					print
+				}')"
 
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk 'BEGIN {
-		    add_space=0
-		  }
-		  /<!-- SHTRACER INSERTED -->/{
-		    if (add_space == 0) {
-		      add_space = 1
-          if (previous_space_count == space_count) {
-            add_space_count = previous_space_count + 2
-          }
-          else {
-            add_space_count = previous_space_count + 4
-          }
+				add_space=0
+			}
+			/<!-- SHTRACER INSERTED -->/{
+				if (add_space == 0) {
+					add_space = 1
+					if (previous_space_count == space_count) {
+						add_space_count = previous_space_count + 2
+					}
+					else {
+						add_space_count = previous_space_count + 4
+					}
 		    }
 		    else {
 		      add_space = 0
 		      printf "%*s%s\n", add_space_count, "", $0
-          next
+					next
 		    }
-      }
+			}
 		  {
-        previous_space_count = space_count
-        match($0, /^[ \t]*/)
-        space_count = RLENGTH
+				previous_space_count = space_count
+				match($0, /^[ \t]*/)
+				space_count = RLENGTH
 		    if (add_space == 1) {
 		      printf "%*s%s\n", add_space_count, "", $0
-		    } else {
-          print $0
-        }
+		    }
+	      else {
+					print $0
+				}
 		  }')"
 
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
-      sed '/<!-- SHTRACER INSERTED -->/d')"
+			sed '/<!-- SHTRACER INSERTED -->/d')"
 
-
-    echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
+		echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
 
 		# [JS]
 		# Subsitute a comment block in the template js file to "$_JS_CONTENTS"
-    while read -r s; do
-      case "$s" in
-        *//\ js_contents*)
-          printf "%s\n" "$_JS_CONTENTS"
-          ;;
-        *)
-          printf "%s\n" "$s"
-          ;;
-      esac
-    done <"${_HTML_ASSETS_DIR%/}/show_text.js" |
-      sed 's/\\$/\\\\/' |
-		  sed 's/<SHTRACER_NEWLINE>/\\\\n/' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+		while read -r s; do
+			case "$s" in
+			*//\ js_contents*)
+				printf "%s\n" "$_JS_CONTENTS"
+				;;
+			*)
+				printf "%s\n" "$s"
+				;;
+			esac
+		done <"${_HTML_ASSETS_DIR%/}/show_text.js" |
+			sed 's/\\$/\\\\/' |
+			sed 's/<SHTRACER_NEWLINE>/\\\\n/' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 
 		# [CSS]
 		cat "${_HTML_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
