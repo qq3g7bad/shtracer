@@ -287,20 +287,24 @@ convert_template_html() {
 # @param $1 : UNIQ_FILE
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
-  (
-  	_UNIQ_FILE="$1"
-  	_TEMPLATE_ASSETS_DIR="$2"
-		_JS_TEMPLATE='
-@TRACE_TARGET_FILENAME@: {content: `
-@TRACE_TARGET_CONTENTS@
-`,
-},
-'
-		pattern="@TRACE_TARGET_CONTENTS@"
+	(
+		_UNIQ_FILE="$1"
+		_TEMPLATE_ASSETS_DIR="$2"
+
+		# Define the template with a tab-indented structure
+		_JS_TEMPLATE=$(cat <<- 'EOF'
+			@TRACE_TARGET_FILENAME@: {content: `
+			@TRACE_TARGET_CONTENTS@
+			`,
+			},
+			EOF
+		)
+
 		# Make a JavaScript file
 		_JS_CONTENTS="$(
 			echo "$_UNIQ_FILE" |
 				while read -r s; do
+          # Convert a filename to be used in JaveScript's key.
 					_TRACE_TARGET_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
 
 					# for JavaScript escape
@@ -314,7 +318,7 @@ convert_template_js() {
 						sed 's/@TRACE_TARGET_FILENAME@/'"$_TRACE_TARGET_FILENAME"'/g' |
 						while read -r line; do
 							case "$line" in
-							*"$pattern"*)
+							*"@TRACE_TARGET_CONTENTS@"*)
 								printf "%s\n" "$_TRACE_TARGET_CONTENTS"
 								;;
 							*)
