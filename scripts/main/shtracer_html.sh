@@ -364,7 +364,7 @@ make_html() {
 				print tag, line, path
 			}')"
 		_UML_FILENAME="$3"
-		_UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u)\n${CONFIG_PATH}"
+    _UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u | sed "\$a${CONFIG_PATH}")"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
 		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UNIQ_FILE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
