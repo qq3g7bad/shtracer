@@ -219,6 +219,9 @@ For details, see documents in `./docs/` directory.
       * Git Bash
       * MinGW
       * Cygwin
+
+### Optional
+
 * [shUnit2](https://github.com/kward/shunit2) (for unit testing)
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
 * [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
