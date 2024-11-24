@@ -168,50 +168,27 @@ make_target_flowchart() {
 	)
 }
 
-convert_template_html() {
-  :
-}
-
-convert_template_js() {
-  :
-}
-
 ##
-# @brief  Make output files (html, js, css)
-# @param  $1 : TAG_TABLE_FILENAME
-# @param  $2 : TAGS
-# @param  $3 : UML_FILENAME
-make_html() {
+# @brief Convert a template html file for output.html
+# @param $1 : TAG_TABLE_FILENAME
+# @param $2 : TAG_INFO_TABLE
+# @param $3 : UNIQ_FILE
+# @param $4 : UML_FILENAME
+# @param $5 : TEMPLATE_HTML_DIR
+convert_template_html() {
 	(
-		_TABLE_HTML=""
-		_MERMAID_SCRIPT=""
-
-		_TEMPLATE_HTML_DIR="${SCRIPT_DIR%/}/scripts/main/template/"
-		_TEMPLTE_ASSETS_DIR="${_TEMPLATE_HTML_DIR%/}/assets/"
-		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
-
-		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
-				tag = $2;
-				path = $5
-				line = $6
-				print tag, line, path
-			}')"
-
-		_UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u)\n${CONFIG_PATH}"
-
-		mkdir -p "${OUTPUT_DIR%/}/assets/"
-
-		# [HTML]
-    # _UNIQ_FILE
-    # _TAG_INFO_TABLE
-    # _TEMPLATE_HTML_DIR
+    _TAG_TABLE_FILENAME="$1"
+    _TAG_INFO_TABLE="$2"
+    _UNIQ_FILE="$3"
+    _UML_FILENAME="$4"
+    _TEMPLATE_HTML_DIR="$5"
 
 		# Add header row
 		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
 			for (i = 1; i <= NF; i++) {
 				printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
 			}
-		}' <"$1")  </tr>\n</thead>\n"
+		}' <"$_TAG_TABLE_FILENAME")  </tr>\n</thead>\n"
 
 		# Prepare the tag table : Convert a tag table to a html table.
 		_TABLE_HTML="$_TABLE_HTML<tbody>$(awk '{
@@ -220,7 +197,7 @@ make_html() {
 					printf "    <td>"$i"</td>\\n"
 				}
 			printf "  </tr>"
-		} ' <"$1")\n</tbody>"
+		} ' <"$_TAG_TABLE_FILENAME")\n</tbody>"
 
 		# Insert the tag table to a html template.
 		_HTML_CONTENT="$(
@@ -229,7 +206,7 @@ make_html() {
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
 		_HTML_CONTENT="$(
-			echo "$_TAG_INFO_TABLE" |
+			echo "$2" |
 				{
 					while read -r s; do
 						_TAG="$(echo "$s" | awk '{print $1}')"
@@ -255,7 +232,7 @@ make_html() {
 			done)\n</ul>"
 
 		# Prepare the Mermaid UML
-		_MERMAID_SCRIPT="$(cat "$3")"
+		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
 
 		# Insert the Mermaid UML to a html template.
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
@@ -267,7 +244,6 @@ make_html() {
 						"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
 					print
 				}' |
-
 			awk '
 				BEGIN {
 			    add_space = 0
@@ -302,12 +278,18 @@ make_html() {
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed '/<!-- SHTRACER INSERTED -->/d')"
 
-		echo "$_HTML_CONTENT" >"${OUTPUT_DIR%/}/output.html"
+		echo "$_HTML_CONTENT"
+	)
+}
 
-		# [JS]
-    # UNIQ_FILE
-    # ASSETS_TEMPLATE_DIR
-
+##
+# @brief Convert template js file for tracing targets
+# @param $1 : UNIQ_FILE
+# @param $2 : TEMPLATE_ASSETS_DIR
+convert_template_js() {
+  (
+  	_UNIQ_FILE="$1"
+  	_TEMPLATE_ASSETS_DIR="$2"
 		_JS_TEMPLATE='
 @TRACE_TARGET_FILENAME@: {content: `
 @TRACE_TARGET_CONTENTS@
@@ -343,7 +325,6 @@ make_html() {
 				done
 		)"
 
-
 		# Subsitute a comment block in the template js file to "$_JS_CONTENTS"
 		while read -r s; do
 			case "$s" in
@@ -354,12 +335,36 @@ make_html() {
 				printf "%s\n" "$s"
 				;;
 			esac
-		done <"${_TEMPLTE_ASSETS_DIR%/}/show_text.js" |
+		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js" |
 			sed 's/\\$/\\\\/' |
-			sed 's/<SHTRACER_NEWLINE>/\\\\n/' >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+			sed 's/<SHTRACER_NEWLINE>/\\\\n/'
+    )
+}
 
-		# [CSS]
-    # TEMPLATE_ASSETS_DIR
+##
+# @brief  Make output files (html, js, css)
+# @param  $1 : TAG_TABLE_FILENAME
+# @param  $2 : TAGS
+# @param  $3 : UML_FILENAME
+make_html() {
+	(
+		_TEMPLATE_HTML_DIR="${SCRIPT_DIR%/}/scripts/main/template/"
+		_TEMPLTE_ASSETS_DIR="${_TEMPLATE_HTML_DIR%/}/assets/"
+		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
+
+		_TAG_TABLE_FILENAME="$1"
+		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
+				tag = $2;
+				path = $5
+				line = $6
+				print tag, line, path
+			}')"
+		_UML_FILENAME="$3"
+		_UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u)\n${CONFIG_PATH}"
+
+		mkdir -p "${OUTPUT_DIR%/}/assets/"
+		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UNIQ_FILE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
+    convert_template_js "$_UNIQ_FILE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
 	)
 }
