@@ -43,8 +43,8 @@ print_usage() {
 		  -h, --help                       Show this help message
 
 		Examples:
-		      1. Normal mode
-		         $ ./shtracer ./sample/config.md
+		  1. Normal mode
+		     $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
 		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
