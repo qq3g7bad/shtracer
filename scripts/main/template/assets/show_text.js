@@ -2,7 +2,9 @@ const files = {
   // js_contents
 
   /*
-   *  @TRACE_TARGET_FILENAME@: {content: `
+   *  @TRACE_TARGET_FILENAME@: {
+   *    path: "@TRACE_TARGET_PATH@,
+   *    content: `
    *  @TRACE_TARGET_CONTENTS@
    *  `,
    *  },
@@ -16,9 +18,8 @@ const files = {
  * @param fileName       : [str] filename used in files (different from the real filename).
  * @param highlightLine  : [int] a line number to highlight
  * @param language       : [str] language for syntax highlighting (highlight.js)
- * @param path           : [str] file absolute path
  */
-function showText(event, fileName, highlightLine, language, path) {
+function showText(event, fileName, highlightLine, language) {
   event.preventDefault();
   const file = files[fileName];
   const textContainer = document.getElementById('text-container');
@@ -46,7 +47,7 @@ function showText(event, fileName, highlightLine, language, path) {
   }
 
   const outputElement = document.getElementById("file-information");
-  outputElement.textContent = path;
+  outputElement.textContent = file.path;
 }
 
 /**
@@ -138,12 +139,12 @@ function sortTable(columnIndex) {
 /**
  * @brief Show the tooltip
  * @param event          : [MoueseEvent]
- * @param path           : [str] file absolute path
+ * @param fileName       : [str] filename used in files (different from the real filename).
  */
-function showTooltip(event, path) {
+function showTooltip(event, fileName) {
     const tooltip = document.getElementById('tooltip');
 
-    tooltip.textContent = path;
+    tooltip.textContent = files[fileName].path;
     tooltip.style.left = `${event.pageX + 10}px`;
     tooltip.style.top = `${event.pageY + 10}px`;
     tooltip.style.opacity = 0.9;

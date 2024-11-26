@@ -172,16 +172,14 @@ make_target_flowchart() {
 # @brief Convert a template html file for output.html
 # @param $1 : TAG_TABLE_FILENAME
 # @param $2 : TAG_INFO_TABLE
-# @param $3 : UNIQ_FILE
-# @param $4 : UML_FILENAME
-# @param $5 : TEMPLATE_HTML_DIR
+# @param $3 : UML_FILENAME
+# @param $4 : TEMPLATE_HTML_DIR
 convert_template_html() {
 	(
     _TAG_TABLE_FILENAME="$1"
     _TAG_INFO_TABLE="$2"
-    _UNIQ_FILE="$3"
-    _UML_FILENAME="$4"
-    _TEMPLATE_HTML_DIR="$5"
+    _UML_FILENAME="$3"
+    _TEMPLATE_HTML_DIR="$4"
 
 		# Add header row
 		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
@@ -206,7 +204,7 @@ convert_template_html() {
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
 		_HTML_CONTENT="$(
-			echo "$2" |
+			echo "$_TAG_INFO_TABLE" |
 				{
 					while read -r s; do
 						_TAG="$(echo "$s" | awk '{print $1}')"
@@ -215,7 +213,7 @@ convert_template_html() {
 						_FILENAME="$(basename "$_FILE_PATH" | sed 's/\./_/g; s/^/Target_/')"
 						_EXTENSION=$(basename "$_FILE_PATH" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
 						_EXTENSION="${_EXTENSION:-sh}"
-						_SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\', \'""$_FILE_PATH""\')\" onmouseover=\"showTooltip(event, \'""$_FILE_PATH""\')\" onmouseout=\"hideTooltip()\">""$_TAG""</a>|g"
+						_SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\')\" onmouseover=\"showTooltip(event, \'""$_FILENAME""\')\" onmouseout=\"hideTooltip()\">""$_TAG""</a>|g"
 						_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$_SED_COMMAND")"
 					done
 					echo "$_HTML_CONTENT"
@@ -223,12 +221,12 @@ convert_template_html() {
 		)"
 
 		# Prepare file information
-		_INFORMATION="<ul>\n$(echo "$2" | awk '{print $3}' | sort -u |
+		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u |
 			while read -r s; do
 				_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
 				_EXTENSION=$(basename "$s" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
 				_EXTENSION="${_EXTENSION:-sh}"
-				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""', '""$s""')\" onmouseover=\"showTooltip(event, '""$s""')\" onmouseout=\"hideTooltip()\">""$(basename "$s")""</a></li>"
+				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""')\" onmouseover=\"showTooltip(event, '""$_FILENAME""')\" onmouseout=\"hideTooltip()\">""$(basename "$s")""</a></li>"
 			done)\n</ul>"
 
 		# Prepare the Mermaid UML
@@ -284,16 +282,18 @@ convert_template_html() {
 
 ##
 # @brief Convert template js file for tracing targets
-# @param $1 : UNIQ_FILE
+# @param $1 : TAG_INFO_TABLE
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
 	(
-		_UNIQ_FILE="$1"
+    _TAG_INFO_TABLE="$1"
 		_TEMPLATE_ASSETS_DIR="$2"
 
 		# Define the template with a tab-indented structure
 		_JS_TEMPLATE=$(cat <<- 'EOF'
-			@TRACE_TARGET_FILENAME@: {content: `
+			@TRACE_TARGET_FILENAME@: {
+      path:"@TRACE_TARGET_PATH@",
+      content: `
 			@TRACE_TARGET_CONTENTS@
 			`,
 			},
@@ -302,24 +302,25 @@ convert_template_js() {
 
 		# Make a JavaScript file
 		_JS_CONTENTS="$(
-			echo "$_UNIQ_FILE" |
-				while read -r s; do
+			echo "$_TAG_INFO_TABLE" | awk '{ print $3 }' | sort -u |
+				while read -r path; do
           # Convert a filename to be used in JaveScript's key.
-					_TRACE_TARGET_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
+				  _FILENAME="$(basename "$path" | sed 's/\./_/g; s/^/Target_/')"
 
 					# for JavaScript escape
-					_TRACE_TARGET_CONTENTS="$(sed 's/\\n/<SHTRACER_NEWLINE>/g' <"$s" |
+					_CONTENTS="$(sed 's/\\n/<SHTRACER_NEWLINE>/g' <"$path" |
 						sed 's/`/\\&/g' |
 						sed 's/${/\\${/g' |
 						sed 's/\\\([0-9]\)/\\u005c\1/')"
 
 					# Insert trace target contents to the JavaScript template
 					echo "$_JS_TEMPLATE" |
-						sed 's/@TRACE_TARGET_FILENAME@/'"$_TRACE_TARGET_FILENAME"'/g' |
+						sed 's|@TRACE_TARGET_PATH@|'"$path"'|g' |
+						sed 's/@TRACE_TARGET_FILENAME@/'"$_FILENAME"'/g' |
 						while read -r line; do
 							case "$line" in
 							*"@TRACE_TARGET_CONTENTS@"*)
-								printf "%s\n" "$_TRACE_TARGET_CONTENTS"
+								printf "%s\n" "$_CONTENTS"
 								;;
 							*)
 								printf "%s\n" "$line"
@@ -357,18 +358,20 @@ make_html() {
 		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
 
 		_TAG_TABLE_FILENAME="$1"
-		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" '{
+		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" -v config_path="${CONFIG_PATH}" '{
 				tag = $2;
 				path = $5
 				line = $6
 				print tag, line, path
-			}')"
+			}
+      END {
+        print "@CONFIG@", "1", config_path
+      }')"
 		_UML_FILENAME="$3"
-    _UNIQ_FILE="$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u | sed "\$a${CONFIG_PATH}")"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
-		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UNIQ_FILE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
-    convert_template_js "$_UNIQ_FILE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
+    convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
 	)
 }
