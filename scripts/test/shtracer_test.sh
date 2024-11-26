@@ -332,8 +332,8 @@ test_parse_arguments_with_config_file() {
 		# Act -------------
 		parse_arguments "$0"
 		# Assert ----------
-    _DIRNAME=$(cd "$(dirname "$0")" && pwd)
-    assertEquals "${_DIRNAME%/}/${0##*/}" "$CONFIG_PATH"
+		_DIRNAME=$(cd "$(dirname "$0")" && pwd)
+		assertEquals "${_DIRNAME%/}/${0##*/}" "$CONFIG_PATH"
 		assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
 		assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"

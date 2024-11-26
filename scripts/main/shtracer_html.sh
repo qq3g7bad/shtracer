@@ -215,7 +215,7 @@ convert_template_html() {
 						_FILENAME="$(basename "$_FILE_PATH" | sed 's/\./_/g; s/^/Target_/')"
 						_EXTENSION=$(basename "$_FILE_PATH" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
 						_EXTENSION="${_EXTENSION:-sh}"
-						_SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\', \'""$_FILE_PATH""\')\">""$_TAG""</a>|g"
+						_SED_COMMAND="s|""$_TAG""|<a href=\"#\" onclick=\"showText(event, \'""$_FILENAME""\', ""$_LINE"", \'""$_EXTENSION""\', \'""$_FILE_PATH""\')\" onmouseover=\"showTooltip(event, \'""$_FILE_PATH""\')\" onmouseout=\"hideTooltip()\">""$_TAG""</a>|g"
 						_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$_SED_COMMAND")"
 					done
 					echo "$_HTML_CONTENT"
@@ -223,12 +223,12 @@ convert_template_html() {
 		)"
 
 		# Prepare file information
-		_INFORMATION="<ul>\n$(echo "$_UNIQ_FILE" |
+		_INFORMATION="<ul>\n$(echo "$2" | awk '{print $3}' | sort -u |
 			while read -r s; do
 				_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
 				_EXTENSION=$(basename "$s" | sed -n 's/.*\.\([^\.]*\)$/\1/p')
 				_EXTENSION="${_EXTENSION:-sh}"
-				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""', '""$s""')\">""$(basename "$s")""</a></li>"
+				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""', '""$s""')\" onmouseover=\"showTooltip(event, '""$s""')\" onmouseout=\"hideTooltip()\">""$(basename "$s")""</a></li>"
 			done)\n</ul>"
 
 		# Prepare the Mermaid UML

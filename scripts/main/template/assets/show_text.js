@@ -16,6 +16,7 @@ const files = {
  * @param fileName       : [str] filename used in files (different from the real filename).
  * @param highlightLine  : [int] a line number to highlight
  * @param language       : [str] language for syntax highlighting (highlight.js)
+ * @param path           : [str] file absolute path
  */
 function showText(event, fileName, highlightLine, language, path) {
   event.preventDefault();
@@ -132,6 +133,28 @@ function sortTable(columnIndex) {
     }
   });
   hideSameText();
+}
+
+/**
+ * @brief Show the tooltip
+ * @param event          : [MoueseEvent]
+ * @param path           : [str] file absolute path
+ */
+function showTooltip(event, path) {
+    const tooltip = document.getElementById('tooltip');
+
+    tooltip.textContent = path;
+    tooltip.style.left = `${event.pageX + 10}px`;
+    tooltip.style.top = `${event.pageY + 10}px`;
+    tooltip.style.opacity = 0.9;
+}
+
+/**
+ * @brief Hide the tooltip
+ */
+function hideTooltip() {
+    const tooltip = document.getElementById('tooltip');
+    tooltip.style.opacity = 0;
 }
 
 window.onload = function() {
