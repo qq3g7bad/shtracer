@@ -23,6 +23,8 @@ esac
 # @tag		@IMP3.1@ (FROM: @ARC3.1@)
 make_target_flowchart() {
 	(
+		profile_start "MAKE_TARGET_FLOWCHART"
+
 		_CONFIG_OUTPUT_DATA="$1"
 		_FORK_STRING_BRE="\(fork\)"
 
@@ -165,6 +167,7 @@ make_target_flowchart() {
 			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
 
 		echo "$_UML_OUTPUT_FILENAME"
+		profile_end "MAKE_TARGET_FLOWCHART"
 	)
 }
 
@@ -176,19 +179,24 @@ make_target_flowchart() {
 # @param $4 : TEMPLATE_HTML_DIR
 convert_template_html() {
 	(
-    _TAG_TABLE_FILENAME="$1"
-    _TAG_INFO_TABLE="$2"
-    _UML_FILENAME="$3"
-    _TEMPLATE_HTML_DIR="$4"
+		profile_start "CONVERT_TEMPLATE_HTML"
 
+		_TAG_TABLE_FILENAME="$1"
+		_TAG_INFO_TABLE="$2"
+		_UML_FILENAME="$3"
+		_TEMPLATE_HTML_DIR="$4"
+
+		profile_start "CONVERT_TEMPLATE_HTML_ADD_HEADER_ROW"
 		# Add header row
 		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
 			for (i = 1; i <= NF; i++) {
 				printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
 			}
 		}' <"$_TAG_TABLE_FILENAME")  </tr>\n</thead>\n"
+		profile_end "CONVERT_TEMPLATE_HTML_ADD_HEADER_ROW"
 
 		# Prepare the tag table : Convert a tag table to a html table.
+		profile_start "CONVERT_TEMPLATE_HTML_PREPARE_TAG_TABLE"
 		_TABLE_HTML="$_TABLE_HTML<tbody>$(awk '{
 			printf "\\n  <tr>\\n"
 				for (i = 1; i <= NF; i++) {
@@ -196,13 +204,18 @@ convert_template_html() {
 				}
 			printf "  </tr>"
 		} ' <"$_TAG_TABLE_FILENAME")\n</tbody>"
+		profile_end "CONVERT_TEMPLATE_HTML_PREPARE_TAG_TABLE"
 
 		# Insert the tag table to a html template.
+		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
 				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
+		profile_end "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
+
+		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE_LINK"
 		_HTML_CONTENT="$(
 			echo "$_TAG_INFO_TABLE" |
 				{
@@ -219,8 +232,10 @@ convert_template_html() {
 					echo "$_HTML_CONTENT"
 				}
 		)"
+		profile_end "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE_LINK"
 
 		# Prepare file information
+		profile_start "CONVERT_TEMPLATE_HTML_INSERT_INFORMATION"
 		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" | awk '{print $3}' | sort -u |
 			while read -r s; do
 				_FILENAME="$(basename "$s" | sed 's/\./_/g; s/^/Target_/')"
@@ -228,10 +243,12 @@ convert_template_html() {
 				_EXTENSION="${_EXTENSION:-sh}"
 				echo "<li><a href=\"#\" onclick=\"showText(event, '""$_FILENAME""', ""1"", '""$_EXTENSION""')\" onmouseover=\"showTooltip(event, '""$_FILENAME""')\" onmouseout=\"hideTooltip()\">""$(basename "$s")""</a></li>"
 			done)\n</ul>"
+		profile_end "CONVERT_TEMPLATE_HTML_INSERT_INFORMATION"
 
 		# Prepare the Mermaid UML
 		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
 
+		profile_start "CONVERT_TEMPLATE_HTML_INSERT_MERMAID"
 		# Insert the Mermaid UML to a html template.
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk -v information="${_INFORMATION}" -v mermaid_script="${_MERMAID_SCRIPT}" '
@@ -273,10 +290,13 @@ convert_template_html() {
 				}
 			')"
 
+		profile_end "CONVERT_TEMPLATE_HTML_INSERT_MERMAID"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed '/<!-- SHTRACER INSERTED -->/d')"
 
 		echo "$_HTML_CONTENT"
+
+		profile_end "CONVERT_TEMPLATE_HTML"
 	)
 }
 
@@ -286,17 +306,19 @@ convert_template_html() {
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
 	(
-    _TAG_INFO_TABLE="$1"
+		profile_start "CONVERT_TEMPLATE_JS"
+		_TAG_INFO_TABLE="$1"
 		_TEMPLATE_ASSETS_DIR="$2"
 
 		# Define the template with a tab-indented structure
-		_JS_TEMPLATE=$(cat <<- 'EOF'
-			@TRACE_TARGET_FILENAME@: {
-      path:"@TRACE_TARGET_PATH@",
-      content: `
-			@TRACE_TARGET_CONTENTS@
-			`,
-			},
+		_JS_TEMPLATE=$(
+			cat <<-'EOF'
+				@TRACE_TARGET_FILENAME@: {
+				      path:"@TRACE_TARGET_PATH@",
+				      content: `
+				@TRACE_TARGET_CONTENTS@
+				`,
+				},
 			EOF
 		)
 
@@ -304,8 +326,8 @@ convert_template_js() {
 		_JS_CONTENTS="$(
 			echo "$_TAG_INFO_TABLE" | awk '{ print $3 }' | sort -u |
 				while read -r path; do
-          # Convert a filename to be used in JaveScript's key.
-				  _FILENAME="$(basename "$path" | sed 's/\./_/g; s/^/Target_/')"
+					# Convert a filename to be used in JaveScript's key.
+					_FILENAME="$(basename "$path" | sed 's/\./_/g; s/^/Target_/')"
 
 					# for JavaScript escape
 					_CONTENTS="$(sed 's/\\n/<SHTRACER_NEWLINE>/g' <"$path" |
@@ -342,8 +364,9 @@ convert_template_js() {
 			esac
 		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js" |
 			sed 's/\\$/\\\\/' |
-			sed 's/<SHTRACER_NEWLINE>/\\\\n/'
-    )
+			sed 's/<SstartHTRACER_NEWLINE>/\\\\n/'
+		profile_end "CONVERT_TEMPLATE_JS"
+	)
 }
 
 ##
@@ -371,7 +394,7 @@ make_html() {
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
 		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
-    convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
+		convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
 	)
 }

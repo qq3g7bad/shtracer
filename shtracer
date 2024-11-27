@@ -116,8 +116,11 @@ parse_arguments() {
 main_routine() {
 
 	load_functions
+
+  profile_start "INITIALIZE"
 	init_environment
 	parse_arguments "$@"
+  profile_end "INITIALIZE"
 
 	_OUTPUT_STRING="$(
 

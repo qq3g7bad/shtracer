@@ -333,19 +333,19 @@ print_verification_result() {
 	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
 	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
 
-  _RETURN_NUM="0"
+	_RETURN_NUM="0"
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-    _RETURN_NUM=$((_RETURN_NUM+1))
+		_RETURN_NUM=$((_RETURN_NUM + 1))
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-    _RETURN_NUM=$((_RETURN_NUM+1))
+		_RETURN_NUM=$((_RETURN_NUM + 1))
 	fi
-  return "$_RETURN_NUM"
+	return "$_RETURN_NUM"
 }
 
 ##
