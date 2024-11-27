@@ -106,7 +106,7 @@ parse_arguments() {
 
 	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
 	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
-  CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
+	CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
 	CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
 }
 
@@ -117,10 +117,10 @@ main_routine() {
 
 	load_functions
 
-  profile_start "INITIALIZE"
+	profile_start "INITIALIZE"
 	init_environment
 	parse_arguments "$@"
-  profile_end "INITIALIZE"
+	profile_end "INITIALIZE"
 
 	_OUTPUT_STRING="$(
 

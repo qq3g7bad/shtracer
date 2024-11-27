@@ -108,6 +108,7 @@ extract_tags() {
 	fi
 
 	(
+    profile_start "EXTRACT_TAGS"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
