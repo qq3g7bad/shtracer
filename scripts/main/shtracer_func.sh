@@ -125,8 +125,8 @@ extract_tags() {
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
 				_TAG_FORMAT="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $5 }' | sed 's/^`//' | sed 's/`$//')"
-				_TAG_LINE_FORMAT="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $6 }' | sed 's/^`//' | sed 's/`$//')"
-				_TAG_TITLE_OFFSET="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $7 }')"
+        _TAG_LINE_FORMAT="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $6 }' | sed 's/^`//' | sed 's/`$//')"
+        _TAG_TITLE_OFFSET="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $7 }')"
 				_TAG_TITLE_OFFSET="${_TAG_TITLE_OFFSET:-1}"
 
 				_FROM_TAG_START="FROM:"
@@ -157,62 +157,61 @@ extract_tags() {
 				fi
 
 				echo "$_FILE" |
-					while read -r t; do
-						awk <"$t" \
-							' # For title offset, extract only the offset line
-							BEGIN {
-								counter = -1
-							}
-
-							# 1) Print tag column
-							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
-								counter='"$_TAG_TITLE_OFFSET"';
-								print "'"$_TITLE"'"                      # column 1: trace target
-
-								match($0, /'"$_TAG_FORMAT"'/)
-								tag=substr($0, RSTART, RLENGTH)
-								print tag;                               # column 2: tag
-
-								match($0, /'"$_FROM_TAG_REGEX"'/)
-								if (RSTART == 0) {                       # no from tag
-									from_tag="'"$NODATA_STRING"'"
-								}
-								else{
-									from_tag=substr($0, RSTART+1, RLENGTH-2)
-									sub(/'"$_FROM_TAG_START"'/, "", from_tag)
-									sub(/^[[:space:]]*/, "", from_tag)
-									sub(/[[:space:]]$/, "", from_tag)
-								}
-								print from_tag;                          # column 3: from tag
-							}
-
-							# 2) Print the offset line
+						awk '
+              # For title offset, extract only the offset line
 							{
-								if (counter == 0) {
-									sub(/^#+[[:space:]]*/, "", $0)
-									print;                                 # column 4: title
+                path = $0
+								counter = -1
+								while (getline line < path > 0) {
 
-									cmd	=	"basename	\"'"$t"'\"";	cmd	|	\
-											getline	filename;	close(cmd)
-									cmd	=	"dirname	\"'"$t"'\"";	cmd	|	\
-											getline	dirname_result;	close(cmd)
-									cmd	=	"cd	"dirname_result";PWD=\"$(pwd)\";	\
-												echo	\"${PWD%/}/\"";	\
-												cmd	|	getline	absolute_path;	close(cmd)
-									print	absolute_path	filename           # column 5: file absolute path
-									print NR                               # column 6: line number including title
-									print'"\"$_TITLE_SEPARATOR"\"'
-								}
-								if (counter >= 0) {
-									counter--;
+									# 1) Print tag column
+                  if (line ~ /'"$_TAG_FORMAT"'/ && line ~ /'"$_TAG_LINE_FORMAT"'/) {
+										counter='"$_TAG_TITLE_OFFSET"';
+										print "'"$_TITLE"'"                    # column 1: trace target
+
+										match(line, /'"$_TAG_FORMAT"'/)
+										tag=substr(line, RSTART, RLENGTH)
+										print tag;                             # column 2: tag
+
+										match(line, /'"$_FROM_TAG_REGEX"'/)
+										if (RSTART == 0) {                     # no from tag
+											from_tag="'"$NODATA_STRING"'"
+										}
+										else{
+											from_tag=substr(line, RSTART+1, RLENGTH-2)
+											sub(/'"$_FROM_TAG_START"'/, "", from_tag)
+											sub(/^[[:space:]]*/, "", from_tag)
+											sub(/[[:space:]]$/, "", from_tag)
+										}
+										print from_tag;                        # column 3: from tag
+									}
+
+									# 2) Print the offset line
+									if (counter == 0) {
+										sub(/^#+[[:space:]]*/, "", line)
+										print;                                 # column 4: title
+
+										cmd = "basename \""path"\""; cmd | \
+												getline filename; close(cmd)
+										cmd = "dirname \""path"\""; cmd | \
+												getline dirname_result; close(cmd)
+										cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
+												echo \"${PWD%/}/\""; \
+												cmd | getline absolute_path; close(cmd)
+										print	absolute_path filename           # column 5: file absolute path
+										print NR                               # column 6: line number including title
+										print'"\"$_TITLE_SEPARATOR"\"'
+									}
+									if (counter >= 0) {
+										counter--;
+									}
+
 								}
 							}
-
 							' |
 							sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
 							tr -d '\n' |
 							sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g'
-					done
 			done >"$_TAG_OUTPUT_LEVEL1"
 
 		# echo the output file location
