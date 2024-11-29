@@ -23,6 +23,7 @@ esac
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
 check_configfile() {
 	(
+		profile_start "CHECK_CONFIGFILE"
 		# Prepare the output directory and filenames
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
@@ -90,6 +91,7 @@ check_configfile() {
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"
+		profile_end "CHECK_CONFIGFILE"
 	)
 }
 
@@ -108,7 +110,7 @@ extract_tags() {
 	fi
 
 	(
-    profile_start "EXTRACT_TAGS"
+		profile_start "EXTRACT_TAGS"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
@@ -165,14 +167,14 @@ extract_tags() {
 							# 1) Print tag column
 							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
 								counter='"$_TAG_TITLE_OFFSET"';
-								print "'"$_TITLE"'"											 # column 1: trace target
+								print "'"$_TITLE"'"                      # column 1: trace target
 
 								match($0, /'"$_TAG_FORMAT"'/)
 								tag=substr($0, RSTART, RLENGTH)
-								print tag;															 # column 2: tag
+								print tag;                               # column 2: tag
 
 								match($0, /'"$_FROM_TAG_REGEX"'/)
-								if (RSTART == 0) {											 # no from tag
+								if (RSTART == 0) {                       # no from tag
 									from_tag="'"$NODATA_STRING"'"
 								}
 								else{
@@ -181,14 +183,14 @@ extract_tags() {
 									sub(/^[[:space:]]*/, "", from_tag)
 									sub(/[[:space:]]$/, "", from_tag)
 								}
-								print from_tag;													 # column 3: from tag
+								print from_tag;                          # column 3: from tag
 							}
 
 							# 2) Print the offset line
 							{
 								if (counter == 0) {
 									sub(/^#+[[:space:]]*/, "", $0)
-									print;																 # column 4: title
+									print;                                 # column 4: title
 
 									cmd	=	"basename	\"'"$t"'\"";	cmd	|	\
 											getline	filename;	close(cmd)
@@ -197,8 +199,8 @@ extract_tags() {
 									cmd	=	"cd	"dirname_result";PWD=\"$(pwd)\";	\
 												echo	\"${PWD%/}/\"";	\
 												cmd	|	getline	absolute_path;	close(cmd)
-									print	absolute_path	filename					 # column 5: file	absolute	path
-									print NR															 # column 6: line number including title
+									print	absolute_path	filename           # column 5: file absolute path
+									print NR                               # column 6: line number including title
 									print'"\"$_TITLE_SEPARATOR"\"'
 								}
 								if (counter >= 0) {
@@ -215,6 +217,7 @@ extract_tags() {
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
+    profile_end "EXTRACT_TAGS"
 	)
 }
 

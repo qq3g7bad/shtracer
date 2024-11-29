@@ -1,5 +1,9 @@
 #!/bin/sh
 
+SHTRACER_TRUE="1"
+SHTRACER_FALSE="0"
+SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_TRUE"
+
 ##
 # @brief  Initialize environment
 # @tag    @IMP4.1@ (FROM: @ARC1.2@)
@@ -31,6 +35,9 @@ error_exit() {
 # @brief For profiling
 # @param $1 : PROCESS_NAME
 profile_start() {
+  if [ "$SHTRACER_IS_PROFILE_ENABLE" -ne "$SHTRACER_TRUE" ]; then
+    return
+  fi
 	PROCESS_NAME="$1"
 	if [ -z "$PROCESS_NAME" ]; then
 		echo "Error: process name is required." >&2
@@ -44,6 +51,9 @@ profile_start() {
 # @brief For profiling
 # @param $1 : PROCESS_NAME
 profile_end() {
+  if [ "$SHTRACER_IS_PROFILE_ENABLE" -ne "$SHTRACER_TRUE" ]; then
+    return
+  fi
 	PROCESS_NAME="$1"
 	if [ -z "$PROCESS_NAME" ]; then
 		echo "Error: process name is required." >&2

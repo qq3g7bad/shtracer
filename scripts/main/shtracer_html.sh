@@ -18,9 +18,9 @@ esac
 
 ##
 # @brief
-# @param	$1 : CONFIG_OUTPUT_DATA
+# @param $1 : CONFIG_OUTPUT_DATA
 # @return UML_OUTPUT_FILENAME
-# @tag		@IMP3.1@ (FROM: @ARC3.1@)
+# @tag @IMP3.1@ (FROM: @ARC3.1@)
 make_target_flowchart() {
 	(
 		profile_start "MAKE_TARGET_FLOWCHART"
@@ -209,7 +209,7 @@ convert_template_html() {
 		# Insert the tag table to a html template.
 		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
 		_HTML_CONTENT="$(
-			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
+				sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
 				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
@@ -233,7 +233,7 @@ convert_template_html() {
 				}
 
 					print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
- 				}')")"
+				}')")"
 		profile_end "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE_LINK"
 
 		# Prepare file information
@@ -244,7 +244,7 @@ convert_template_html() {
 			awk '{
 				n = split($0, parts, "/");
 				filename = parts[n];
-        raw_filename = filename;
+				raw_filename = filename;
 				gsub(/\./, "_", filename);
 				gsub(/^/, "Target_", filename);
 				extension_pos = match(filename, /\.[^\.]+$/);
@@ -255,7 +255,7 @@ convert_template_html() {
 					extension = "sh";
 				}
 				print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', ""1"", '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
-      }')\n</ul>"
+			}')\n</ul>"
 		profile_end "CONVERT_TEMPLATE_HTML_INSERT_INFORMATION"
 
 		# Prepare the Mermaid UML
@@ -273,33 +273,33 @@ convert_template_html() {
 					print
 				}' |
 			awk '
-				BEGIN {
-			    add_space = 0
-				}
+					BEGIN {
+				    add_space = 0
+					}
 
-				# Handle special comment
-				/<!-- SHTRACER INSERTED -->/ {
-			    if (add_space == 0) {
-		        add_space = 1
-		        add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
-			    } else {
-		        add_space = 0
-		        printf "%*s%s\n", add_space_count, "", $0
-		        next
-			    }
+					# Handle special comment
+					/<!-- SHTRACER INSERTED -->/ {
+					if (add_space == 0) {
+						add_space = 1
+						add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
+					} else {
+						add_space = 0
+						printf "%*s%s\n", add_space_count, "", $0
+						next
+					}
 				}
 
 				# Process regular lines
 				{
-			    previous_space_count = space_count
-			    match($0, /^[ \t]*/)
-			    space_count = RLENGTH
+					previous_space_count = space_count
+					match($0, /^[ \t]*/)
+					space_count = RLENGTH
 
-			    if (add_space == 1) {
-		        printf "%*s%s\n", add_space_count, "", $0
-			    } else {
-		        print $0
-			    }
+					if (add_space == 1) {
+						printf "%*s%s\n", add_space_count, "", $0
+					} else {
+						print $0
+					}
 				}
 			')"
 
@@ -339,29 +339,29 @@ convert_template_js() {
 		_JS_CONTENTS="$(
 			echo "$_TAG_INFO_TABLE" | awk '{ print $3 }' | sort -u |
 				awk -v js_template="$_JS_TEMPLATE" 'BEGIN{
-              init_js_template = js_template
-              }
-              {
-                js_template = init_js_template
-                contents = ""
-              path = $0
-              n = split($0, parts, "/");
-              filename = parts[n];
-              raw_filename = filename;
-              gsub(/\./, "_", filename);
-              gsub(/^/, "Target_", filename);
+						init_js_template = js_template
+					}
+					{
+						js_template = init_js_template
+						contents = ""
+						path = $0
+						n = split($0, parts, "/");
+						filename = parts[n];
+						raw_filename = filename;
+						gsub(/\./, "_", filename);
+						gsub(/^/, "Target_", filename);
 
-              while (getline line < path > 0) {
-                  contents = contents line "\n"
-              }
-              gsub(/&/, "\\\\&", contents)                       # REMOVE FROM SHTRACER PREVIEW
-              gsub(/`/, "\\`", contents)                         # REMOVE FROM SHTRACER PREVIEW
-              gsub(/\${/, "\\\\${", contents)                    # REMOVE FROM SHTRACER PREVIEW
-              gsub(/\\([0-9])/, "@SHTRACER@\1", contents)
-            gsub(/@TRACE_TARGET_PATH@/, path, js_template);
-            gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
-            gsub(/@TRACE_TARGET_CONTENTS@/, contents, js_template);
-            print js_template
+						while (getline line < path > 0) {
+							contents = contents line "\n"
+						}
+						gsub(/&/, "\\\\&", contents)                       # REMOVE FROM SHTRACER PREVIEW
+						gsub(/`/, "\\`", contents)                         # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\${/, "\\\\${", contents)                    # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\([0-9])/, "@SHTRACER@\1", contents)
+						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
+						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
+						gsub(/@TRACE_TARGET_CONTENTS@/, contents, js_template);
+						print js_template
 					}'
 		)"
 
@@ -376,7 +376,7 @@ convert_template_js() {
 				;;
 			esac
 		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js" |
-      sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/\1REMOVED FROM PREVIEW/g' |
+			sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/ /g' |          # gomakashi
 			sed 's/<SHTRACER_NEWLINE>/\\\\n/'
 		profile_end "CONVERT_TEMPLATE_JS"
 	)
@@ -400,9 +400,9 @@ make_html() {
 				line = $6
 				print tag, line, path
 			}
-      END {
-        print "@CONFIG@", "1", config_path
-      }')"
+			END {
+				print "@CONFIG@", "1", config_path
+			}')"
 		_UML_FILENAME="$3"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
