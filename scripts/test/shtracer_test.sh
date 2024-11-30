@@ -39,7 +39,6 @@ test_default_global_constant() {
 	assertEquals "${SHTRACER_MODE}" "NORMAL"
 	assertEquals "${AFTER_TAG}" ""
 	assertEquals "${BEFORE_TAG}" ""
-	assertEquals "${OUTPUT_DIR}" "./output/"
 	assertEquals "${SHTRACER_SEPARATOR}" "<shtracer_separator>"
 	assertEquals "${NODATA_STRING}" "NONE"
 }

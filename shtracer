@@ -8,11 +8,10 @@ CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
-OUTPUT_DIR='./output/'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 NODATA_STRING="NONE"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-
+OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 ##
 # @}
 #
