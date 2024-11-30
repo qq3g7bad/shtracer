@@ -33,14 +33,18 @@ check_configfile() {
 		# Delete comment blocks from the confiuration markdown file
 		_CONFIG_FILE_WITHOUT_COMMENT="$(awk <"$1" \
 			'
-			/`.*<!--.*-->.*`/	 { match($0, /`.*<!--.*-->.*`/);							 # Exception for comment blocks that is surrounded by backquotes.
-														print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-														next;}
-													{ sub(/<!--.*-->/, "") }
-			/<!--/							{ in_comment=1 }
+			/`.*<!--.*-->.*`/   {
+				match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
+				print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
+				next;
+			}
+			{
+				sub(/<!--.*-->/, "")
+			}
+			/<!--/ { in_comment=1 }
 			/-->/ && in_comment { in_comment=0; next }
-			/<!--/,/-->/				{ if (in_comment) next }
-			!in_comment					{ print }
+			/<!--/,/-->/ { if (in_comment) next }
+			!in_comment { print }
 			' |
 			sed '/^[[:space:]]*$/d' |    # Delete empty lines
 			sed 's/^[[:space:]]*\* //' | # Delete start spaces
@@ -72,7 +76,7 @@ check_configfile() {
 					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
 				}
 
-				/^PATH'"$SHTRACER_SEPARATOR"'/	{
+				/^PATH'"$SHTRACER_SEPARATOR"'/ {
 					if (a["title"] != "") {
 						print_data()
 					}
@@ -148,7 +152,7 @@ extract_tags() {
 				}
 				return string
 			}
-      BEGIN {
+			BEGIN {
 				OFS="'"$SHTRACER_SEPARATOR"'"
       }
 			{
@@ -167,7 +171,7 @@ extract_tags() {
 					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
 				} else {
 					cmd = "find \"" path "\" -maxdepth 1 -type f | grep -E \"" extension "\""
-          while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
+					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
 				}
 			}' | sort -u)"
 
@@ -175,19 +179,19 @@ extract_tags() {
 			awk -F "$SHTRACER_SEPARATOR" '
             # For title offset, extract only the offset line
 						{
-              title = $1
-              path = $2
-              tag_format = $5
-              tag_line_format = $6
-              tag_title_offset = $7
+							title = $1
+							path = $2
+							tag_format = $5
+							tag_line_format = $6
+							tag_title_offset = $7
 
-              line_num = 0
+							line_num = 0
 							counter = -1
 							while (getline line < path > 0) {
-                line_num++
+								line_num++
 
 								# 1) Print tag column
-                if (line ~ tag_format && line ~ tag_line_format) {
+								if (line ~ tag_format && line ~ tag_line_format) {
 									counter=tag_title_offset;
 									print title                            # column 1: trace target
 
@@ -220,7 +224,7 @@ extract_tags() {
 									cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
 											echo \"${PWD%/}/\""; \
 											cmd | getline absolute_path; close(cmd)
-									print	absolute_path filename           # column 5: file absolute path
+									print absolute_path filename           # column 5: file absolute path
 									print line_num                         # column 6: line number including title
 									print '"\"$_TITLE_SEPARATOR"\"'
 								}
