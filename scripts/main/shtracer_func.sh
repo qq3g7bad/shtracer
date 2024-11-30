@@ -23,6 +23,7 @@ esac
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
 check_configfile() {
 	(
+		profile_start "CHECK_CONFIGFILE"
 		# Prepare the output directory and filenames
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
@@ -32,14 +33,18 @@ check_configfile() {
 		# Delete comment blocks from the confiuration markdown file
 		_CONFIG_FILE_WITHOUT_COMMENT="$(awk <"$1" \
 			'
-			/`.*<!--.*-->.*`/	 { match($0, /`.*<!--.*-->.*`/);							 # Exception for comment blocks that is surrounded by backquotes.
-														print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-														next;}
-													{ sub(/<!--.*-->/, "") }
-			/<!--/							{ in_comment=1 }
+			/`.*<!--.*-->.*`/   {
+				match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
+				print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
+				next;
+			}
+			{
+				sub(/<!--.*-->/, "")
+			}
+			/<!--/ { in_comment=1 }
 			/-->/ && in_comment { in_comment=0; next }
-			/<!--/,/-->/				{ if (in_comment) next }
-			!in_comment					{ print }
+			/<!--/,/-->/ { if (in_comment) next }
+			!in_comment { print }
 			' |
 			sed '/^[[:space:]]*$/d' |    # Delete empty lines
 			sed 's/^[[:space:]]*\* //' | # Delete start spaces
@@ -71,7 +76,7 @@ check_configfile() {
 					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
 				}
 
-				/^PATH'"$SHTRACER_SEPARATOR"'/	{
+				/^PATH'"$SHTRACER_SEPARATOR"'/ {
 					if (a["title"] != "") {
 						print_data()
 					}
@@ -90,6 +95,7 @@ check_configfile() {
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"
+		profile_end "CHECK_CONFIGFILE"
 	)
 }
 
@@ -101,119 +107,141 @@ check_configfile() {
 extract_tags() {
 
 	if [ -e "$1" ]; then
-		:
+		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
+		_ABSOLUTE_TAG_DIRNAME="$(
+			cd "$(dirname "$1")" || exit 1
+			pwd
+		)"
+		_ABSOLUTE_TAG_PATH=${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME
 	else
 		error_exit 1 "cannot find a config output data."
 		return
 	fi
 
 	(
+		profile_start "EXTRACT_TAGS"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
 		mkdir -p "$_TAG_OUTPUT_DIR"
+		cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+
+		_TITLE_SEPARATOR="--"
+		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+
+		_FROM_TAG_START="FROM:"
+		_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
 
 		# Read config parse results (tag information are included in one line)
-		_TARGET_DATA="$(cat "$1")"
+		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" '
+			function extract_from_doublequote(string) {
+				sub(/^[[:space:]]*/, "", string)
+				sub(/[[:space:]]*$/, "", string)
+				if (string ~ /".*"/) {
+					string = substr(string, index(string, "\"") + 1);
+					string = substr(string, 1, length(string) - 1);
+				}
+				return string
+			}
+			function extract_from_backtick(string) {
+				sub(/^[[:space:]]*/, "", string)
+				sub(/[[:space:]]*$/, "", string)
+				if (string ~ /`.*`/) {
+					string = substr(string, index(string, "`") + 1);
+					string = substr(string, 1, length(string) - 1);
+				}
+				return string
+			}
+			BEGIN {
+				OFS="'"$SHTRACER_SEPARATOR"'"
+      }
+			{
+				title = $1;
+				path = extract_from_doublequote($2);
+				extension = extract_from_doublequote($3);
+				brief = $4;
+				tag_format = extract_from_backtick($5)
+				tag_line_format = extract_from_backtick($6)
+				tag_title_offset = $7 == "" ? 1 : $7
 
-		echo "$_TARGET_DATA" |
-			while read -r _DATA; do
-				_TITLE="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $1 }')"
-				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
-				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
-				_TAG_FORMAT="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $5 }' | sed 's/^`//' | sed 's/`$//')"
-				_TAG_LINE_FORMAT="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $6 }' | sed 's/^`//' | sed 's/`$//')"
-				_TAG_TITLE_OFFSET="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $7 }')"
-				_TAG_TITLE_OFFSET="${_TAG_TITLE_OFFSET:-1}"
+				if (tag_format == "") { next }
 
-				_FROM_TAG_START="FROM:"
-				_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
+				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
+				if (is_file_exist == 0) {
+					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
+				} else {
+					cmd = "find \"" path "\" -maxdepth 1 -type f | grep -E \"" extension "\""
+					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
+				}
+			}' | sort -u)"
 
-				cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+		echo "$_FILES" |
+			awk -F "$SHTRACER_SEPARATOR" '
+            # For title offset, extract only the offset line
+						{
+							title = $1
+							path = $2
+							tag_format = $5
+							tag_line_format = $6
+							tag_title_offset = $7
 
-				_TITLE_SEPARATOR="--"
-				_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+							line_num = 0
+							counter = -1
+							while (getline line < path > 0) {
+								line_num++
 
-				# Check if TAG_FORMAT is empty
-				if [ "$_TAG_FORMAT" = "" ]; then
-					continue
-				fi
+								# 1) Print tag column
+								if (line ~ tag_format && line ~ tag_line_format) {
+									counter=tag_title_offset;
+									print title                            # column 1: trace target
 
-				# Check if TARGET_PATH is file or direcrory
-				if [ -f "$_PATH" ]; then # File
-					_FILE="$_PATH"
-				else # Directory (Check extention: Multiple extensions can be set by grep argument way)
-					_EXTENSION=${_EXTENSION:-*}
-					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null |
-						grep -E "$_EXTENSION" |
-						sed "s@^@$_PATH@")"
+									match(line, tag_format)
+									tag=substr(line, RSTART, RLENGTH)
+									print tag;                             # column 2: tag
 
-					if [ "$(echo "$_FILE" | sed '/^$/d' | wc -l)" -eq 0 ]; then
-						return # There are no files to match specified extension.
-					fi
-				fi
-
-				echo "$_FILE" |
-					while read -r t; do
-						awk <"$t" \
-							' # For title offset, extract only the offset line
-							BEGIN {
-								counter = -1
-							}
-
-							# 1) Print tag column
-							/'"$_TAG_FORMAT"'/ && /'"$_TAG_LINE_FORMAT"'/ {
-								counter='"$_TAG_TITLE_OFFSET"';
-								print "'"$_TITLE"'"											 # column 1: trace target
-
-								match($0, /'"$_TAG_FORMAT"'/)
-								tag=substr($0, RSTART, RLENGTH)
-								print tag;															 # column 2: tag
-
-								match($0, /'"$_FROM_TAG_REGEX"'/)
-								if (RSTART == 0) {											 # no from tag
-									from_tag="'"$NODATA_STRING"'"
+									match(line, /'"$_FROM_TAG_REGEX"'/)
+									if (RSTART == 0) {                     # no from tag
+										from_tag="'"$NODATA_STRING"'"
+									}
+									else{
+										from_tag=substr(line, RSTART+1, RLENGTH-2)
+										sub(/'"$_FROM_TAG_START"'/, "", from_tag)
+										sub(/^[[:space:]]*/, "", from_tag)
+										sub(/[[:space:]]$/, "", from_tag)
+									}
+									print from_tag;                        # column 3: from tag
 								}
-								else{
-									from_tag=substr($0, RSTART+1, RLENGTH-2)
-									sub(/'"$_FROM_TAG_START"'/, "", from_tag)
-									sub(/^[[:space:]]*/, "", from_tag)
-									sub(/[[:space:]]$/, "", from_tag)
-								}
-								print from_tag;													 # column 3: from tag
-							}
 
-							# 2) Print the offset line
-							{
+								# 2) Print the offset line
 								if (counter == 0) {
-									sub(/^#+[[:space:]]*/, "", $0)
-									print;																 # column 4: title
+									sub(/^#+[[:space:]]*/, "", line)
+									print line;                            # column 4: title
 
-									cmd	=	"basename	\"'"$t"'\"";	cmd	|	\
-											getline	filename;	close(cmd)
-									cmd	=	"dirname	\"'"$t"'\"";	cmd	|	\
-											getline	dirname_result;	close(cmd)
-									cmd	=	"cd	"dirname_result";PWD=\"$(pwd)\";	\
-												echo	\"${PWD%/}/\"";	\
-												cmd	|	getline	absolute_path;	close(cmd)
-									print	absolute_path	filename					 # column 5: file	absolute	path
-									print NR															 # column 6: line number including title
-									print'"\"$_TITLE_SEPARATOR"\"'
+									cmd = "basename \""path"\""; cmd | \
+											getline filename; close(cmd)
+									cmd = "dirname \""path"\""; cmd | \
+											getline dirname_result; close(cmd)
+									cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
+											echo \"${PWD%/}/\""; \
+											cmd | getline absolute_path; close(cmd)
+									print absolute_path filename           # column 5: file absolute path
+									print line_num                         # column 6: line number including title
+									print '"\"$_TITLE_SEPARATOR"\"'
 								}
 								if (counter >= 0) {
 									counter--;
 								}
-							}
 
-							' |
-							sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
-							tr -d '\n' |
-							sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g'
-					done
-			done >"$_TAG_OUTPUT_LEVEL1"
+							}
+						}
+						' |
+			sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
+			tr -d '\n' |
+			sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g' >"$_TAG_OUTPUT_LEVEL1"
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
+		profile_end "EXTRACT_TAGS"
 	)
 }
 
@@ -370,7 +398,7 @@ swap_tags() {
 				# Check if TARGET_PATH is file or direcrory
 				if [ -f "$_PATH" ]; then # File
 					_FILE="$_PATH"
-				else # Directory (Check extention: Multiple extensions can be set by grep argument way)
+				else # Directory (Check extension: Multiple extensions can be set by grep argument way)
 					_EXTENSION=${_EXTENSION:-*}
 					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null |
 						grep -E "$_EXTENSION" |

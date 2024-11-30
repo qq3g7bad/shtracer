@@ -2,7 +2,6 @@
 
 # Source test target
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-cd "${SCRIPT_DIR}" || exit 1
 
 . "../main/shtracer_func.sh"
 . "../main/shtracer_util.sh"
@@ -23,8 +22,9 @@ setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	NODATA_STRING="NONE"
-	OUTPUT_DIR="./output/"
-	CONFIG_DIR="./testdata/"
+	OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
+	CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
+  cd "${SCRIPT_DIR}" || exit 1
 }
 
 ##
