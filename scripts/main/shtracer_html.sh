@@ -356,7 +356,7 @@ convert_template_js() {
 						}
 						gsub(/&/, "\\\\&", contents)                       # REMOVE FROM SHTRACER PREVIEW
 						gsub(/`/, "\\`", contents)                         # REMOVE FROM SHTRACER PREVIEW
-						gsub(/\${/, "\\\\${", contents)                    # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\${/, "\\${", contents)                      # REMOVE FROM SHTRACER PREVIEW
 						gsub(/\\([0-9])/, "@SHTRACER@\1", contents)
 						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
 						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
