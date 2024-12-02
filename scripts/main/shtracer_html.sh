@@ -352,19 +352,28 @@ convert_template_js() {
 						gsub(/^/, "Target_", filename);
 
 						while (getline line < path > 0) {
+							sub(/[^\\]\\$/, "<SHTRACER_BACKSLASH>", line)    # REMOVE FROM SHTRACER PREVIEW
 							contents = contents line "\n"
 						}
+						gsub(/\\n/, "<SHTRACER_BACKSLASH>n", contents)     # REMOVE FROM SHTRACER PREVIEW
 						gsub(/&/, "\\\\&", contents)                       # REMOVE FROM SHTRACER PREVIEW
 						gsub(/`/, "\\`", contents)                         # REMOVE FROM SHTRACER PREVIEW
 						gsub(/\${/, "\\${", contents)                      # REMOVE FROM SHTRACER PREVIEW
-						gsub(/\\([0-9])/, "@SHTRACER@\1", contents)
+						gsub(/\\1/, "<SHTRACER_BACKSLASH>1", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\2/, "<SHTRACER_BACKSLASH>2", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\3/, "<SHTRACER_BACKSLASH>3", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\4/, "<SHTRACER_BACKSLASH>4", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\5/, "<SHTRACER_BACKSLASH>5", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\6/, "<SHTRACER_BACKSLASH>6", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\7/, "<SHTRACER_BACKSLASH>7", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\8/, "<SHTRACER_BACKSLASH>8", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\9/, "<SHTRACER_BACKSLASH>9", contents)     # REMOVE FROM SHTRACER PREVIEW
 						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
 						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
 						gsub(/@TRACE_TARGET_CONTENTS@/, contents, js_template);
 						print js_template
 					}'
 		)"
-
 		# Subsitute a comment block in the template js file to "$_JS_CONTENTS"
 		while read -r s; do
 			case "$s" in
@@ -376,8 +385,9 @@ convert_template_js() {
 				;;
 			esac
 		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js" |
-			sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/ /g' |          # gomakashi
-			sed 's/<SHTRACER_NEWLINE>/\\\\n/'
+			sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/ /g' |
+			sed 's/<SHTRACER_NEWLINE>/\\\\n/' |
+			sed 's/<SHTRACER_BACKSLASH>/\\\\/'
 		profile_end "CONVERT_TEMPLATE_JS"
 	)
 }
