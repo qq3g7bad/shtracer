@@ -10,6 +10,7 @@ BEFORE_TAG=''
 AFTER_TAG=''
 SHTRACER_SEPARATOR="<shtracer_separator>"
 NODATA_STRING="NONE"
+CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 ##
@@ -103,6 +104,7 @@ parse_arguments() {
 		error_exit 1 "$1 does not exist"
 	fi
 
+  cd "$CURRENT_DIR" || error_exit 1 "cannot change current directory"
 	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
 	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
 	CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
@@ -160,7 +162,6 @@ main_routine() {
 
 case "$0" in
 *shtracer)
-	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
 	main_routine "$@"
 	;;
 *)
