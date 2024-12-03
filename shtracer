@@ -8,11 +8,11 @@ CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
-OUTPUT_DIR='./output/'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 NODATA_STRING="NONE"
+CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-
+OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 ##
 # @}
 #
@@ -43,8 +43,8 @@ print_usage() {
 		  -h, --help                       Show this help message
 
 		Examples:
-		      1. Normal mode
-		         $ ./shtracer ./sample/config.md
+		  1. Normal mode
+		     $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
 		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
@@ -104,9 +104,10 @@ parse_arguments() {
 		error_exit 1 "$1 does not exist"
 	fi
 
+  cd "$CURRENT_DIR" || error_exit 1 "cannot change current directory"
 	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
 	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
-  CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
+	CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
 	CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
 }
 
@@ -116,8 +117,11 @@ parse_arguments() {
 main_routine() {
 
 	load_functions
+
+	profile_start "INITIALIZE"
 	init_environment
 	parse_arguments "$@"
+	profile_end "INITIALIZE"
 
 	_OUTPUT_STRING="$(
 
@@ -158,7 +162,6 @@ main_routine() {
 
 case "$0" in
 *shtracer)
-	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
 	main_routine "$@"
 	;;
 *)

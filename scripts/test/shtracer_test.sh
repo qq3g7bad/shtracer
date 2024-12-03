@@ -39,7 +39,6 @@ test_default_global_constant() {
 	assertEquals "${SHTRACER_MODE}" "NORMAL"
 	assertEquals "${AFTER_TAG}" ""
 	assertEquals "${BEFORE_TAG}" ""
-	assertEquals "${OUTPUT_DIR}" "./output/"
 	assertEquals "${SHTRACER_SEPARATOR}" "<shtracer_separator>"
 	assertEquals "${NODATA_STRING}" "NONE"
 }
@@ -332,7 +331,8 @@ test_parse_arguments_with_config_file() {
 		# Act -------------
 		parse_arguments "$0"
 		# Assert ----------
-		assertEquals "$0" "$CONFIG_PATH"
+		_DIRNAME=$(cd "$(dirname "$0")" && pwd)
+		assertEquals "${_DIRNAME%/}/${0##*/}" "$CONFIG_PATH"
 		assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
 		assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"
