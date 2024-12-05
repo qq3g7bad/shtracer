@@ -7,5 +7,5 @@
   * **TAG FORMAT**: `@TD[0-9\.]+@`         <!-- Tag format must be written in ERE (Extended regular expressions) and surrounded backquotes for discriminating other comment blocks in markdown. -->
   * **TAG LINE FORMAT**: `<!--.*-->`
   * **TAG-TITLE OFFSET**: 1                <!-- Relationship between the tag and its title: default is 1 -->
-  * **EXTENSION**: md
+  * **EXTENSION FILTER**: "*.md"
 

@@ -170,7 +170,7 @@ extract_tags() {
 				if (is_file_exist == 0) {
 					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
 				} else {
-					cmd = "find \"" path "\" -maxdepth 1 -type f | grep -E \"" extension "\""
+					cmd = "find \"" path "\" -type f -name \"" extension "\""
 					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
 				}
 			}' | sort -u)"
