@@ -209,7 +209,7 @@ convert_template_html() {
 		# Insert the tag table to a html template.
 		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
 		_HTML_CONTENT="$(
-				sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
+			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
 				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"

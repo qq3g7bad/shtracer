@@ -22,11 +22,11 @@ OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 # @tag    @IMP1.1@ (FROM: @ARC1.2@)
 load_functions() {
 	_PREVIOUS_DIR="$(pwd)"
-	cd "${SCRIPT_DIR}" || error_exit 1 "cannot change current directory"
+	cd "${SCRIPT_DIR}" || error_exit 1 "load_fucntions" "Cannot change current directory"
 	. "./scripts/main/shtracer_util.sh"
 	. "./scripts/main/shtracer_func.sh"
 	. "./scripts/main/shtracer_html.sh"
-	cd "${_PREVIOUS_DIR}" || error_exit 1 "cannot change current directory"
+	cd "${_PREVIOUS_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
 }
 
 ##
@@ -78,7 +78,7 @@ parse_arguments() {
 		return
 		;;
 	1-*) # Undefined option
-		error_exit 1 'Invalid argument'
+		error_exit 1 "parse_arguments" "Invalid argument"
 		;;
 	1*) # Normal mode
 		SHTRACER_MODE='NORMAL'
@@ -95,16 +95,16 @@ parse_arguments() {
 		AFTER_TAG="$4"
 		;;
 	*)
-		error_exit 1 'Invalid argument'
+		error_exit 1 "parse_arguments" "Invalid argument"
 		;;
 	esac
 
 	# Check if config file exists
 	if [ ! -r "$1" ]; then
-		error_exit 1 "$1 does not exist"
+		error_exit 1 "parse_arguments" "$1 does not exist"
 	fi
 
-  cd "$CURRENT_DIR" || error_exit 1 "cannot change current directory"
+	cd "$CURRENT_DIR" || error_exit 1 "parse_arguments" "Cannot change current directory"
 	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
 	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
 	CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
@@ -117,47 +117,46 @@ parse_arguments() {
 main_routine() {
 
 	load_functions
-
-	profile_start "INITIALIZE"
 	init_environment
 	parse_arguments "$@"
-	profile_end "INITIALIZE"
 
-	_OUTPUT_STRING="$(
+	# Tag change mode
+	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
+		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+		return 0
 
-		# Tag change mode
-		if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
-			swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+	# Test mode
+	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
+		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+		return 0
+	fi
 
-		# Test mode
-		elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-			sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+	# Normal mode or Verify mode
+	if ! _TAGS=$(extract_tags "$CONFIG_OUTPUT"); then
+		error_exit 1 "main_routine" "Error in extract_tags"
+	fi
+	if ! _TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS"); then
+		error_exit 1 "main_routine" "Error in make_tag_table"
+	fi
 
-		# Normal mode or Verify mode
-		else
+	_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
+	_VERIFICATION_FILENAME=${_TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
-			_TAGS=$(extract_tags "$CONFIG_OUTPUT")
-			_TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS")
+	if [ "$SHTRACER_MODE" = 'NORMAL' ]; then
 
-			_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
-			_VERIFICATION_FILENAME=${_TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
-
-			# Veify mode
-			if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-				:
-			# Normal mode
-			else
-				_UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"
-				make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"
-			fi
-
-			if print_verification_result "$_VERIFICATION_FILENAME"; then
-				cat "$_TAG_TABLE_FILENAME"
-			fi
+		if ! _UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"; then
+			error_exit 1 "main_routine" "Error in make_target_flowchart"
 		fi
-	)"
 
-	echo "$_OUTPUT_STRING"
+
+		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"; then
+			error_exit 1 "main_routine" "Error in make_html"
+		fi
+	fi
+
+	if print_verification_result "$_VERIFICATION_FILENAME"; then
+		cat "$_TAG_TABLE_FILENAME"
+	fi
 }
 
 case "$0" in

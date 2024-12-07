@@ -43,7 +43,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/config.md")"
+		_RETURN_VALUE="$(check_configfile "./testdata/test_config1.md")"
 
 		# Assert ----------
 
@@ -83,7 +83,7 @@ test_extract_tags_without_argument() {
 		)"
 
 		# output filename
-		assertEquals "shtracer_func_test.sh: cannot find a config output data." "${_RETURN_VALUE##*/}"
+		assertEquals "[shtracer_func_test.sh][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 

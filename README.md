@@ -231,3 +231,8 @@ For details, see documents in `./docs/` directory.
 * RTM is important not only in software field but also in other fields, so that contributions from other fields are welcomed.
 * Consider using [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) rules for creating explicit and meaningful commit messages.
 
+## ✅ TODO
+
+* Set maxdepth and use wildcard for searching trace targets
+* Useful error handling
+  * If extracted tags are empty, throws an error.
