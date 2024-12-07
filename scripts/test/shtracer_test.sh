@@ -125,11 +125,11 @@ test_error_exit() {
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			error_exit 2 "test_error" 2>&1
+			error_exit 2 "function_name" "test_error" 2>&1
 		)"
 		# Assert ----------
 		assertEquals 2 "$?"
-		assertEquals "shtracer_test.sh: test_error" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][function_name]: test_error" "$_RETURN_VALUE"
 	)
 }
 
@@ -179,7 +179,7 @@ test_parse_arguments_version3() {
 		)"
 
 		# Assert ----------
-		assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -260,7 +260,7 @@ test_parse_arguments_undefined_option() {
 		)"
 
 		# Assert ----------
-		assertEquals "shtracer_test.sh: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -317,7 +317,7 @@ test_parse_arguments_with_non_existent_config_file() {
 			parse_arguments "non_existent_file" 2>&1
 		)"
 		# Assert ----------
-		assertEquals "shtracer_test.sh: non_existent_file does not exist" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
 	)
 }
 
@@ -370,6 +370,42 @@ test_main_routine() {
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 
 		# TODO: add tests if functions of each mode are called
+	)
+}
+
+##
+# @brief  Test for main_routine (tag output is isolated)
+# @tag    @UT1.19@ (FROM: @IMP4.1@)
+test_main_routine_multiple_directories() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+    _RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		IFS=' '
+
+		# Assert ----------
+    assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')"  "[shtracer_test.sh]" # Error occur
+
+	)
+}
+
+##
+# @brief  Test for main_routine (tag output is isolated)
+# @tag    @UT1.20@ (FROM: @IMP4.1@)
+test_main_routine_output_isolated() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+    _RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		IFS=' '
+
+		# Assert ----------
+    assertEquals "[shtracer_test.sh][make_tag_table]: Tag data is empty" "$(echo "$_RETURN" | sed -n '1p')"
+
 	)
 }
 
