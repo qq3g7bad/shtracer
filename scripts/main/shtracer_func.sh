@@ -133,7 +133,7 @@ extract_tags() {
 		_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
 
 		# Read config parse results (tag information are included in one line)
-		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" '
+		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 			function extract_from_doublequote(string) {
 				sub(/^[[:space:]]*/, "", string)
 				sub(/[[:space:]]*$/, "", string)
@@ -153,7 +153,7 @@ extract_tags() {
 				return string
 			}
 			BEGIN {
-				OFS="'"$SHTRACER_SEPARATOR"'"
+				OFS=separator
       }
 			{
 				title = $1;
@@ -176,7 +176,7 @@ extract_tags() {
 			}' | sort -u)"
 
 		echo "$_FILES" |
-			awk -F "$SHTRACER_SEPARATOR" '
+			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 				# For title offset, extract only the offset line
 				{
 					title = $1
@@ -193,14 +193,14 @@ extract_tags() {
 						# 1) Print tag column
 						if (line ~ tag_format && line ~ tag_line_format) {
 							counter=tag_title_offset;
-							print title                            # column 1: trace target
+							printf("%s%s", title, separator)                       # column 1: trace target
 
 							match(line, tag_format)
 							tag=substr(line, RSTART, RLENGTH)
-							print tag;                             # column 2: tag
+							printf("%s%s", tag, separator)                         # column 2: tag
 
 							match(line, /'"$_FROM_TAG_REGEX"'/)
-							if (RSTART == 0) {                     # no from tag
+							if (RSTART == 0) {                                     # no from tag
 								from_tag="'"$NODATA_STRING"'"
 							}
 							else{
@@ -209,24 +209,21 @@ extract_tags() {
 								sub(/^[[:space:]]*/, "", from_tag)
 								sub(/[[:space:]]$/, "", from_tag)
 							}
-							print from_tag;                        # column 3: from tag
+							printf("%s%s", from_tag, separator)                    # column 3: from tag
 						}
 
 						# 2) Print the offset line
 						if (counter == 0) {
 							sub(/^#+[[:space:]]*/, "", line)
-							print line;                            # column 4: title
+							printf("%s%s", line, separator)                        # column 4: title
 
-							cmd = "basename \""path"\""; cmd | \
-									getline filename; close(cmd)
-							cmd = "dirname \""path"\""; cmd | \
-									getline dirname_result; close(cmd)
-							cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
-									echo \"${PWD%/}/\""; \
-									cmd | getline absolute_path; close(cmd)
-							print absolute_path filename           # column 5: file absolute path
-							print line_num                         # column 6: line number including title
-							print '"\"$_TITLE_SEPARATOR"\"'
+							filename = path; gsub(".*/", "", filename);
+							dirname = path; gsub("/[^/]*$", "", dirname)
+							cmd = "cd "dirname";PWD=\"$(pwd)\"; \
+								echo \"${PWD%/}/\""; \
+								cmd | getline absolute_path; close(cmd)
+							printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
+							printf("%s%s\n", line_num, separator)                  # column 6: line number including title
 						}
 						if (counter >= 0) {
 							counter--;
@@ -234,10 +231,7 @@ extract_tags() {
 
 					}
 				}
-				' |
-			sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
-			tr -d '\n' |
-			sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g' >"$_TAG_OUTPUT_LEVEL1"
+				' >"$_TAG_OUTPUT_LEVEL1"
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
@@ -363,7 +357,7 @@ print_verification_result() {
 
 	_RETURN_NUM="0"
 
-  if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 		_RETURN_NUM=$((_RETURN_NUM + 1))
