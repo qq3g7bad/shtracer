@@ -21,10 +21,11 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
+	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	NODATA_STRING="NONE"
 	OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 	CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
-  cd "${SCRIPT_DIR}" || exit 1
+	cd "${SCRIPT_DIR}" || exit 1
 }
 
 ##

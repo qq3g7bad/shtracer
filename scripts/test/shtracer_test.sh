@@ -22,6 +22,7 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SCRIPT_DIR="../../"
+	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 }
 
 ##
@@ -382,11 +383,11 @@ test_main_routine_multiple_directories() {
 		set -u
 
 		# Act -------------
-    _RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-    assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')"  "[shtracer_test.sh]" # Error occur
+		assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')" "[shtracer_test.sh]" # Error occur
 
 	)
 }
@@ -400,11 +401,11 @@ test_main_routine_output_isolated() {
 		set -u
 
 		# Act -------------
-    _RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-    assertEquals "[shtracer_test.sh][make_tag_table]: Tag data is empty" "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_test.sh][make_tag_table]: Tag data is empty" "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
