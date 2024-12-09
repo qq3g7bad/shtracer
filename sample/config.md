@@ -45,6 +45,7 @@
 * **PATH**: "../scripts/test/"
   * **BRIEF**: "All files are shell scripts."
   * **EXTENSION FILTER**: "*.sh"
+  * **IGNORE FILTER**: "shunit2|unittest_sample" <!-- Multiple conditions are acceptable by using "|". -->
   * **TAG FORMAT**: `@UT[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
 

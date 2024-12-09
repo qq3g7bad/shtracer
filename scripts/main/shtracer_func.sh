@@ -53,35 +53,40 @@ check_configfile() {
 
 		# Convert sections to lines
 		echo "$_CONFIG_FILE_WITHOUT_COMMENT" |
-			sed 's/:/'"$SHTRACER_SEPARATOR"'/' | # Separator
-			sed 's/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
-			awk -F "$SHTRACER_SEPARATOR" '\
+			sed 's/:/'"$SHTRACER_SEPARATOR"'/;
+						s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
+			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
 				function print_data() {
 					print \
-						a["title"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["PATH"]	'"\"$SHTRACER_SEPARATOR\""'\
-						a["EXTENSION FILTER"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["BRIEF"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["TAG FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["TAG LINE FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["TITLE"],
+						a["PATH"],
+						a["EXTENSION FILTER"],
+						a["IGNORE FILTER"],
+						a["BRIEF"],
+						a["TAG FORMAT"],
+						a["TAG LINE FORMAT"],
 						a["TAG-TITLE OFFSET"];
 				}
 
-				BEGIN { precount=1; count=1; }
+				BEGIN {
+					precount=1; count=1;
+					OFS=separator
+				}
+
 				/^#/ {
 					match($0, /^#+/)
 					gsub(/^#+ */, "", $0)
 					t[RLENGTH]=$0
 					title="";
-					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
+					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i]) }
 				}
 
-				/^PATH'"$SHTRACER_SEPARATOR"'/ {
-					if (a["title"] != "") {
+				$0 ~ ("^PATH" separator) {
+					if (a["TITLE"] != "") {
 						print_data()
 					}
 					for(i in a){a[i]=""}
-					a["title"]=title
+					a["TITLE"]=title
 				}
 
 				{
@@ -154,23 +159,38 @@ extract_tags() {
 			}
 			BEGIN {
 				OFS=separator
-      }
+			}
 			{
 				title = $1;
 				path = extract_from_doublequote($2);
 				extension = extract_from_doublequote($3);
-				brief = $4;
-				tag_format = extract_from_backtick($5)
-				tag_line_format = extract_from_backtick($6)
-				tag_title_offset = $7 == "" ? 1 : $7
+				ignore = extract_from_doublequote($4);
+				brief = $5;
+				tag_format = extract_from_backtick($6)
+				tag_line_format = extract_from_backtick($7)
+				tag_title_offset = $8 == "" ? 1 : $8
 
 				if (tag_format == "") { next }
 
 				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 				if (is_file_exist == 0) {
 					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
-				} else {
-					cmd = "find \"" path "\" -type f -name \"" extension "\""
+				}
+				else {
+					if (ignore != "") {
+						split(ignore, ignore_exts, "|");
+						ignore_ext_str = "";
+						for (i in ignore_exts) {
+							if (ignore_ext_str != "") {
+								ignore_ext_str = ignore_ext_str " -o ";
+							}
+							ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
+						}
+						cmd = "find \"" path "\" \( "ignore_ext_str" \) -prune -o \( -type f -name \""extension"\" \) -print";
+					}
+						else {
+							cmd = "find \"" path "\" -type f -name \"" extension "\""
+						}
 					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
 				}
 			}' | sort -u)"
@@ -223,7 +243,8 @@ extract_tags() {
 								echo \"${PWD%/}/\""; \
 								cmd | getline absolute_path; close(cmd)
 							printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
-							printf("%s%s\n", line_num, separator)                  # column 6: line number including title
+							printf("%s%s", line_num, separator)                    # column 6: line number including title
+							printf("%s\n", NR, separator)                          # column 7: file num
 						}
 						if (counter >= 0) {
 							counter--;

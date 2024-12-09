@@ -233,6 +233,4 @@ For details, see documents in `./docs/` directory.
 
 ## ✅ TODO
 
-* Set maxdepth and use wildcard for searching trace targets
-* Useful error handling
-  * If extracted tags are empty, throws an error.
+* Add configurations for excluding the specific files (ignore)
