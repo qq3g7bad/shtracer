@@ -26,7 +26,7 @@ make_target_flowchart() {
 		profile_start "MAKE_TARGET_FLOWCHART"
 
 		_CONFIG_OUTPUT_DATA="$1"
-		_FORK_STRING_BRE="\(fork\)"
+		_FORK_STRING_BRE="\\\\(fork\\\\)"
 
 		_UML_OUTPUT_DIR="${OUTPUT_DIR%/}/uml/"
 		_UML_OUTPUT_CONFIG="${_UML_OUTPUT_DIR%/}/01_config"

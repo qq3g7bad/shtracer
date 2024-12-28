@@ -148,8 +148,6 @@ Examples:
 Note:
   - The <configfile> argument must always be specified before options.
 
-Version:
-  - 0.0.1
 ```
 
 ### Change tag mode
