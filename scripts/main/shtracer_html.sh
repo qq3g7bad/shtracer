@@ -39,21 +39,21 @@ make_target_flowchart() {
 		# Parse config output data
 		awk <"$_CONFIG_OUTPUT_DATA" \
 			-F "$SHTRACER_SEPARATOR" \
-			'{if(previous != $1){print $1}; previous=$1}' |
-			awk -F":" \
+			'{ if(previous != $1){print $1}; previous=$1 }' |
+			awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
 				'BEGIN{}
 				{
 					# Fork counter
-					fork_count = gsub(/'"$_FORK_STRING_BRE"'/, "&")
-					fork_count_index=2*fork_count
-					increment_index=2*fork_count+1
+					fork_count       = gsub(fork_string_bre, "&")
+					fork_count_index = 2*fork_count
+					increment_index  = 2*fork_count + 1
 
 					idx[increment_index]++
 
 					# If fork detected
 					if(previous_fork_count+1 == fork_count) {
-						idx[fork_count_index]=0
-						idx[increment_index]=1
+						idx[fork_count_index] = 0
+						idx[increment_index]  = 1
 						idx[increment_index-2]++
 					}
 					previous_fork_count=fork_count
@@ -79,8 +79,7 @@ make_target_flowchart() {
 
 					print flowchart_idx, $0
 				}' |
-			sed 's/^[^_]*_//' |
-			sed 's/ :/:/' >"$_UML_OUTPUT_CONFIG"
+			sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
 
 		# Prepare declaration for UML
 		awk <"$_UML_OUTPUT_CONFIG" \
@@ -89,11 +88,11 @@ make_target_flowchart() {
 
 		# Prepare relationships for UML
 		awk <"$_UML_OUTPUT_CONFIG" \
-			-F ":" \
+			-F ":" -v fork_string_bre="$_FORK_STRING_BRE"\
 			'BEGIN{previous="start"}
 			{
 				# Fork counter
-				fork_count = gsub(/'"$_FORK_STRING_BRE"'/, "&")
+				fork_count = gsub(fork_string_bre, "&")
 
 				split($1, section, "_")
 				split(previous, previous_section, "_")
@@ -209,7 +208,7 @@ convert_template_html() {
 		# Insert the tag table to a html template.
 		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
 		_HTML_CONTENT="$(
-				sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
+			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
 				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"

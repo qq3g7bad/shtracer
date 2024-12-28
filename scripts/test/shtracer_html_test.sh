@@ -11,9 +11,9 @@ cd "${SCRIPT_DIR}" || exit 1
 # @brief
 #
 oneTimeSetUp() {
-  echo "----------------------------------------"
-  echo " TEST : $0"
-  echo "----------------------------------------"
+	echo "----------------------------------------"
+	echo " TEST : $0"
+	echo "----------------------------------------"
 }
 
 ##
@@ -25,6 +25,7 @@ setUp() {
 	NODATA_STRING="NONE"
 	OUTPUT_DIR="./output/"
 	CONFIG_DIR="./testdata/"
+	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
 }
 
@@ -34,6 +35,5 @@ setUp() {
 tearDown() {
 	:
 }
-
 
 . "./shunit2/shunit2"

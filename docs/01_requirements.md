@@ -56,16 +56,16 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 <!-- @REQ1.3@ -->
 ### The file structure can be convert to UML format by executing scripts.
 
-* Output the result as a markdown file.
-  * `./output/structure/uml.md`
+* Output the result as a [mermaid.js](https://mermaid.js.org/) file.
 
 <!-- @REQ1.4@ -->
 ### Check if configuration file are written correctly.
 
-* [ ] The file/directory written in `PATH` exist.
-* [ ] If `PATH` are directory, the `EXTENSION FILTER` field are written correctly.
-* [ ] Tags are exist on `PATH` file.
-* [ ] Tags are not duplicated.
+* Check whether the file or directory in `PATH` exists.
+* If `PATH` means a directory, the `EXTENSION FILTER` field are written correctly.
+* Tags are exist on `PATH` file.
+* Tags are not duplicated.
+* Tags are not isolated.
 
 ## 📥 2. Input
 
@@ -73,7 +73,7 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 ### Use text files
 
 * Normal text files are easy to manage under SCM (such as git).
-* Markdown is acceptable, as are text files for programs (e.g. `*.c`, `*.cpp`).
+* Markdown format is acceptable, as are text files for programs (e.g. `*.c`, `*.cpp`).
   * But proprietary binary files such as MSexcel files must be converted to text files first.
   * It may seem like a pain but is important for easy change management.
 * Each file has tag data.
@@ -93,7 +93,7 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 <!-- @REQ3.1.1@ -->
 #### Make a text file which explain the relationship between two trace targets.
 
-* The relationship between tags are shown by a simple text table (nx2).
+* The relationship between tags are shown by a simple text table (n x 2).
   * column 1: start tag
   * column 2: next connected tag
 * Each tag has a hyperlink to the file that contains it.

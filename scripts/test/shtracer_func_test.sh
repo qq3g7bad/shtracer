@@ -21,10 +21,11 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
+	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	NODATA_STRING="NONE"
 	OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 	CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
-  cd "${SCRIPT_DIR}" || exit 1
+	cd "${SCRIPT_DIR}" || exit 1
 }
 
 ##
@@ -43,7 +44,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/config.md")"
+		_RETURN_VALUE="$(check_configfile "./testdata/test_config1.md")"
 
 		# Assert ----------
 
@@ -83,7 +84,7 @@ test_extract_tags_without_argument() {
 		)"
 
 		# output filename
-		assertEquals "shtracer_func_test.sh: cannot find a config output data." "${_RETURN_VALUE##*/}"
+		assertEquals "[shtracer_func_test.sh][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 

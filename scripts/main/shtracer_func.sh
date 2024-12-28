@@ -53,35 +53,40 @@ check_configfile() {
 
 		# Convert sections to lines
 		echo "$_CONFIG_FILE_WITHOUT_COMMENT" |
-			sed 's/:/'"$SHTRACER_SEPARATOR"'/' | # Separator
-			sed 's/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
-			awk -F "$SHTRACER_SEPARATOR" '\
+			sed 's/:/'"$SHTRACER_SEPARATOR"'/;
+						s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
+			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
 				function print_data() {
 					print \
-						a["title"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["PATH"]	'"\"$SHTRACER_SEPARATOR\""'\
-						a["EXTENSION FILTER"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["BRIEF"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["TAG FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
-						a["TAG LINE FORMAT"] '"\"$SHTRACER_SEPARATOR\""'\
+						a["TITLE"],
+						a["PATH"],
+						a["EXTENSION FILTER"],
+						a["IGNORE FILTER"],
+						a["BRIEF"],
+						a["TAG FORMAT"],
+						a["TAG LINE FORMAT"],
 						a["TAG-TITLE OFFSET"];
 				}
 
-				BEGIN { precount=1; count=1; }
+				BEGIN {
+					precount=1; count=1;
+					OFS=separator
+				}
+
 				/^#/ {
 					match($0, /^#+/)
 					gsub(/^#+ */, "", $0)
 					t[RLENGTH]=$0
 					title="";
-					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i])}
+					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i]) }
 				}
 
-				/^PATH'"$SHTRACER_SEPARATOR"'/ {
-					if (a["title"] != "") {
+				$0 ~ ("^PATH" separator) {
+					if (a["TITLE"] != "") {
 						print_data()
 					}
 					for(i in a){a[i]=""}
-					a["title"]=title
+					a["TITLE"]=title
 				}
 
 				{
@@ -114,7 +119,7 @@ extract_tags() {
 		)"
 		_ABSOLUTE_TAG_PATH=${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME
 	else
-		error_exit 1 "cannot find a config output data."
+		error_exit 1 "extract_tags" "Cannot find a config output data."
 		return
 	fi
 
@@ -124,7 +129,7 @@ extract_tags() {
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
 		mkdir -p "$_TAG_OUTPUT_DIR"
-		cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+		cd "$CONFIG_DIR" || error_exit 1 "extract_tags" "Cannot change directory to config path"
 
 		_TITLE_SEPARATOR="--"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
@@ -133,7 +138,7 @@ extract_tags() {
 		_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
 
 		# Read config parse results (tag information are included in one line)
-		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" '
+		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 			function extract_from_doublequote(string) {
 				sub(/^[[:space:]]*/, "", string)
 				sub(/[[:space:]]*$/, "", string)
@@ -153,91 +158,101 @@ extract_tags() {
 				return string
 			}
 			BEGIN {
-				OFS="'"$SHTRACER_SEPARATOR"'"
-      }
+				OFS=separator
+			}
 			{
 				title = $1;
 				path = extract_from_doublequote($2);
 				extension = extract_from_doublequote($3);
-				brief = $4;
-				tag_format = extract_from_backtick($5)
-				tag_line_format = extract_from_backtick($6)
-				tag_title_offset = $7 == "" ? 1 : $7
+				ignore = extract_from_doublequote($4);
+				brief = $5;
+				tag_format = extract_from_backtick($6)
+				tag_line_format = extract_from_backtick($7)
+				tag_title_offset = $8 == "" ? 1 : $8
 
 				if (tag_format == "") { next }
 
 				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 				if (is_file_exist == 0) {
 					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
-				} else {
-					cmd = "find \"" path "\" -maxdepth 1 -type f | grep -E \"" extension "\""
+				}
+				else {
+					if (ignore != "") {
+						split(ignore, ignore_exts, "|");
+						ignore_ext_str = "";
+						for (i in ignore_exts) {
+							if (ignore_ext_str != "") {
+								ignore_ext_str = ignore_ext_str " -o ";
+							}
+							ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
+						}
+						cmd = "find \"" path "\" \( "ignore_ext_str" \) -prune -o \( -type f -name \""extension"\" \) -print";
+					}
+						else {
+							cmd = "find \"" path "\" -type f -name \"" extension "\""
+						}
 					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
 				}
 			}' | sort -u)"
 
 		echo "$_FILES" |
-			awk -F "$SHTRACER_SEPARATOR" '
-            # For title offset, extract only the offset line
-						{
-							title = $1
-							path = $2
-							tag_format = $5
-							tag_line_format = $6
-							tag_title_offset = $7
+			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+				# For title offset, extract only the offset line
+				{
+					title = $1
+					path = $2
+					tag_format = $5
+					tag_line_format = $6
+					tag_title_offset = $7
 
-							line_num = 0
-							counter = -1
-							while (getline line < path > 0) {
-								line_num++
+					line_num = 0
+					counter = -1
+					while (getline line < path > 0) {
+						line_num++
 
-								# 1) Print tag column
-								if (line ~ tag_format && line ~ tag_line_format) {
-									counter=tag_title_offset;
-									print title                            # column 1: trace target
+						# 1) Print tag column
+						if (line ~ tag_format && line ~ tag_line_format) {
+							counter=tag_title_offset;
+							printf("%s%s", title, separator)                       # column 1: trace target
 
-									match(line, tag_format)
-									tag=substr(line, RSTART, RLENGTH)
-									print tag;                             # column 2: tag
+							match(line, tag_format)
+							tag=substr(line, RSTART, RLENGTH)
+							printf("%s%s", tag, separator)                         # column 2: tag
 
-									match(line, /'"$_FROM_TAG_REGEX"'/)
-									if (RSTART == 0) {                     # no from tag
-										from_tag="'"$NODATA_STRING"'"
-									}
-									else{
-										from_tag=substr(line, RSTART+1, RLENGTH-2)
-										sub(/'"$_FROM_TAG_START"'/, "", from_tag)
-										sub(/^[[:space:]]*/, "", from_tag)
-										sub(/[[:space:]]$/, "", from_tag)
-									}
-									print from_tag;                        # column 3: from tag
-								}
-
-								# 2) Print the offset line
-								if (counter == 0) {
-									sub(/^#+[[:space:]]*/, "", line)
-									print line;                            # column 4: title
-
-									cmd = "basename \""path"\""; cmd | \
-											getline filename; close(cmd)
-									cmd = "dirname \""path"\""; cmd | \
-											getline dirname_result; close(cmd)
-									cmd = "cd "dirname_result";PWD=\"$(pwd)\"; \
-											echo \"${PWD%/}/\""; \
-											cmd | getline absolute_path; close(cmd)
-									print absolute_path filename           # column 5: file absolute path
-									print line_num                         # column 6: line number including title
-									print '"\"$_TITLE_SEPARATOR"\"'
-								}
-								if (counter >= 0) {
-									counter--;
-								}
-
+							match(line, /'"$_FROM_TAG_REGEX"'/)
+							if (RSTART == 0) {                                     # no from tag
+								from_tag="'"$NODATA_STRING"'"
 							}
+							else{
+								from_tag=substr(line, RSTART+1, RLENGTH-2)
+								sub(/'"$_FROM_TAG_START"'/, "", from_tag)
+								sub(/^[[:space:]]*/, "", from_tag)
+								sub(/[[:space:]]$/, "", from_tag)
+							}
+							printf("%s%s", from_tag, separator)                    # column 3: from tag
 						}
-						' |
-			sed 's/$/'"$SHTRACER_SEPARATOR"'/' |
-			tr -d '\n' |
-			sed 's/'"$_TITLE_SEPARATOR$SHTRACER_SEPARATOR"'/\n/g' >"$_TAG_OUTPUT_LEVEL1"
+
+						# 2) Print the offset line
+						if (counter == 0) {
+							sub(/^#+[[:space:]]*/, "", line)
+							printf("%s%s", line, separator)                        # column 4: title
+
+							filename = path; gsub(".*/", "", filename);
+							dirname = path; gsub("/[^/]*$", "", dirname)
+							cmd = "cd "dirname";PWD=\"$(pwd)\"; \
+								echo \"${PWD%/}/\""; \
+								cmd | getline absolute_path; close(cmd)
+							printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
+							printf("%s%s", line_num, separator)                    # column 6: line number including title
+							printf("%s\n", NR, separator)                          # column 7: file num
+						}
+						if (counter >= 0) {
+							counter--;
+						}
+
+					}
+				}
+				' >"$_TAG_OUTPUT_LEVEL1"
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
@@ -252,7 +267,7 @@ extract_tags() {
 # @tag    @IMP2.3@ (FROM: @ARC2.2@)
 make_tag_table() {
 	if [ ! -r "$1" ] || [ $# -ne 1 ]; then
-		error_exit 1 "incorrect argument."
+		error_exit 1 "make_tag_table" "incorrect argument."
 	fi
 
 	(
@@ -293,7 +308,7 @@ make_tag_table() {
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
 			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
 		else
-			error_exit 1 "tag data is empty"
+			error_exit 1 "make_tag_table" "Tag data is empty"
 		fi
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
@@ -327,7 +342,7 @@ make_tag_table() {
 join_tag_pairs() {
 	(
 		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
-			error_exit 1 "incorrect argument."
+			error_exit 1 "join_tag_pairs" "Incorrect argument."
 		fi
 
 		_TAG_TABLE="$1"
@@ -363,7 +378,7 @@ print_verification_result() {
 
 	_RETURN_NUM="0"
 
-	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ]; then
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 		_RETURN_NUM=$((_RETURN_NUM + 1))
@@ -393,7 +408,7 @@ swap_tags() {
 			while read -r _DATA; do
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
-				cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+				cd "$CONFIG_DIR" || error_exit 1 "swat_tags" "Cannot change directory to config path"
 
 				# Check if TARGET_PATH is file or direcrory
 				if [ -f "$_PATH" ]; then # File
@@ -412,7 +427,7 @@ swap_tags() {
 			done)"
 
 		(
-			cd "$CONFIG_DIR" || error_exit 1 'ERROR: cannot change directory to config path'
+			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
 			echo "$_FILE_LIST" |
 				sort -u |
 				while read -r t; do

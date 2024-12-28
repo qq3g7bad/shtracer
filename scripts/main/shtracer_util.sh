@@ -1,8 +1,8 @@
 #!/bin/sh
 
-SHTRACER_TRUE="1"
-SHTRACER_FALSE="0"
-SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+SHTRACER_TRUE="${SHTRACER_TRUE:=1}"
+SHTRACER_FALSE="${SHTRACER_FALSE:=0}"
+SHTRACER_IS_PROFILE_ENABLE="${SHTRACER_IS_PROFILE_ENABLE:=$SHTRACER_TRUE}"
 
 ##
 # @brief  Initialize environment
@@ -25,8 +25,8 @@ init_environment() {
 # @param  $2 : Error message
 # @tag    @IMP4.2@ (FROM: @ARC1.2@)
 error_exit() {
-	if [ -n "$2" ]; then
-		echo "${0##*/}: $2" 1>&2
+	if [ $# -ge 3 ]; then
+		echo "[${0##*/}][$2]: $3" 1>&2
 	fi
 	exit "$1"
 }
