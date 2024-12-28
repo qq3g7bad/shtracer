@@ -186,7 +186,7 @@ extract_tags() {
 							}
 							ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
 						}
-						cmd = "find \"" path "\" \( "ignore_ext_str" \) -prune -o \( -type f -name \""extension"\" \) -print";
+						cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f -name \""extension"\" \\) -print";
 					}
 						else {
 							cmd = "find \"" path "\" -type f -name \"" extension "\""
