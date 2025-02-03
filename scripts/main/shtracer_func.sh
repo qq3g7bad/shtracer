@@ -23,7 +23,7 @@ esac
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
 check_configfile() {
 	(
-		profile_start "CHECK_CONFIGFILE"
+		profile_start "check_configfile"
 		# Prepare the output directory and filenames
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
@@ -100,7 +100,7 @@ check_configfile() {
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"
-		profile_end "CHECK_CONFIGFILE"
+		profile_end "check_configfile"
 	)
 }
 
@@ -124,7 +124,7 @@ extract_tags() {
 	fi
 
 	(
-		profile_start "EXTRACT_TAGS"
+		profile_start "extract_tags"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
@@ -256,7 +256,7 @@ extract_tags() {
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
-		profile_end "EXTRACT_TAGS"
+		profile_end "extract_tags"
 	)
 }
 
@@ -308,7 +308,7 @@ make_tag_table() {
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
 			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
 		else
-			error_exit 1 "make_tag_table" "Tag data is empty"
+			error_exit 1 "make_tag_table" "No linked tags found."
 		fi
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
