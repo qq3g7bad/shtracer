@@ -130,7 +130,7 @@ test_error_exit() {
 		)"
 		# Assert ----------
 		assertEquals 2 "$?"
-		assertEquals "[shtracer_test.sh][function_name]: test_error" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][error][function_name]: test_error" "$_RETURN_VALUE"
 	)
 }
 
@@ -180,7 +180,7 @@ test_parse_arguments_version3() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -261,7 +261,7 @@ test_parse_arguments_undefined_option() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -318,7 +318,7 @@ test_parse_arguments_with_non_existent_config_file() {
 			parse_arguments "non_existent_file" 2>&1
 		)"
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
+		assertEquals "[shtracer_test.sh][error][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
 	)
 }
 
@@ -405,7 +405,7 @@ test_main_routine_output_isolated() {
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][make_tag_table]: Tag data is empty" "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_test.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
