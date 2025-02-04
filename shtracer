@@ -148,7 +148,6 @@ main_routine() {
 			error_exit 1 "main_routine" "Error in make_target_flowchart"
 		fi
 
-
 		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"; then
 			error_exit 1 "main_routine" "Error in make_html"
 		fi

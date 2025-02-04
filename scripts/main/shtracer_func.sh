@@ -66,7 +66,8 @@ check_configfile() {
 						a["TAG FORMAT"],
 						a["TAG LINE FORMAT"],
 						a["TAG-TITLE OFFSET"],
-						a["EXTRA-SCRIPT"];
+						a["PRE-EXTRA-SCRIPT"],
+						a["POST-EXTRA-SCRIPT"];
 				}
 
 				BEGIN {
@@ -115,6 +116,7 @@ check_configfile() {
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
 extract_tags() {
+	profile_start "extract_tags"
 
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
@@ -129,7 +131,6 @@ extract_tags() {
 	fi
 
 	(
-		profile_start "extract_tags"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
@@ -174,12 +175,14 @@ extract_tags() {
 				tag_format = extract_from_backtick($6)
 				tag_line_format = extract_from_backtick($7)
 				tag_title_offset = $8 == "" ? 1 : $8
+				pre_extra_script = extract_from_backtick($9)
+				post_extra_script = extract_from_backtick($10)
 
 				if (tag_format == "") { next }
 
 				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 				if (is_file_exist == 0) {
-					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
+					print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
 				}
 				else {
 					if (ignore != "") {
@@ -196,7 +199,7 @@ extract_tags() {
 						else {
 							cmd = "find \"" path "\" -type f -name \"" extension "\""
 						}
-					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
+					while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
 				}
 			}' | sort -u)"
 
@@ -206,9 +209,14 @@ extract_tags() {
 				{
 					title = $1
 					path = $2
-					tag_format = $5
-					tag_line_format = $6
-					tag_title_offset = $7
+					tag_format = $6
+					tag_line_format = $7
+					tag_title_offset = $8
+					pre_extra_script = $9
+					post_extra_script = $10
+
+					# Execute pre_extra_script
+	        system(pre_extra_script)
 
 					line_num = 0
 					counter = -1
@@ -256,6 +264,8 @@ extract_tags() {
 						}
 
 					}
+					# Execute post_extra_script
+					system(post_extra_script)
 				}
 				' >"$_TAG_OUTPUT_LEVEL1"
 
@@ -455,3 +465,4 @@ swap_tags() {
 		)
 	)
 }
+
