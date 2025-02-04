@@ -65,20 +65,25 @@ check_configfile() {
 						a["BRIEF"],
 						a["TAG FORMAT"],
 						a["TAG LINE FORMAT"],
-						a["TAG-TITLE OFFSET"];
+						a["TAG-TITLE OFFSET"],
+						a["EXTRA-SCRIPT"];
 				}
 
 				BEGIN {
-					precount=1; count=1;
-					OFS=separator
+					precount = 1; count = 1;
+					OFS = separator
 				}
 
+				# Set Markdown title hierarchy by separating with ":"
+				# e.g. title = Heading1:Heading1.1:Heading1.1.1
 				/^#/ {
 					match($0, /^#+/)
 					gsub(/^#+ */, "", $0)
-					t[RLENGTH]=$0
+					t[RLENGTH] = $0
 					title="";
-					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i]) }
+					for (i=2;i<=RLENGTH;i++){
+						title = sprintf("%s:%s", title, t[i])
+					}
 				}
 
 				$0 ~ ("^PATH" separator) {
