@@ -59,7 +59,7 @@ print_usage() {
 		  - The <configfile> argument must always be specified before options.
 
 		Version:
-		  - 0.0.2
+		  - 0.0.3
 
 	USAGE
 	exit 1
