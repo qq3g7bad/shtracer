@@ -403,9 +403,21 @@ print_verification_result() {
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
+	if [ -e "$1" ]; then
+		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
+		_ABSOLUTE_TAG_DIRNAME="$(
+			cd "$(dirname "$1")" || exit 1
+			pwd
+		)"
+		_ABSOLUTE_TAG_PATH=${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME
+	else
+		error_exit 1 "swap_tags" "Cannot find a config output data."
+		return
+	fi
+
 	(
 		# Read config parse results (tag information are included in one line)
-		_TARGET_DATA="$(cat "$1")"
+		_TARGET_DATA="$(cat "$_ABSOLUTE_TAG_PATH")"
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
