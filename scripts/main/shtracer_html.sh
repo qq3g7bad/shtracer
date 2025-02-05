@@ -221,9 +221,9 @@ convert_template_html() {
 				n = split($3, parts, "/");
 				filename = parts[n];
         raw_filename = filename;
+				extension_pos = match(raw_filename, /\.[^\.]+$/);
 				gsub(/\./, "_", filename);
 				gsub(/^/, "Target_", filename);
-				extension_pos = match(raw_filename, /\.[^\.]+$/);
 
 				if (extension_pos) {
 					extension = substr(raw_filename, extension_pos + 1);
@@ -244,9 +244,9 @@ convert_template_html() {
 				n = split($0, parts, "/");
 				filename = parts[n];
 				raw_filename = filename;
+				extension_pos = match(filename, /\.[^\.]+$/);
 				gsub(/\./, "_", filename);
 				gsub(/^/, "Target_", filename);
-				extension_pos = match(filename, /\.[^\.]+$/);
 
 				if (extension_pos) {
 					extension = substr(raw_filename, extension_pos + 1);
