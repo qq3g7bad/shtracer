@@ -84,7 +84,7 @@ test_extract_tags_without_argument() {
 		)"
 
 		# output filename
-		assertEquals "[shtracer_func_test.sh][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
+		assertEquals "[shtracer_func_test.sh][error][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 
