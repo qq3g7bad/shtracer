@@ -30,7 +30,7 @@ end note
 [*] --> input
 [*] --> opt_input
 
-opt_input --> targetfiles : optional scripts
+opt_input --> targetfiles : pre-extra-scripts
 opt_output:Optional output files
 
 state output {
@@ -49,7 +49,7 @@ state opt_output {
 
 
 input --> output : shtracer
-rtm --> opt_output : optional scripts
+rtm --> opt_output : post-extra-scripts
 rtm --> html_output
 uml --> html_output
 
