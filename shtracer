@@ -59,7 +59,7 @@ print_usage() {
 		  - The <configfile> argument must always be specified before options.
 
 		Version:
-		  - 0.0.2
+		  - 0.0.3
 
 	USAGE
 	exit 1
@@ -147,7 +147,6 @@ main_routine() {
 		if ! _UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"; then
 			error_exit 1 "main_routine" "Error in make_target_flowchart"
 		fi
-
 
 		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"; then
 			error_exit 1 "main_routine" "Error in make_html"

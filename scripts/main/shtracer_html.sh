@@ -23,7 +23,7 @@ esac
 # @tag @IMP3.1@ (FROM: @ARC3.1@)
 make_target_flowchart() {
 	(
-		profile_start "MAKE_TARGET_FLOWCHART"
+		profile_start "make_target_flowchart"
 
 		_CONFIG_OUTPUT_DATA="$1"
 		_FORK_STRING_BRE="\\\\(fork\\\\)"
@@ -166,7 +166,7 @@ make_target_flowchart() {
 			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
 
 		echo "$_UML_OUTPUT_FILENAME"
-		profile_end "MAKE_TARGET_FLOWCHART"
+		profile_end "make_target_flowchart"
 	)
 }
 
@@ -178,24 +178,24 @@ make_target_flowchart() {
 # @param $4 : TEMPLATE_HTML_DIR
 convert_template_html() {
 	(
-		profile_start "CONVERT_TEMPLATE_HTML"
+		profile_start "convert_template_html"
 
 		_TAG_TABLE_FILENAME="$1"
 		_TAG_INFO_TABLE="$2"
 		_UML_FILENAME="$3"
 		_TEMPLATE_HTML_DIR="$4"
 
-		profile_start "CONVERT_TEMPLATE_HTML_ADD_HEADER_ROW"
+		profile_start "convert_template_html_add_header_row"
 		# Add header row
 		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
 			for (i = 1; i <= NF; i++) {
 				printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
 			}
 		}' <"$_TAG_TABLE_FILENAME")  </tr>\n</thead>\n"
-		profile_end "CONVERT_TEMPLATE_HTML_ADD_HEADER_ROW"
+		profile_end "convert_template_html_add_header_row"
 
 		# Prepare the tag table : Convert a tag table to a html table.
-		profile_start "CONVERT_TEMPLATE_HTML_PREPARE_TAG_TABLE"
+		profile_start "convert_template_html_prepare_tag_table"
 		_TABLE_HTML="$_TABLE_HTML<tbody>$(awk '{
 			printf "\\n  <tr>\\n"
 				for (i = 1; i <= NF; i++) {
@@ -203,27 +203,27 @@ convert_template_html() {
 				}
 			printf "  </tr>"
 		} ' <"$_TAG_TABLE_FILENAME")\n</tbody>"
-		profile_end "CONVERT_TEMPLATE_HTML_PREPARE_TAG_TABLE"
+		profile_end "convert_template_html_prepare_tag_table"
 
 		# Insert the tag table to a html template.
-		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
+		profile_start "convert_template_html_insert_tag_table"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\\\n'/'\\\\\\\\n'/g" \
 				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
-		profile_end "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE"
+		profile_end "convert_template_html_insert_tag_table"
 
-		profile_start "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE_LINK"
+		profile_start "convert_template_html_insert_tag_table_link"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed "$(echo "$_TAG_INFO_TABLE" |
 				awk '{
 				n = split($3, parts, "/");
 				filename = parts[n];
         raw_filename = filename;
+				extension_pos = match(raw_filename, /\.[^\.]+$/);
 				gsub(/\./, "_", filename);
 				gsub(/^/, "Target_", filename);
-				extension_pos = match(raw_filename, /\.[^\.]+$/);
 
 				if (extension_pos) {
 					extension = substr(raw_filename, extension_pos + 1);
@@ -233,10 +233,10 @@ convert_template_html() {
 
 					print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
 				}')")"
-		profile_end "CONVERT_TEMPLATE_HTML_INSERT_TAG_TABLE_LINK"
+		profile_end "convert_template_html_insert_tag_table_link"
 
 		# Prepare file information
-		profile_start "CONVERT_TEMPLATE_HTML_INSERT_INFORMATION"
+		profile_start "convert_template_html_insert_information"
 		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" |
 			awk '{print $3}' |
 			sort -u |
@@ -244,9 +244,9 @@ convert_template_html() {
 				n = split($0, parts, "/");
 				filename = parts[n];
 				raw_filename = filename;
+				extension_pos = match(filename, /\.[^\.]+$/);
 				gsub(/\./, "_", filename);
 				gsub(/^/, "Target_", filename);
-				extension_pos = match(filename, /\.[^\.]+$/);
 
 				if (extension_pos) {
 					extension = substr(raw_filename, extension_pos + 1);
@@ -255,12 +255,12 @@ convert_template_html() {
 				}
 				print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', ""1"", '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
 			}')\n</ul>"
-		profile_end "CONVERT_TEMPLATE_HTML_INSERT_INFORMATION"
+		profile_end "convert_template_html_insert_information"
 
 		# Prepare the Mermaid UML
 		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
 
-		profile_start "CONVERT_TEMPLATE_HTML_INSERT_MERMAID"
+		profile_start "convert_template_html_insert_mermaid"
 		# Insert the Mermaid UML to a html template.
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk -v information="${_INFORMATION}" -v mermaid_script="${_MERMAID_SCRIPT}" '
@@ -302,13 +302,13 @@ convert_template_html() {
 				}
 			')"
 
-		profile_end "CONVERT_TEMPLATE_HTML_INSERT_MERMAID"
+		profile_end "convert_template_html_insert_mermaid"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed '/<!-- SHTRACER INSERTED -->/d')"
 
 		echo "$_HTML_CONTENT"
 
-		profile_end "CONVERT_TEMPLATE_HTML"
+		profile_end "convert_template_html"
 	)
 }
 
@@ -318,7 +318,7 @@ convert_template_html() {
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
 	(
-		profile_start "CONVERT_TEMPLATE_JS"
+		profile_start "convert_template_js"
 		_TAG_INFO_TABLE="$1"
 		_TEMPLATE_ASSETS_DIR="$2"
 
@@ -387,7 +387,7 @@ convert_template_js() {
 			sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/ /g' |
 			sed 's/<SHTRACER_NEWLINE>/\\\\n/' |
 			sed 's/<SHTRACER_BACKSLASH>/\\\\/'
-		profile_end "CONVERT_TEMPLATE_JS"
+		profile_end "convert_template_js"
 	)
 }
 

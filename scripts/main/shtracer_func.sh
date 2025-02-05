@@ -23,7 +23,7 @@ esac
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
 check_configfile() {
 	(
-		profile_start "CHECK_CONFIGFILE"
+		profile_start "check_configfile"
 		# Prepare the output directory and filenames
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
@@ -65,20 +65,26 @@ check_configfile() {
 						a["BRIEF"],
 						a["TAG FORMAT"],
 						a["TAG LINE FORMAT"],
-						a["TAG-TITLE OFFSET"];
+						a["TAG-TITLE OFFSET"],
+						a["PRE-EXTRA-SCRIPT"],
+						a["POST-EXTRA-SCRIPT"];
 				}
 
 				BEGIN {
-					precount=1; count=1;
-					OFS=separator
+					precount = 1; count = 1;
+					OFS = separator
 				}
 
+				# Set Markdown title hierarchy by separating with ":"
+				# e.g. title = Heading1:Heading1.1:Heading1.1.1
 				/^#/ {
 					match($0, /^#+/)
 					gsub(/^#+ */, "", $0)
-					t[RLENGTH]=$0
+					t[RLENGTH] = $0
 					title="";
-					for (i=2;i<=RLENGTH;i++){ title=sprintf("%s:%s", title, t[i]) }
+					for (i=2;i<=RLENGTH;i++){
+						title = sprintf("%s:%s", title, t[i])
+					}
 				}
 
 				$0 ~ ("^PATH" separator) {
@@ -100,7 +106,7 @@ check_configfile() {
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"
-		profile_end "CHECK_CONFIGFILE"
+		profile_end "check_configfile"
 	)
 }
 
@@ -110,6 +116,7 @@ check_configfile() {
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
 extract_tags() {
+	profile_start "extract_tags"
 
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
@@ -124,7 +131,6 @@ extract_tags() {
 	fi
 
 	(
-		profile_start "EXTRACT_TAGS"
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
@@ -169,12 +175,14 @@ extract_tags() {
 				tag_format = extract_from_backtick($6)
 				tag_line_format = extract_from_backtick($7)
 				tag_title_offset = $8 == "" ? 1 : $8
+				pre_extra_script = extract_from_backtick($9)
+				post_extra_script = extract_from_backtick($10)
 
 				if (tag_format == "") { next }
 
 				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 				if (is_file_exist == 0) {
-					print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""
+					print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
 				}
 				else {
 					if (ignore != "") {
@@ -191,7 +199,7 @@ extract_tags() {
 						else {
 							cmd = "find \"" path "\" -type f -name \"" extension "\""
 						}
-					while ((cmd | getline path) > 0) { print title, path, extension, brief, tag_format, tag_line_format, tag_title_offset, ""; } close(cmd);
+					while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
 				}
 			}' | sort -u)"
 
@@ -201,9 +209,14 @@ extract_tags() {
 				{
 					title = $1
 					path = $2
-					tag_format = $5
-					tag_line_format = $6
-					tag_title_offset = $7
+					tag_format = $6
+					tag_line_format = $7
+					tag_title_offset = $8
+					pre_extra_script = $9
+					post_extra_script = $10
+
+					# Execute pre_extra_script
+	        system(pre_extra_script)
 
 					line_num = 0
 					counter = -1
@@ -251,12 +264,14 @@ extract_tags() {
 						}
 
 					}
+					# Execute post_extra_script
+					system(post_extra_script)
 				}
 				' >"$_TAG_OUTPUT_LEVEL1"
 
 		# echo the output file location
 		echo "$_TAG_OUTPUT_LEVEL1"
-		profile_end "EXTRACT_TAGS"
+		profile_end "extract_tags"
 	)
 }
 
@@ -308,7 +323,7 @@ make_tag_table() {
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
 			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
 		else
-			error_exit 1 "make_tag_table" "Tag data is empty"
+			error_exit 1 "make_tag_table" "No linked tags found."
 		fi
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
@@ -398,9 +413,21 @@ print_verification_result() {
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
+	if [ -e "$1" ]; then
+		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
+		_ABSOLUTE_TAG_DIRNAME="$(
+			cd "$(dirname "$1")" || exit 1
+			pwd
+		)"
+		_ABSOLUTE_TAG_PATH=${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME
+	else
+		error_exit 1 "swap_tags" "Cannot find a config output data."
+		return
+	fi
+
 	(
 		# Read config parse results (tag information are included in one line)
-		_TARGET_DATA="$(cat "$1")"
+		_TARGET_DATA="$(cat "$_ABSOLUTE_TAG_PATH")"
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
@@ -438,3 +465,4 @@ swap_tags() {
 		)
 	)
 }
+

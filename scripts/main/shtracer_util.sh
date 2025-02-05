@@ -26,7 +26,7 @@ init_environment() {
 # @tag    @IMP4.2@ (FROM: @ARC1.2@)
 error_exit() {
 	if [ $# -ge 3 ]; then
-		echo "[${0##*/}][$2]: $3" 1>&2
+		echo "[${0##*/}][error][$2]: $3" 1>&2
 	fi
 	exit "$1"
 }
@@ -69,7 +69,6 @@ profile_end() {
 	END_TIME=$(date +%s.%N)
 	ELAPSED=$(awk -v end="$END_TIME" -v start="$START_TIME" 'BEGIN{printf "%.2f\n", end-start}')
 
-	echo "Process '$PROCESS_NAME' took ${ELAPSED} seconds." >&2
-
+	echo "[shtracer][profile][$PROCESS_NAME]: ${ELAPSED} sec" >&2
 	eval "unset PROFILE_START_TIME_$PROCESS_NAME"
 }
