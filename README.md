@@ -231,4 +231,6 @@ For details, see documents in `./docs/` directory.
 
 ## ✅ TODO
 
-* Add configurations for excluding the specific files (ignore)
+* Use custom css files for html output.
+* Change the template file extension to something meaningless
+
