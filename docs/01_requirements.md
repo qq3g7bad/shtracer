@@ -24,14 +24,20 @@
 
 #### Field format
 
-Name               | Value
------------------- | --------
-Trace target       | Mandatory. Section name. This is used for constructing the trace structure.
-`PATH`             | Mandatory. Target file path (a directory or a file).
-`BRIEF`            | Optional. Brief information.
-`TAG FORMAT`       | Optional. Written in [BRE](https://www.gnu.org/software/sed/manual/html_node/BRE-syntax.html). If `TAG FORMAT` is not written, ShellTracer make trace to the file not the items in the file.
-`TAG LINE FORMAT`  | Optional. Written in [BRE](https://www.gnu.org/software/sed/manual/html_node/BRE-syntax.html).
-`TAG-TITLE OFFSET` | Optional. Set the offset value between the tag and its related title. **Title is individual elements to trace.**
+column | optional  | content                                                              | quotation
+------ | --------- | -------------------------------------------------------------------- | -------
+1      | mandatory | trace target title                                                   | "
+2      | mandatory | path (to directory or file from your config file)                    | "
+3      | optional  | extention with wildcard (BRE is acceptable)                          | "
+4      | optional  | ignore filter (you can use wildcards)                                | "
+5      | optional  | description                                                          | "
+6      | mandatory | tag format (for serching tags written in BRE)                        | `
+7      | mandatory | tag line format (for serching lines including tags written in BRE)   | `
+8      | optional  | tag-title offset (how many lines away from each tags, default: 1)    | none
+9      | optional  | pre-extra-script                                                     | `
+10     | optional  | post-extra-script                                                    | `
+
+* **[BRE](https://www.gnu.org/software/sed/manual/html_node/BRE-syntax.html)**: Basic regular expressions.
 
 ```markdown
 ## Trace target
@@ -84,7 +90,8 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 ### (Optional) Convert MSexcel (`*.xlsx`) or MSword (`*.docx`) format trace target to markdown files.
 
 * It is not mandatory.
-* Since it relies on other proprietary programs, you may wish to use tools other than shell scripts.
+  * Since it relies on other proprietary programs, you may wish to use tools other than shell scripts.
+* An example is [pandoc-comment-extractor](https://github.com/qq3g7bad/pandoc-comment-extractor).
 
 ## 📤 3. Output
 
@@ -167,7 +174,6 @@ Trace target       | Mandatory. Section name. This is used for constructing the 
 
 ### Reduce dependence on specific shells and be as POSIX compliant as possible.
 
-<!-- @REQ6.1@ -->
 ## 📗 6. Definition
 
 * **Trace target**: File or directory which has information to trace.

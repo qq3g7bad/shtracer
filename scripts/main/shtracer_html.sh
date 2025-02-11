@@ -109,10 +109,13 @@ make_target_flowchart() {
 				}
 
 				# 2) fork counter decremented
-				else if(previous_fork_count-1 == fork_count) {
-					print "end"
-					for (i=1; i<=fork_counter[fork_count+1]; i++) {
-						print "id"fork_last[i]" --> id"$1
+				else if(previous_fork_count >= fork_count+1) {
+					while(previous_fork_count >= fork_count+1) {
+						print "end"
+					  for (i=1; i<=fork_counter[previous_fork_count]; i++) {
+					  	print "id"fork_last[i]" --> id"$1
+					  }
+						previous_fork_count--;
 					}
 				}
 
@@ -147,14 +150,25 @@ make_target_flowchart() {
 					}
 				}
 				previous_fork_count=fork_count
-			} END { print "id"$1" --> stop"}' >"$_UML_OUTPUT_RELATIONSHIPS"
+			}
+			END {
+				# When the fork block is not closed at the last line
+				if (fork_count >= 1) {
+					while(fork_count >=1) {
+						print "end"
+						fork_count--;
+					}
+				}
+				else {
+					print stop[End]
+					print "id"$1" --> stop"
+				}
+			}' >"$_UML_OUTPUT_RELATIONSHIPS"
 
 		_TEMPLATE_FLOWCHART='flowchart TB
 
 			start[Start]
 			@state_declaration@
-			stop[End]
-
 			@state_relationships@
 			'
 
@@ -217,20 +231,19 @@ convert_template_html() {
 		profile_start "convert_template_html_insert_tag_table_link"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed "$(echo "$_TAG_INFO_TABLE" |
-				awk '{
-				n = split($3, parts, "/");
-				filename = parts[n];
-        raw_filename = filename;
-				extension_pos = match(raw_filename, /\.[^\.]+$/);
-				gsub(/\./, "_", filename);
-				gsub(/^/, "Target_", filename);
+				awk -F"$SHTRACER_SEPARATOR" '{
+					n = split($3, parts, "/");
+					filename = parts[n];
+					raw_filename = filename;
+					extension_pos = match(raw_filename, /\.[^\.]+$/);
+					gsub(/\./, "_", filename);
+					gsub(/^/, "Target_", filename);
 
-				if (extension_pos) {
-					extension = substr(raw_filename, extension_pos + 1);
-				} else {
-					extension = "sh";
-				}
-
+					if (extension_pos) {
+						extension = substr(raw_filename, extension_pos + 1);
+					} else {
+						extension = "sh";
+					}
 					print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
 				}')")"
 		profile_end "convert_template_html_insert_tag_table_link"
@@ -238,7 +251,7 @@ convert_template_html() {
 		# Prepare file information
 		profile_start "convert_template_html_insert_information"
 		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" |
-			awk '{print $3}' |
+			awk -F"$SHTRACER_SEPARATOR" '{print $3}' |
 			sort -u |
 			awk '{
 				n = split($0, parts, "/");
@@ -272,12 +285,12 @@ convert_template_html() {
 					print
 				}' |
 			awk '
-					BEGIN {
+				BEGIN {
 				    add_space = 0
-					}
+				}
 
-					# Handle special comment
-					/<!-- SHTRACER INSERTED -->/ {
+				# Handle special comment
+				/<!-- SHTRACER INSERTED -->/ {
 					if (add_space == 0) {
 						add_space = 1
 						add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
@@ -336,7 +349,7 @@ convert_template_js() {
 
 		# Make a JavaScript file
 		_JS_CONTENTS="$(
-			echo "$_TAG_INFO_TABLE" | awk '{ print $3 }' | sort -u |
+			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u |
 				awk -v js_template="$_JS_TEMPLATE" 'BEGIN{
 						init_js_template = js_template
 					}
@@ -367,6 +380,7 @@ convert_template_js() {
 						gsub(/\\7/, "<SHTRACER_BACKSLASH>7", contents)     # REMOVE FROM SHTRACER PREVIEW
 						gsub(/\\8/, "<SHTRACER_BACKSLASH>8", contents)     # REMOVE FROM SHTRACER PREVIEW
 						gsub(/\\9/, "<SHTRACER_BACKSLASH>9", contents)     # REMOVE FROM SHTRACER PREVIEW
+						gsub(/\\0/, "<SHTRACER_BACKSLASH>0", contents)     # REMOVE FROM SHTRACER PREVIEW
 						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
 						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
 						gsub(/@TRACE_TARGET_CONTENTS@/, contents, js_template);
@@ -403,7 +417,11 @@ make_html() {
 		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
 
 		_TAG_TABLE_FILENAME="$1"
-		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" -v config_path="${CONFIG_PATH}" '{
+		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" -v config_path="${CONFIG_PATH}" -v separator="$SHTRACER_SEPARATOR" '
+			BEGIN {
+				OFS = separator;
+			}
+			{
 				tag = $2;
 				path = $5
 				line = $6

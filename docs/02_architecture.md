@@ -8,7 +8,6 @@
 ├── sample                Sample config data
 └── scripts               Scripts for `shtracer`
     ├── main              Main shell scripts (and helper functions)
-    ├── optional          Optional shell/python scripts
     └── test              For testing
         └── shunit2       Testing framework introduced by git submodule
 ```
@@ -18,11 +17,8 @@
 ```mermaid
 stateDiagram
 
-rtm:Requirements traceability matrix (RTM)
-
 input:Input
 opt_input:Optional input files
-opt_output:Optional output files
 
 state input {
   targetfiles:Trace target files
@@ -32,26 +28,36 @@ state opt_input {
   wordinput:Word files
   excelinput:Excel files
 }
-state opt_output {
-  exceloutput:Excel files
-}
-
-note right of input
-  Markdown files
+note left of input
+  Text files
 end note
 
 [*] --> input
 [*] --> opt_input
-opt_input --> targetfiles : optional scripts
 
-input --> rtm : shtracer
-note left of rtm
-  Markdown files
-end note
+opt_input --> targetfiles : pre-extra-scripts
+opt_output:Optional output files
 
-rtm --> [*]
-rtm --> opt_output : optional scripts
-opt_output --> [*]
+state output {
+  txt_output: Text files
+  html_output:HTML file
+}
+
+state txt_output {
+  rtm:Requirements traceability matrix (RTM)
+  uml:UML
+}
+
+state opt_output {
+  excel_output:Excel file
+}
+
+
+input --> output : shtracer
+rtm --> opt_output : post-extra-scripts
+rtm --> html_output
+uml --> html_output
+
 ```
 
 <!-- @ARC1.1@ (FROM: @REQ5.1@) -->
@@ -85,23 +91,26 @@ The `shtracer` file includes utility functions.
 
 ### 📄 `shtracer_func.sh`
 
-<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.4@, @REQ2.1@, @REQ6.1@) -->
+<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.3@) -->
 #### Check the config file
 
 * Read configuration file.
 * Extract each trace target information in one line. Each line has the following items.
 
-column | content
------- | --------------------
-1      | (mandatory) trace target title
-2      | (mandatory) path (to directory or file)
-3      | (optional) extention with wildcard (BRE is acceptable)
-4      | (optional) description
-5      | (mandatory) tag format (for serching tags written in BRE)
-6      | (mandatory) tag line format (for serching lines including tags written in BRE)
-7      | (optional) tag-title offset (how many lines away from each tags, default: 1)
+column | optional  | content                                                              | quotation
+------ | --------- | -------------------------------------------------------------------- | -------
+1      | mandatory | trace target title                                                   | "
+2      | mandatory | path (to directory or file from your config file)                    | "
+3      | optional  | extention with wildcard (BRE is acceptable)                          | "
+4      | optional  | ignore filter (you can use wildcards)                                | "
+5      | optional  | description                                                          | "
+6      | mandatory | tag format (for serching tags written in BRE)                        | `
+7      | mandatory | tag line format (for serching lines including tags written in BRE)   | `
+8      | optional  | tag-title offset (how many lines away from each tags, default: 1)    | none
+9      | optional  | pre-extra-script                                                     | `
+10     | optional  | post-extra-script                                                    | `
 
-<!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.1.1@, @REQ3.1.2@, @REQ6.1@) -->
+<!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.1.1@) -->
 #### Make tag table
 
 * Read trace targets.
@@ -117,7 +126,7 @@ NONE @REQ1.3@
 @ARC2.1@ @IMP4.1@
 ```
 
-<!-- @ARC2.3@ (FROM: @REQ2.1@, @REQ3.2.1@, @REQ6.1@) -->
+<!-- @ARC2.3@ (FROM: @REQ2.1@, @REQ3.2.1@) -->
 #### Join tag table
 
 * Connect tag tables from right direction.
@@ -175,7 +184,3 @@ id3_2_2 --> id4
 id4 --> stop
 ```
 
-<!-- @ARC4.1@ (FROM: @REQ2.2@, @REQ3.3@) -->
-## 📂 scripts/optional/
-
-* Not implemented
