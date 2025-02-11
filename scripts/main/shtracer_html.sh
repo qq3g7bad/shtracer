@@ -112,10 +112,10 @@ make_target_flowchart() {
 				else if(previous_fork_count >= fork_count+1) {
 					while(previous_fork_count >= fork_count+1) {
 						print "end"
+					  for (i=1; i<=fork_counter[previous_fork_count]; i++) {
+					  	print "id"fork_last[i]" --> id"$1
+					  }
 						previous_fork_count--;
-					}
-					for (i=1; i<=fork_counter[previous_fork_count]; i++) {
-						print "id"fork_last[i]" --> id"$1
 					}
 				}
 
@@ -152,6 +152,7 @@ make_target_flowchart() {
 				previous_fork_count=fork_count
 			}
 			END {
+				# When the fork block is not closed at the last line
 				if (fork_count >= 1) {
 					while(fork_count >=1) {
 						print "end"
