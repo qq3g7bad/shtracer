@@ -141,6 +141,7 @@ make_target_flowchart() {
 						else {
 							print previous" --> id"$1
 							fork_last[fork_counter[fork_count]] = $1
+							previous="id"$1
 						}
 					}
 					# 3-2)
