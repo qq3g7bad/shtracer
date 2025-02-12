@@ -86,38 +86,43 @@ function hideSameText() {
 function sortTable(columnIndex) {
   const table = document.getElementById("tag-table");
 
-  /*
-   * Set a data attribute in the table to maintain
-   * the sort state of each column (first time only)
-   */
   if (!table.sortStates) {
-    /* Initial value : ascending = false */
     table.sortStates = Array.from(table.querySelectorAll('th')).map(() => false);
   }
 
-  /* Get and switch the current column sorting state */
   const ascending = !table.sortStates[columnIndex];
-
-  /* Reset other column sorting state */
   table.sortStates = table.sortStates.map((_, index) => index === columnIndex ? ascending : false);
 
-  /* Sort the table */
   const rows = Array.from(table.rows).slice(1);
+
   rows.sort((a, b) => {
     const cellA = a.cells[columnIndex].innerText.trim();
     const cellB = b.cells[columnIndex].innerText.trim();
 
-    let valueA = isNaN(cellA) ? cellA : parseFloat(cellA);
-    let valueB = isNaN(cellB) ? cellB : parseFloat(cellB);
+    // "REQ" や "@" を除去し、数値部分だけを取り出す
+    const extractNumbers = (str) => str
+      .replace(/[^\d.]/g, '') // 数字とピリオド以外を削除
+      .split('.')             // ピリオドで分割
+      .map(num => /^\d+$/.test(num) ? parseInt(num, 10) : NaN) // 数値変換
+      .filter(num => !isNaN(num)); // NaN を除外
 
-    if (valueA < valueB) return ascending ? -1 : 1;
-    if (valueA > valueB) return ascending ? 1 : -1;
+    const valueA = extractNumbers(cellA);
+    const valueB = extractNumbers(cellB);
+
+    // **各要素ごとに比較**
+    for (let i = 0; i < Math.max(valueA.length, valueB.length); i++) {
+      const numA = valueA[i] || 0; // 足りない桁は 0 として扱う
+      const numB = valueB[i] || 0;
+      if (numA !== numB) {
+        return ascending ? numA - numB : numB - numA;
+      }
+    }
+
     return 0;
   });
 
   rows.forEach(row => table.appendChild(row));
 
-  /* Refresh headers */
   const headers = table.querySelectorAll('th');
   headers.forEach((header, index) => {
     const sortIndicator = header.querySelector('.sort-indicator');
@@ -133,6 +138,7 @@ function sortTable(columnIndex) {
       header.removeChild(sortIndicator);
     }
   });
+
   hideSameText();
 }
 
