@@ -2,7 +2,13 @@
 
 SHTRACER_TRUE="${SHTRACER_TRUE:=1}"
 SHTRACER_FALSE="${SHTRACER_FALSE:=0}"
-SHTRACER_IS_PROFILE_ENABLE="${SHTRACER_IS_PROFILE_ENABLE:=$SHTRACER_TRUE}"
+
+##
+# @brief Flag to enable or disable the output of time taken by each function
+# @details
+#
+# When SHTRACER_IS_PROFILE_ENABLE is set to SHTRACER_TRUE, the time taken by each function during execution is output to stderr.
+SHTRACER_IS_PROFILE_ENABLE="${SHTRACER_IS_PROFILE_ENABLE:=$SHTRACER_FALSE}"
 
 ##
 # @brief  Initialize environment
