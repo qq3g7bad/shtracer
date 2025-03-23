@@ -196,9 +196,9 @@ extract_tags() {
 						}
 						cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f -name \""extension"\" \\) -print";
 					}
-						else {
-							cmd = "find \"" path "\" -type f -name \"" extension "\""
-						}
+					else {
+						cmd = "find \"" path "\" -type f -name \"" extension "\""
+					}
 					while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
 				}
 			}' | sort -u)"
@@ -216,7 +216,7 @@ extract_tags() {
 					post_extra_script = $10
 
 					# Execute pre_extra_script
-	        system(pre_extra_script)
+					system(pre_extra_script)
 
 					line_num = 0
 					counter = -1
@@ -305,7 +305,7 @@ make_tag_table() {
 				for (i=1; i<=length(parent); i++){
 					print(parent[i], $2);
 				}
-		 }' >"$_TAG_PAIRS"
+		}' >"$_TAG_PAIRS"
 
 		# Prepare upstream table (starting point)
 		grep "^$NODATA_STRING" "$_TAG_PAIRS" |
@@ -322,6 +322,9 @@ make_tag_table() {
 		# Make joined tag table (each row has a single trace tag chain)
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
 			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
+		  if [ $? -ne 0 ]; then
+		  	error_exit 1 "make_tag_table" "Error in joine_tag_pairs"
+		  fi
 		else
 			error_exit 1 "make_tag_table" "No linked tags found."
 		fi
@@ -366,7 +369,12 @@ join_tag_pairs() {
 		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
 		_NF_PLUS1="$((_NF + 1))"
 
-		_JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM" |
+		_JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM")"
+		if [ $? -ne 0 ]; then
+			error_exit 1 "join_tag_pairs" "Error in join command"
+		fi
+
+		_JOINED_TMP="$(echo "$_JOINED_TMP" |
 			awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' |
 			awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' |
 			sort -k$_NF_PLUS1,$_NF_PLUS1)"
