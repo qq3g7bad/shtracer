@@ -221,7 +221,7 @@ extract_tags() {
 					path = $2
 					tag_format = $6
 					tag_line_format = $7
-					tag_title_offset = $8
+					tag_title_offset = $8 ? $8 > 0 : 0
 					pre_extra_script = $9
 					post_extra_script = $10
 
