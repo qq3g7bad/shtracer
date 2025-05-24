@@ -232,5 +232,5 @@ For details, see documents in `./docs/` directory.
 ## ✅ TODO
 
 * Use custom css files for html output.
-* Change the template file extension to something meaningless
+* Use OR condition in the extension filter.
 
