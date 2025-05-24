@@ -88,7 +88,7 @@ make_target_flowchart() {
 
 		# Prepare relationships for UML
 		awk <"$_UML_OUTPUT_CONFIG" \
-			-F ":" -v fork_string_bre="$_FORK_STRING_BRE"\
+			-F ":" -v fork_string_bre="$_FORK_STRING_BRE" \
 			'BEGIN{previous="start"}
 			{
 				# Fork counter
@@ -106,15 +106,16 @@ make_target_flowchart() {
 					print fork_base" --> id"$1
 					fork_counter[fork_count]++
 					print "subgraph \""$(NF-1) "\""
+					fork_last[fork_counter[fork_count]] = $1
 				}
 
 				# 2) fork counter decremented
 				else if(previous_fork_count >= fork_count+1) {
 					while(previous_fork_count >= fork_count+1) {
 						print "end"
-					  for (i=1; i<=fork_counter[previous_fork_count]; i++) {
-					  	print "id"fork_last[i]" --> id"$1
-					  }
+						for (i=1; i<=fork_counter[previous_fork_count]; i++) {
+							print "id"fork_last[i]" --> id"$1
+						}
 						previous_fork_count--;
 					}
 				}
@@ -129,6 +130,7 @@ make_target_flowchart() {
 							previous="id"$1
 							fork_counter[fork_count]++
 							print "subgraph \""$(NF-1) "\""
+							fork_last[fork_counter[fork_count]] = $1
 						}
 
 						# 3-2) fork end
@@ -144,7 +146,7 @@ make_target_flowchart() {
 							previous="id"$1
 						}
 					}
-					# 3-2)
+					# 4-1)
 					else {
 						print previous" --> id"$1
 						previous="id"$1
@@ -164,7 +166,9 @@ make_target_flowchart() {
 					print stop[End]
 					print "id"$1" --> stop"
 				}
-			}' >"$_UML_OUTPUT_RELATIONSHIPS"
+			}' |
+			# delete subgraphs without data
+			sed '/^subgraph ".*"$/{N;/^\(subgraph ".*"\)\nend$/d;}' >"$_UML_OUTPUT_RELATIONSHIPS"
 
 		_TEMPLATE_FLOWCHART='flowchart TB
 
