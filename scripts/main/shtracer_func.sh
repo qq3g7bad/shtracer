@@ -185,6 +185,16 @@ extract_tags() {
 					print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
 				}
 				else {
+					# for multiple extension filter
+					n = split(extension, ext_arr, "|")
+					ext_expr = ""
+					for (i = 1; i <= n; i++) {
+						if (i > 1) {
+							ext_expr = ext_expr " -o"
+						}
+						ext_expr = ext_expr " -name \"" ext_arr[i] "\""
+					}
+
 					if (ignore != "") {
 						split(ignore, ignore_exts, "|");
 						ignore_ext_str = "";
@@ -194,10 +204,10 @@ extract_tags() {
 							}
 							ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
 						}
-						cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f -name \""extension"\" \\) -print";
+						cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f " ext_expr " \\) -print";
 					}
 					else {
-						cmd = "find \"" path "\" -type f -name \"" extension "\""
+						cmd = "find \"" path "\" -type f " ext_expr ""
 					}
 					while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
 				}
