@@ -17,6 +17,100 @@ case "$0" in
 esac
 
 ##
+# @brief   Remove comments from config markdown file
+# @param   $1 : CONFIG_MARKDOWN_PATH
+# @return  Echoes cleaned config content to stdout
+# @tag     @IMP2.1.1@ (FROM: @IMP2.1@)
+_check_config_remove_comments() {
+	_CONFIG_MARKDOWN_PATH="$1"
+
+	# Delete comment blocks from the configuration markdown file
+	awk <"$_CONFIG_MARKDOWN_PATH" \
+		'
+		/`.*<!--.*-->.*`/   {
+			match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
+			print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
+			next;
+		}
+		{
+			sub(/<!--.*-->/, "")
+		}
+		/<!--/ { in_comment=1 }
+		/-->/ && in_comment { in_comment=0; next }
+		/<!--/,/-->/ { if (in_comment) next }
+		!in_comment { print }
+		' |
+		sed '/^[[:space:]]*$/d' |    # Delete empty lines
+		sed 's/^[[:space:]]*\* //' | # Delete start spaces
+		sed 's/[[:space:]]*$//' |    # Delete end spaces
+		sed 's/\*\*\(.*\)\*\*:/\1:/'
+}
+
+##
+# @brief   Convert cleaned config content to table format
+# @param   $1 : Cleaned config content (from _check_config_remove_comments)
+# @param   $2 : Output file path
+# @return  None (writes to $2)
+# @tag     @IMP2.1.2@ (FROM: @IMP2.1@)
+_check_config_convert_to_table() {
+	_CONFIG_CONTENT="$1"
+	_CONFIG_TABLE="$2"
+
+	# Convert sections to lines
+	echo "$_CONFIG_CONTENT" |
+		sed 's/:/'"$SHTRACER_SEPARATOR"'/;
+					s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
+		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
+			function print_data() {
+				print \
+					a["TITLE"],
+					a["PATH"],
+					a["EXTENSION FILTER"],
+					a["IGNORE FILTER"],
+					a["BRIEF"],
+					a["TAG FORMAT"],
+					a["TAG LINE FORMAT"],
+					a["TAG-TITLE OFFSET"],
+					a["PRE-EXTRA-SCRIPT"],
+					a["POST-EXTRA-SCRIPT"];
+			}
+
+			BEGIN {
+				precount = 1; count = 1;
+				OFS = separator
+			}
+
+			# Set Markdown title hierarchy by separating with ":"
+			# e.g. title = Heading1:Heading1.1:Heading1.1.1
+			/^#/ {
+				match($0, /^#+/)
+				gsub(/^#+ */, "", $0)
+				t[RLENGTH] = $0
+				title="";
+				for (i=2;i<=RLENGTH;i++){
+					title = sprintf("%s:%s", title, t[i])
+				}
+			}
+
+			$0 ~ ("^PATH" separator) {
+				if (a["TITLE"] != "") {
+					print_data()
+				}
+				for(i in a){a[i]=""}
+				a["TITLE"]=title
+			}
+
+			{
+				a[$1]=$2
+			}
+
+			END {
+				print_data()
+			}
+		' >"$_CONFIG_TABLE"
+}
+
+##
 # @brief
 # @param  $1 : CONFIG_MARKDOWN_PATH
 # @return CONFIG_OUTPUT_DATA
@@ -30,79 +124,11 @@ check_configfile() {
 
 		mkdir -p "$_CONFIG_OUTPUT_DIR"
 
-		# Delete comment blocks from the confiuration markdown file
-		_CONFIG_FILE_WITHOUT_COMMENT="$(awk <"$1" \
-			'
-			/`.*<!--.*-->.*`/   {
-				match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
-				print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-				next;
-			}
-			{
-				sub(/<!--.*-->/, "")
-			}
-			/<!--/ { in_comment=1 }
-			/-->/ && in_comment { in_comment=0; next }
-			/<!--/,/-->/ { if (in_comment) next }
-			!in_comment { print }
-			' |
-			sed '/^[[:space:]]*$/d' |    # Delete empty lines
-			sed 's/^[[:space:]]*\* //' | # Delete start spaces
-			sed 's/[[:space:]]*$//' |    # Delete end spaces
-			sed 's/\*\*\(.*\)\*\*:/\1:/')"
+		# Remove comments from config markdown file
+		_CONFIG_FILE_WITHOUT_COMMENT="$(_check_config_remove_comments "$1")"
 
-		# Convert sections to lines
-		echo "$_CONFIG_FILE_WITHOUT_COMMENT" |
-			sed 's/:/'"$SHTRACER_SEPARATOR"'/;
-						s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
-			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
-				function print_data() {
-					print \
-						a["TITLE"],
-						a["PATH"],
-						a["EXTENSION FILTER"],
-						a["IGNORE FILTER"],
-						a["BRIEF"],
-						a["TAG FORMAT"],
-						a["TAG LINE FORMAT"],
-						a["TAG-TITLE OFFSET"],
-						a["PRE-EXTRA-SCRIPT"],
-						a["POST-EXTRA-SCRIPT"];
-				}
-
-				BEGIN {
-					precount = 1; count = 1;
-					OFS = separator
-				}
-
-				# Set Markdown title hierarchy by separating with ":"
-				# e.g. title = Heading1:Heading1.1:Heading1.1.1
-				/^#/ {
-					match($0, /^#+/)
-					gsub(/^#+ */, "", $0)
-					t[RLENGTH] = $0
-					title="";
-					for (i=2;i<=RLENGTH;i++){
-						title = sprintf("%s:%s", title, t[i])
-					}
-				}
-
-				$0 ~ ("^PATH" separator) {
-					if (a["TITLE"] != "") {
-						print_data()
-					}
-					for(i in a){a[i]=""}
-					a["TITLE"]=title
-				}
-
-				{
-					a[$1]=$2
-				}
-
-				END {
-					print_data()
-				}
-			' >"$_CONFIG_TABLE"
+		# Convert cleaned content to table format
+		_check_config_convert_to_table "$_CONFIG_FILE_WITHOUT_COMMENT" "$_CONFIG_TABLE"
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"
