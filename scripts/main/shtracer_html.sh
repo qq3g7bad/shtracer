@@ -17,6 +17,177 @@ case "$0" in
 esac
 
 ##
+# @brief   Parse config and generate flowchart indices
+# @param   $1 : CONFIG_OUTPUT_DATA path
+# @param   $2 : FORK_STRING_BRE
+# @param   $3 : UML_OUTPUT_CONFIG output path
+# @return  None (writes to $3)
+# @tag     @IMP3.1.1@ (FROM: @IMP3.1@)
+_make_flowchart_parse_config() {
+	_CONFIG_OUTPUT_DATA="$1"
+	_FORK_STRING_BRE="$2"
+	_UML_OUTPUT_CONFIG="$3"
+
+	# Parse config output data
+	awk <"$_CONFIG_OUTPUT_DATA" \
+		-F "$SHTRACER_SEPARATOR" \
+		'{ if(previous != $1){print $1}; previous=$1 }' |
+		awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
+			'BEGIN{}
+			{
+				# Fork counter
+				fork_count       = gsub(fork_string_bre, "&")
+				fork_count_index = 2*fork_count
+				increment_index  = 2*fork_count + 1
+
+				idx[increment_index]++
+
+				# If fork detected
+				if(previous_fork_count+1 == fork_count) {
+					idx[fork_count_index] = 0
+					idx[increment_index]  = 1
+					idx[increment_index-2]++
+				}
+				previous_fork_count=fork_count
+
+
+				# In fork situation, concatenation from $1 to $(NF-1)
+				if(fork_count_index > 0) {
+					fork_section = ""
+					for (i = 2; i < NF; i++) {
+						fork_section = fork_section"-"$i
+					}
+					if (fork_section != previous_fork_section) {
+						idx[fork_count_index]++
+						idx[increment_index]=1
+					}
+					previous_fork_section = fork_section
+				}
+
+				flowchart_idx = ""
+				for (i = 1; i <= increment_index; i++) {
+					flowchart_idx = flowchart_idx"_"idx[i]
+				}
+
+				print flowchart_idx, $0
+			}' |
+		sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
+}
+
+##
+# @brief   Prepare UML declarations from config
+# @param   $1 : UML_OUTPUT_CONFIG path
+# @param   $2 : UML_OUTPUT_DECLARATION output path
+# @return  None (writes to $2)
+# @tag     @IMP3.1.2@ (FROM: @IMP3.1@)
+_make_flowchart_prepare_declarations() {
+	_UML_OUTPUT_CONFIG="$1"
+	_UML_OUTPUT_DECLARATION="$2"
+
+	# Prepare declaration for UML
+	awk <"$_UML_OUTPUT_CONFIG" \
+		-F ":" \
+		'{print "id"$1"(["$NF"])"}' >"$_UML_OUTPUT_DECLARATION"
+}
+
+##
+# @brief   Prepare UML relationships from config
+# @param   $1 : UML_OUTPUT_CONFIG path
+# @param   $2 : FORK_STRING_BRE
+# @param   $3 : UML_OUTPUT_RELATIONSHIPS output path
+# @return  None (writes to $3)
+# @tag     @IMP3.1.3@ (FROM: @IMP3.1@)
+_make_flowchart_prepare_relationships() {
+	_UML_OUTPUT_CONFIG="$1"
+	_FORK_STRING_BRE="$2"
+	_UML_OUTPUT_RELATIONSHIPS="$3"
+
+	# Prepare relationships for UML
+	awk <"$_UML_OUTPUT_CONFIG" \
+		-F ":" -v fork_string_bre="$_FORK_STRING_BRE" \
+		'BEGIN{previous="start"}
+		{
+			# Fork counter
+			fork_count = gsub(fork_string_bre, "&")
+
+			split($1, section, "_")
+			split(previous, previous_section, "_")
+
+			# If fork detected
+
+			# 1) fork counter incremented
+			if(previous_fork_count+1 == fork_count) {
+				fork_base=previous
+				previous="id"$1
+				print fork_base" --> id"$1
+				fork_counter[fork_count]++
+				print "subgraph \""$(NF-1) "\""
+				fork_last[fork_counter[fork_count]] = $1
+			}
+
+			# 2) fork counter decremented
+			else if(previous_fork_count >= fork_count+1) {
+				while(previous_fork_count >= fork_count+1) {
+					print "end"
+					for (i=1; i<=fork_counter[previous_fork_count]; i++) {
+						print "id"fork_last[i]" --> id"$1
+					}
+					previous_fork_count--;
+				}
+			}
+
+			else{
+				if (length(section) > 2 && length(previous_section) > 2) {
+
+					# 3-1) fork again
+					if(section[length(section)-1] > previous_section[length(previous_section)-1]) {
+						print "end"
+						print fork_base" --> id"$1
+						previous="id"$1
+						fork_counter[fork_count]++
+						print "subgraph \""$(NF-1) "\""
+						fork_last[fork_counter[fork_count]] = $1
+					}
+
+					# 3-2) fork end
+					else if(section[length(section)-1] < previous_section[length(previous_section)-1]) {
+						print previous" --> id"$1
+						previous="id"$1
+					}
+
+					# 3-3) In the same fork
+					else {
+						print previous" --> id"$1
+						fork_last[fork_counter[fork_count]] = $1
+						previous="id"$1
+					}
+				}
+				# 4-1)
+				else {
+					print previous" --> id"$1
+					previous="id"$1
+				}
+			}
+			previous_fork_count=fork_count
+		}
+		END {
+			# When the fork block is not closed at the last line
+			if (fork_count >= 1) {
+				while(fork_count >=1) {
+					print "end"
+					fork_count--;
+				}
+			}
+			else {
+				print stop[End]
+				print "id"$1" --> stop"
+			}
+		}' |
+		# delete subgraphs without data
+		sed '/^subgraph ".*"$/{N;/^\(subgraph ".*"\)\nend$/d;}' >"$_UML_OUTPUT_RELATIONSHIPS"
+}
+
+##
 # @brief
 # @param $1 : CONFIG_OUTPUT_DATA
 # @return UML_OUTPUT_FILENAME
@@ -36,140 +207,16 @@ make_target_flowchart() {
 
 		mkdir -p "$_UML_OUTPUT_DIR"
 
-		# Parse config output data
-		awk <"$_CONFIG_OUTPUT_DATA" \
-			-F "$SHTRACER_SEPARATOR" \
-			'{ if(previous != $1){print $1}; previous=$1 }' |
-			awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
-				'BEGIN{}
-				{
-					# Fork counter
-					fork_count       = gsub(fork_string_bre, "&")
-					fork_count_index = 2*fork_count
-					increment_index  = 2*fork_count + 1
+		# Parse config and generate flowchart indices
+		_make_flowchart_parse_config "$_CONFIG_OUTPUT_DATA" "$_FORK_STRING_BRE" "$_UML_OUTPUT_CONFIG"
 
-					idx[increment_index]++
-
-					# If fork detected
-					if(previous_fork_count+1 == fork_count) {
-						idx[fork_count_index] = 0
-						idx[increment_index]  = 1
-						idx[increment_index-2]++
-					}
-					previous_fork_count=fork_count
-
-
-					# In fork situation, concatenation from $1 to $(NF-1)
-					if(fork_count_index > 0) {
-						fork_section = ""
-						for (i = 2; i < NF; i++) {
-							fork_section = fork_section"-"$i
-						}
-						if (fork_section != previous_fork_section) {
-							idx[fork_count_index]++
-							idx[increment_index]=1
-						}
-						previous_fork_section = fork_section
-					}
-
-					flowchart_idx = ""
-					for (i = 1; i <= increment_index; i++) {
-						flowchart_idx = flowchart_idx"_"idx[i]
-					}
-
-					print flowchart_idx, $0
-				}' |
-			sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
-
-		# Prepare declaration for UML
-		awk <"$_UML_OUTPUT_CONFIG" \
-			-F ":" \
-			'{print "id"$1"(["$NF"])"}' >"$_UML_OUTPUT_DECLARATION"
+		# Prepare declarations for UML
+		_make_flowchart_prepare_declarations "$_UML_OUTPUT_CONFIG" "$_UML_OUTPUT_DECLARATION"
 
 		# Prepare relationships for UML
-		awk <"$_UML_OUTPUT_CONFIG" \
-			-F ":" -v fork_string_bre="$_FORK_STRING_BRE" \
-			'BEGIN{previous="start"}
-			{
-				# Fork counter
-				fork_count = gsub(fork_string_bre, "&")
+		_make_flowchart_prepare_relationships "$_UML_OUTPUT_CONFIG" "$_FORK_STRING_BRE" "$_UML_OUTPUT_RELATIONSHIPS"
 
-				split($1, section, "_")
-				split(previous, previous_section, "_")
-
-				# If fork detected
-
-				# 1) fork counter incremented
-				if(previous_fork_count+1 == fork_count) {
-					fork_base=previous
-					previous="id"$1
-					print fork_base" --> id"$1
-					fork_counter[fork_count]++
-					print "subgraph \""$(NF-1) "\""
-					fork_last[fork_counter[fork_count]] = $1
-				}
-
-				# 2) fork counter decremented
-				else if(previous_fork_count >= fork_count+1) {
-					while(previous_fork_count >= fork_count+1) {
-						print "end"
-						for (i=1; i<=fork_counter[previous_fork_count]; i++) {
-							print "id"fork_last[i]" --> id"$1
-						}
-						previous_fork_count--;
-					}
-				}
-
-				else{
-					if (length(section) > 2 && length(previous_section) > 2) {
-
-						# 3-1) fork again
-						if(section[length(section)-1] > previous_section[length(previous_section)-1]) {
-							print "end"
-							print fork_base" --> id"$1
-							previous="id"$1
-							fork_counter[fork_count]++
-							print "subgraph \""$(NF-1) "\""
-							fork_last[fork_counter[fork_count]] = $1
-						}
-
-						# 3-2) fork end
-						else if(section[length(section)-1] < previous_section[length(previous_section)-1]) {
-							print previous" --> id"$1
-							previous="id"$1
-						}
-
-						# 3-3) In the same fork
-						else {
-							print previous" --> id"$1
-							fork_last[fork_counter[fork_count]] = $1
-							previous="id"$1
-						}
-					}
-					# 4-1)
-					else {
-						print previous" --> id"$1
-						previous="id"$1
-					}
-				}
-				previous_fork_count=fork_count
-			}
-			END {
-				# When the fork block is not closed at the last line
-				if (fork_count >= 1) {
-					while(fork_count >=1) {
-						print "end"
-						fork_count--;
-					}
-				}
-				else {
-					print stop[End]
-					print "id"$1" --> stop"
-				}
-			}' |
-			# delete subgraphs without data
-			sed '/^subgraph ".*"$/{N;/^\(subgraph ".*"\)\nend$/d;}' >"$_UML_OUTPUT_RELATIONSHIPS"
-
+		# Generate flowchart from template
 		_TEMPLATE_FLOWCHART='flowchart TB
 
 			start[Start]
