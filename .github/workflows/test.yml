@@ -1,0 +1,97 @@
+# ============================================
+# GitHub Actions Workflow for shtracer
+# ============================================
+# This workflow automatically runs tests when code is pushed or a PR is created.
+
+# Workflow name (displayed in the GitHub Actions tab)
+name: CI Tests
+
+# Trigger: when to run this workflow
+on:
+  push:
+    branches:
+      - main        # On push to main branch
+      - develop     # On push to develop branch
+  pull_request:
+    branches:
+      - main        # On PR to main branch
+      - develop     # On PR to develop branch
+
+# Job definitions
+jobs:
+  # Job 1: Run tests on multiple operating systems
+  test:
+    # Display name for this job
+    name: Run tests on ${{ matrix.os }}
+
+    # Matrix strategy: run tests in parallel on multiple OSes
+    strategy:
+      # Continue running other jobs even if one fails
+      fail-fast: false
+      matrix:
+        # List of operating systems to test on
+        os: [ubuntu-latest, macos-latest]
+        # Note: Windows support can be added later if needed
+
+    # Specify the runner environment
+    runs-on: ${{ matrix.os }}
+
+    # Steps to execute in this job
+    steps:
+      # Step 1: Check out the repository code
+      # actions/checkout@v4 is an official GitHub action
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch submodules recursively (for shUnit2 if it's a submodule)
+          submodules: recursive
+
+      # Step 2: Grant execute permission to shtracer
+      - name: Make shtracer executable
+        run: chmod +x ./shtracer
+
+      # Step 3: Run unit tests
+      - name: Run unit tests
+        run: ./shtracer -t
+
+      # Step 4: Run sample config (verify normal operation)
+      - name: Run sample config
+        run: ./shtracer ./sample/config.md
+
+      # Step 5: Verify that output files were generated
+      - name: Verify output files
+        run: |
+          # Check if generated files exist
+          test -f ./sample/output/tags/04_tag_table || exit 1
+          test -f ./sample/output/uml/20_uml || exit 1
+          test -f ./sample/output/output.html || exit 1
+          echo "All output files generated successfully!"
+
+      # Step 6: Upload logs if tests fail
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}
+          path: |
+            ./sample/output/
+            ./scripts/test/output/
+          retention-days: 7
+
+  # Job 2: Run verification checks
+  verify:
+    name: Run verification checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Make shtracer executable
+        run: chmod +x ./shtracer
+
+      # Verify mode: check for duplicate or isolated tags
+      - name: Run verify mode
+        run: ./shtracer ./sample/config.md -v

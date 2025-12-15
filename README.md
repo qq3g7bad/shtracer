@@ -1,5 +1,9 @@
 # 🐚 shtracer
 
+[![CI Tests](https://github.com/qq3g7bad/shtracer/actions/workflows/test.yml/badge.svg)](https://github.com/qq3g7bad/shtracer/actions/workflows/test.yml)
+[![License](https://img.shields.io/github/license/qq3g7bad/shtracer)](LICENSE)
+[![Shell](https://img.shields.io/badge/shell-POSIX-green.svg)](https://pubs.opengroup.org/onlinepubs/9699919799/)
+
 Open source traceability matrix generator written in shell scripts.
 
 ## 🚩 About
