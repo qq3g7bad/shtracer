@@ -111,6 +111,180 @@ check_configfile() {
 }
 
 ##
+# @brief   Validate config file and return absolute path
+# @param   $1 : CONFIG_OUTPUT_DATA path (may be relative)
+# @return  Echoes absolute path to stdout
+# @exit    Calls error_exit if file doesn't exist
+# @tag     @IMP2.2.1@ (FROM: @IMP2.2@)
+_extract_tags_validate_input() {
+	if [ -e "$1" ]; then
+		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
+		_ABSOLUTE_TAG_DIRNAME="$(
+			cd "$(dirname "$1")" || exit 1
+			pwd
+		)"
+		_ABSOLUTE_TAG_PATH="${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME"
+		echo "$_ABSOLUTE_TAG_PATH"
+	else
+		error_exit 1 "extract_tags" "Cannot find a config output data."
+		return
+	fi
+}
+
+##
+# @brief   Parse config and discover target files
+# @param   $1 : Absolute path to config file
+# @return  Echoes separator-delimited file list to stdout (sorted, unique)
+# @tag     @IMP2.2.2@ (FROM: @IMP2.2@)
+_extract_tags_discover_files() {
+	awk <"$1" -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+		function extract_from_doublequote(string) {
+			sub(/^[[:space:]]*/, "", string)
+			sub(/[[:space:]]*$/, "", string)
+			if (string ~ /".*"/) {
+				string = substr(string, index(string, "\"") + 1);
+				string = substr(string, 1, length(string) - 1);
+			}
+			return string
+		}
+		function extract_from_backtick(string) {
+			sub(/^[[:space:]]*/, "", string)
+			sub(/[[:space:]]*$/, "", string)
+			if (string ~ /`.*`/) {
+				string = substr(string, index(string, "`") + 1);
+				string = substr(string, 1, length(string) - 1);
+			}
+			return string
+		}
+		BEGIN {
+			OFS=separator
+		}
+		{
+			title = $1;
+			path = extract_from_doublequote($2);
+			extension = extract_from_doublequote($3);
+			ignore = extract_from_doublequote($4);
+			brief = $5;
+			tag_format = extract_from_backtick($6)
+			tag_line_format = extract_from_backtick($7)
+			tag_title_offset = $8 == "" ? 1 : $8
+			pre_extra_script = extract_from_backtick($9)
+			post_extra_script = extract_from_backtick($10)
+
+			if (tag_format == "") { next }
+
+			cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
+			if (is_file_exist == 0) {
+				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
+			}
+			else {
+				# for multiple extension filter
+				n = split(extension, ext_arr, "|")
+				ext_expr = ""
+				for (i = 1; i <= n; i++) {
+					if (i > 1) {
+						ext_expr = ext_expr " -o"
+					}
+					ext_expr = ext_expr " -name \"" ext_arr[i] "\""
+				}
+
+				if (ignore != "") {
+					split(ignore, ignore_exts, "|");
+					ignore_ext_str = "";
+					for (i in ignore_exts) {
+						if (ignore_ext_str != "") {
+							ignore_ext_str = ignore_ext_str " -o ";
+						}
+						ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
+					}
+					cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f " ext_expr " \\) -print";
+				}
+				else {
+					cmd = "find \"" path "\" -type f " ext_expr ""
+				}
+				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
+			}
+		}' | sort -u
+}
+
+##
+# @brief   Extract tags from files and write to output
+# @param   $1 : File list from _extract_tags_discover_files
+# @param   $2 : Output file path
+# @return  None (writes to file)
+# @tag     @IMP2.2.3@ (FROM: @IMP2.2@)
+_extract_tags_process_files() {
+	_FROM_TAG_START="FROM:"
+	_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
+
+	echo "$1" |
+		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+			# For title offset, extract only the offset line
+			{
+				title = $1
+				path = $2
+				tag_format = $6
+				tag_line_format = $7
+				tag_title_offset = $8 ? $8 > 0 : 0
+				pre_extra_script = $9
+				post_extra_script = $10
+
+				# Execute pre_extra_script
+				system(pre_extra_script)
+
+				line_num = 0
+				counter = -1
+				while (getline line < path > 0) {
+					line_num++
+
+					# 1) Print tag column
+					if (line ~ tag_format && line ~ tag_line_format) {
+						counter=tag_title_offset;
+						printf("%s%s", title, separator)                       # column 1: trace target
+
+						match(line, tag_format)
+						tag=substr(line, RSTART, RLENGTH)
+						printf("%s%s", tag, separator)                         # column 2: tag
+
+						match(line, /'"$_FROM_TAG_REGEX"'/)
+						if (RSTART == 0) {                                     # no from tag
+							from_tag="'"$NODATA_STRING"'"
+						}
+						else{
+							from_tag=substr(line, RSTART+1, RLENGTH-2)
+							sub(/'"$_FROM_TAG_START"'/, "", from_tag)
+							sub(/^[[:space:]]*/, "", from_tag)
+							sub(/[[:space:]]$/, "", from_tag)
+						}
+						printf("%s%s", from_tag, separator)                    # column 3: from tag
+					}
+
+					# 2) Print the offset line
+					if (counter == 0) {
+						sub(/^#+[[:space:]]*/, "", line)
+						printf("%s%s", line, separator)                        # column 4: title
+
+						filename = path; gsub(".*/", "", filename);
+						dirname = path; gsub("/[^/]*$", "", dirname)
+						cmd = "cd "dirname";PWD=\"$(pwd)\"; \
+							echo \"${PWD%/}/\""; \
+							cmd | getline absolute_path; close(cmd)
+						printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
+						printf("%s%s", line_num, separator)                    # column 6: line number including title
+						printf("%s\n", NR, separator)                          # column 7: file num
+					}
+					if (counter >= 0) {
+						counter--;
+					}
+
+				}
+				# Execute post_extra_script
+				system(post_extra_script)
+			}
+			' >"$2"
+}
+
+##
 # @brief
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @return TAG_OUTPUT_DATA
@@ -118,13 +292,14 @@ check_configfile() {
 extract_tags() {
 	profile_start "extract_tags"
 
+	# Validate input and get absolute path
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
 		_ABSOLUTE_TAG_DIRNAME="$(
 			cd "$(dirname "$1")" || exit 1
 			pwd
 		)"
-		_ABSOLUTE_TAG_PATH=${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME
+		_ABSOLUTE_TAG_PATH="${_ABSOLUTE_TAG_DIRNAME%/}/$_ABSOLUTE_TAG_BASENAME"
 	else
 		error_exit 1 "extract_tags" "Cannot find a config output data."
 		return
@@ -137,149 +312,13 @@ extract_tags() {
 		mkdir -p "$_TAG_OUTPUT_DIR"
 		cd "$CONFIG_DIR" || error_exit 1 "extract_tags" "Cannot change directory to config path"
 
-		_TITLE_SEPARATOR="--"
-		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+		# Discover target files from config
+		_FILES="$(_extract_tags_discover_files "$_ABSOLUTE_TAG_PATH")"
 
-		_FROM_TAG_START="FROM:"
-		_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
+		# Extract tags from discovered files
+		_extract_tags_process_files "$_FILES" "$_TAG_OUTPUT_LEVEL1"
 
-		# Read config parse results (tag information are included in one line)
-		_FILES="$(awk <"$_ABSOLUTE_TAG_PATH" -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
-			function extract_from_doublequote(string) {
-				sub(/^[[:space:]]*/, "", string)
-				sub(/[[:space:]]*$/, "", string)
-				if (string ~ /".*"/) {
-					string = substr(string, index(string, "\"") + 1);
-					string = substr(string, 1, length(string) - 1);
-				}
-				return string
-			}
-			function extract_from_backtick(string) {
-				sub(/^[[:space:]]*/, "", string)
-				sub(/[[:space:]]*$/, "", string)
-				if (string ~ /`.*`/) {
-					string = substr(string, index(string, "`") + 1);
-					string = substr(string, 1, length(string) - 1);
-				}
-				return string
-			}
-			BEGIN {
-				OFS=separator
-			}
-			{
-				title = $1;
-				path = extract_from_doublequote($2);
-				extension = extract_from_doublequote($3);
-				ignore = extract_from_doublequote($4);
-				brief = $5;
-				tag_format = extract_from_backtick($6)
-				tag_line_format = extract_from_backtick($7)
-				tag_title_offset = $8 == "" ? 1 : $8
-				pre_extra_script = extract_from_backtick($9)
-				post_extra_script = extract_from_backtick($10)
-
-				if (tag_format == "") { next }
-
-				cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
-				if (is_file_exist == 0) {
-					print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
-				}
-				else {
-					# for multiple extension filter
-					n = split(extension, ext_arr, "|")
-					ext_expr = ""
-					for (i = 1; i <= n; i++) {
-						if (i > 1) {
-							ext_expr = ext_expr " -o"
-						}
-						ext_expr = ext_expr " -name \"" ext_arr[i] "\""
-					}
-
-					if (ignore != "") {
-						split(ignore, ignore_exts, "|");
-						ignore_ext_str = "";
-						for (i in ignore_exts) {
-							if (ignore_ext_str != "") {
-								ignore_ext_str = ignore_ext_str " -o ";
-							}
-							ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
-						}
-						cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f " ext_expr " \\) -print";
-					}
-					else {
-						cmd = "find \"" path "\" -type f " ext_expr ""
-					}
-					while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
-				}
-			}' | sort -u)"
-
-		echo "$_FILES" |
-			awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
-				# For title offset, extract only the offset line
-				{
-					title = $1
-					path = $2
-					tag_format = $6
-					tag_line_format = $7
-					tag_title_offset = $8 ? $8 > 0 : 0
-					pre_extra_script = $9
-					post_extra_script = $10
-
-					# Execute pre_extra_script
-					system(pre_extra_script)
-
-					line_num = 0
-					counter = -1
-					while (getline line < path > 0) {
-						line_num++
-
-						# 1) Print tag column
-						if (line ~ tag_format && line ~ tag_line_format) {
-							counter=tag_title_offset;
-							printf("%s%s", title, separator)                       # column 1: trace target
-
-							match(line, tag_format)
-							tag=substr(line, RSTART, RLENGTH)
-							printf("%s%s", tag, separator)                         # column 2: tag
-
-							match(line, /'"$_FROM_TAG_REGEX"'/)
-							if (RSTART == 0) {                                     # no from tag
-								from_tag="'"$NODATA_STRING"'"
-							}
-							else{
-								from_tag=substr(line, RSTART+1, RLENGTH-2)
-								sub(/'"$_FROM_TAG_START"'/, "", from_tag)
-								sub(/^[[:space:]]*/, "", from_tag)
-								sub(/[[:space:]]$/, "", from_tag)
-							}
-							printf("%s%s", from_tag, separator)                    # column 3: from tag
-						}
-
-						# 2) Print the offset line
-						if (counter == 0) {
-							sub(/^#+[[:space:]]*/, "", line)
-							printf("%s%s", line, separator)                        # column 4: title
-
-							filename = path; gsub(".*/", "", filename);
-							dirname = path; gsub("/[^/]*$", "", dirname)
-							cmd = "cd "dirname";PWD=\"$(pwd)\"; \
-								echo \"${PWD%/}/\""; \
-								cmd | getline absolute_path; close(cmd)
-							printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
-							printf("%s%s", line_num, separator)                    # column 6: line number including title
-							printf("%s\n", NR, separator)                          # column 7: file num
-						}
-						if (counter >= 0) {
-							counter--;
-						}
-
-					}
-					# Execute post_extra_script
-					system(post_extra_script)
-				}
-				' >"$_TAG_OUTPUT_LEVEL1"
-
-		# echo the output file location
+		# Return output location
 		echo "$_TAG_OUTPUT_LEVEL1"
 		profile_end "extract_tags"
 	)
