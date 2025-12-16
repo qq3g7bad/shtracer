@@ -22,7 +22,6 @@ esac
 # @param   $2 : FORK_STRING_BRE
 # @param   $3 : UML_OUTPUT_CONFIG output path
 # @return  None (writes to $3)
-# @tag     @IMP3.1.1@ (FROM: @IMP3.1@)
 _make_flowchart_parse_config() {
 	_CONFIG_OUTPUT_DATA="$1"
 	_FORK_STRING_BRE="$2"
@@ -79,7 +78,6 @@ _make_flowchart_parse_config() {
 # @param   $1 : UML_OUTPUT_CONFIG path
 # @param   $2 : UML_OUTPUT_DECLARATION output path
 # @return  None (writes to $2)
-# @tag     @IMP3.1.2@ (FROM: @IMP3.1@)
 _make_flowchart_prepare_declarations() {
 	_UML_OUTPUT_CONFIG="$1"
 	_UML_OUTPUT_DECLARATION="$2"
@@ -96,7 +94,6 @@ _make_flowchart_prepare_declarations() {
 # @param   $2 : FORK_STRING_BRE
 # @param   $3 : UML_OUTPUT_RELATIONSHIPS output path
 # @return  None (writes to $3)
-# @tag     @IMP3.1.3@ (FROM: @IMP3.1@)
 _make_flowchart_prepare_relationships() {
 	_UML_OUTPUT_CONFIG="$1"
 	_FORK_STRING_BRE="$2"
