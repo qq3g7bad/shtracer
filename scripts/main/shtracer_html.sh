@@ -185,7 +185,7 @@ _make_flowchart_prepare_relationships() {
 }
 
 ##
-# @brief
+# @brief  Generate Mermaid flowchart diagram from config data
 # @param $1 : CONFIG_OUTPUT_DATA
 # @return UML_OUTPUT_FILENAME
 # @tag @IMP3.1@ (FROM: @ARC3.1@)

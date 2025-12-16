@@ -109,7 +109,7 @@ _check_config_convert_to_table() {
 }
 
 ##
-# @brief
+# @brief  Parse config markdown file and convert to tab-separated table format
 # @param  $1 : CONFIG_MARKDOWN_PATH
 # @return CONFIG_OUTPUT_DATA
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
@@ -306,7 +306,7 @@ _extract_tags_process_files() {
 }
 
 ##
-# @brief
+# @brief  Extract traceability tags and their relationships from all target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
@@ -346,7 +346,7 @@ extract_tags() {
 }
 
 ##
-# @brief
+# @brief  Create tag relationship pairs and build complete traceability matrix
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
 # @tag    @IMP2.3@ (FROM: @ARC2.2@)
@@ -422,7 +422,7 @@ make_tag_table() {
 }
 
 ##
-# @brief
+# @brief  Recursively join tag pairs to build complete traceability chains
 # @param  $1 : filename of the tag table
 # @param  $2 : filename of tag pairs without starting points
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
@@ -460,7 +460,7 @@ join_tag_pairs() {
 }
 
 ##
-# @brief
+# @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
@@ -483,7 +483,7 @@ print_verification_result() {
 }
 
 ##
-# @brief
+# @brief  Swap or rename tags across all trace target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
