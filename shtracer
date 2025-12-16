@@ -154,7 +154,8 @@ main_routine() {
 	fi
 
 	if print_verification_result "$_VERIFICATION_FILENAME"; then
-		cat "$_TAG_TABLE_FILENAME"
+		# cat "$_TAG_TABLE_FILENAME"
+		:
 	fi
 }
 
