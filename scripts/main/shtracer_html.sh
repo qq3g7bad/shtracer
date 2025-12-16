@@ -249,7 +249,9 @@ convert_template_html() {
 		_TEMPLATE_HTML_DIR="$4"
 
 		profile_start "convert_template_html_add_header_row"
-		# Add header row
+		# Add header row with sortable columns
+		# AWK: Read first row of tag table, generate <th> elements with onclick handlers
+		# Output: One <th> per column with sortTable() JavaScript function
 		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
 			for (i = 1; i <= NF; i++) {
 				printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
@@ -258,6 +260,8 @@ convert_template_html() {
 		profile_end "convert_template_html_add_header_row"
 
 		# Prepare the tag table : Convert a tag table to a html table.
+		# AWK: Process all rows, convert each field to <td> elements
+		# Output: Complete <tbody> with one <tr> per input line
 		profile_start "convert_template_html_prepare_tag_table"
 		_TABLE_HTML="$_TABLE_HTML<tbody>$(awk '{
 			printf "\\n  <tr>\\n"
@@ -277,6 +281,13 @@ convert_template_html() {
 		)"
 		profile_end "convert_template_html_insert_tag_table"
 
+		# Convert plain tags to clickable links
+		# AWK: For each tag, generate sed command to replace it with <a> element
+		#   - Extract filename from path ($3) and get basename
+		#   - Replace dots with underscores, add "Target_" prefix for JS identifier
+		#   - Extract file extension for syntax highlighting
+		#   - Generate sed substitution with onclick/onmouseover handlers
+		# Output: sed script that makes all tags clickable
 		profile_start "convert_template_html_insert_tag_table_link"
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			sed "$(echo "$_TAG_INFO_TABLE" |
@@ -297,7 +308,13 @@ convert_template_html() {
 				}')")"
 		profile_end "convert_template_html_insert_tag_table_link"
 
-		# Prepare file information
+		# Prepare file information list for sidebar
+		# Pipeline: Extract file paths, deduplicate, then generate <li> elements
+		# AWK: Extract basename from path, transform to JS identifier (same as above)
+		#   - Convert dots to underscores for valid JavaScript identifier
+		#   - Add "Target_" prefix to avoid conflicts
+		#   - Extract extension for syntax highlighting
+		# Output: <ul> list of clickable file links for the information panel
 		profile_start "convert_template_html_insert_information"
 		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" |
 			awk -F"$SHTRACER_SEPARATOR" '{print $3}' |
@@ -322,8 +339,17 @@ convert_template_html() {
 		# Prepare the Mermaid UML
 		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
 
+		# Insert Mermaid UML and information into HTML template
+		# AWK Pass 1: Replace placeholder comments with actual content
+		#   - Substitute <!-- INSERT INFORMATION --> with file list
+		#   - Substitute <!-- INSERT MERMAID --> with UML diagram
+		#   - Add marker comments for second pass
+		# AWK Pass 2: Fix indentation of inserted content
+		#   - Detect marker comments (<!-- SHTRACER INSERTED -->)
+		#   - Calculate proper indentation based on surrounding HTML context
+		#   - Apply consistent spacing (2 or 4 spaces depending on nesting)
+		#   - Remove markers after processing
 		profile_start "convert_template_html_insert_mermaid"
-		# Insert the Mermaid UML to a html template.
 		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
 			awk -v information="${_INFORMATION}" -v mermaid_script="${_MERMAID_SCRIPT}" '
 				{
@@ -338,7 +364,7 @@ convert_template_html() {
 				    add_space = 0
 				}
 
-				# Handle special comment
+				# Handle special comment markers
 				/<!-- SHTRACER INSERTED -->/ {
 					if (add_space == 0) {
 						add_space = 1
@@ -350,7 +376,7 @@ convert_template_html() {
 					}
 				}
 
-				# Process regular lines
+				# Process regular lines with calculated indentation
 				{
 					previous_space_count = space_count
 					match($0, /^[ \t]*/)

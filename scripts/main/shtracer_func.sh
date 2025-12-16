@@ -238,9 +238,19 @@ _extract_tags_process_files() {
 	_FROM_TAG_START="FROM:"
 	_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
 
+	# Process each discovered file to extract tags and associated information
+	# AWK: Parse config line by line, read each target file, extract tags with context
+	# Process:
+	#   1. Parse config fields (title, path, tag format, offset)
+	#   2. Execute pre-extra-script if specified
+	#   3. Scan file line by line:
+	#      - When tag pattern matches: extract tag ID and FROM tags
+	#      - Count down from TAG_TITLE_OFFSET to find associated title
+	#      - Capture file path and line number for reference
+	#   4. Execute post-extra-script if specified
+	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
 	echo "$1" |
 		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
-			# For title offset, extract only the offset line
 			{
 				title = $1
 				path = $2
@@ -367,6 +377,10 @@ make_tag_table() {
 		mkdir -p "$_TAG_OUTPUT_DIR"
 		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR"
 
+		# Parse tag relationships into pairs
+		# AWK: Split FROM tags (field $3, comma-separated) and pair with TO tag (field $2)
+		# Input: TAG_ID <sep> FROM_TAG1,FROM_TAG2 <sep> ...
+		# Output: FROM_TAG1 TAG_ID\nFROM_TAG2 TAG_ID (space-separated pairs)
 		awk <"$1" \
 			-F"$SHTRACER_SEPARATOR" \
 			'{
