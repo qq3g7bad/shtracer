@@ -300,9 +300,8 @@ test_print_verification_result_with_isolated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
-		echo "@ISOLATED_TAG@" > "$OUTPUT_DIR/verified/isolated"
-		touch "$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+		echo "@ISOLATED_TAG@" >"$OUTPUT_DIR/verified/isolated"
+		_INPUT="$OUTPUT_DIR/verified/isolated"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
@@ -319,9 +318,9 @@ test_print_verification_result_with_duplicated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
-		touch "$OUTPUT_DIR/verified/isolated"
-		echo "@DUPLICATE_TAG@" > "$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
+		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
+		_INPUT="$OUTPUT_DIR/verified/duplicated"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
