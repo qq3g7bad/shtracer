@@ -326,6 +326,65 @@ _html_generate_file_list() {
 }
 
 ##
+# @brief   Insert file information and Mermaid UML into HTML with proper indentation
+# @param   $1 : HTML_CONTENT (template HTML to modify)
+# @param   $2 : INFORMATION (file list HTML)
+# @param   $3 : MERMAID_SCRIPT (UML diagram content)
+# @return  Modified HTML with inserted content and fixed indentation
+_html_insert_content_with_indentation() {
+	# Two-pass AWK processing:
+	# Pass 1: Replace placeholder comments with actual content
+	#   - Substitute <!-- INSERT INFORMATION --> with file list
+	#   - Substitute <!-- INSERT MERMAID --> with UML diagram
+	#   - Add marker comments for second pass
+	# Pass 2: Fix indentation of inserted content
+	#   - Detect marker comments (<!-- SHTRACER INSERTED -->)
+	#   - Calculate proper indentation based on surrounding HTML context
+	#   - Apply consistent spacing (2 or 4 spaces depending on nesting)
+	#   - Remove marker comments after processing
+	echo "$1" |
+		awk -v information="$2" -v mermaid_script="$3" '
+			{
+				gsub(/ *<!-- INSERT INFORMATION -->/,
+					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
+				gsub(/ *<!-- INSERT MERMAID -->/,
+					"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
+				print
+			}' |
+		awk '
+			BEGIN {
+			    add_space = 0
+			}
+
+			# Handle special comment markers
+			/<!-- SHTRACER INSERTED -->/ {
+				if (add_space == 0) {
+					add_space = 1
+					add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
+				} else {
+					add_space = 0
+					printf "%*s%s\n", add_space_count, "", $0
+					next
+				}
+			}
+
+			# Process regular lines with calculated indentation
+			{
+				previous_space_count = space_count
+				match($0, /^[ \t]*/)
+				space_count = RLENGTH
+
+				if (add_space == 1) {
+					printf "%*s%s\n", add_space_count, "", $0
+				} else {
+					print $0
+				}
+			}
+		' |
+		sed '/<!-- SHTRACER INSERTED -->/d'
+}
+
+##
 # @brief Convert a template html file for output.html
 # @param $1 : TAG_TABLE_FILENAME
 # @param $2 : TAG_INFO_TABLE
@@ -365,63 +424,11 @@ convert_template_html() {
 		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_insert_information"
 
-		# Prepare the Mermaid UML
-		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
-
-		# Insert Mermaid UML and information into HTML template
-		# AWK Pass 1: Replace placeholder comments with actual content
-		#   - Substitute <!-- INSERT INFORMATION --> with file list
-		#   - Substitute <!-- INSERT MERMAID --> with UML diagram
-		#   - Add marker comments for second pass
-		# AWK Pass 2: Fix indentation of inserted content
-		#   - Detect marker comments (<!-- SHTRACER INSERTED -->)
-		#   - Calculate proper indentation based on surrounding HTML context
-		#   - Apply consistent spacing (2 or 4 spaces depending on nesting)
-		#   - Remove markers after processing
+		# Insert file information and Mermaid UML with proper indentation
 		profile_start "convert_template_html_insert_mermaid"
-		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
-			awk -v information="${_INFORMATION}" -v mermaid_script="${_MERMAID_SCRIPT}" '
-				{
-					gsub(/ *<!-- INSERT INFORMATION -->/,
-						"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
-					gsub(/ *<!-- INSERT MERMAID -->/,
-						"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
-					print
-				}' |
-			awk '
-				BEGIN {
-				    add_space = 0
-				}
-
-				# Handle special comment markers
-				/<!-- SHTRACER INSERTED -->/ {
-					if (add_space == 0) {
-						add_space = 1
-						add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
-					} else {
-						add_space = 0
-						printf "%*s%s\n", add_space_count, "", $0
-						next
-					}
-				}
-
-				# Process regular lines with calculated indentation
-				{
-					previous_space_count = space_count
-					match($0, /^[ \t]*/)
-					space_count = RLENGTH
-
-					if (add_space == 1) {
-						printf "%*s%s\n", add_space_count, "", $0
-					} else {
-						print $0
-					}
-				}
-			')"
-
+		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
+		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION" "$_MERMAID_SCRIPT")"
 		profile_end "convert_template_html_insert_mermaid"
-		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
-			sed '/<!-- SHTRACER INSERTED -->/d')"
 
 		echo "$_HTML_CONTENT"
 
