@@ -1,2 +1,22 @@
+# Generated output
 sample/output/
+
+# Editor/IDE files
 .vimconf
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.log
