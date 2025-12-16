@@ -234,6 +234,38 @@ make_target_flowchart() {
 }
 
 ##
+# @brief   Generate HTML table header with sortable columns
+# @param   $1 : TAG_TABLE_FILENAME
+# @return  HTML <thead> element with sort buttons (literal \n for sed processing)
+_html_add_table_header() {
+	# AWK: Read first row of tag table, generate <th> elements with onclick handlers
+	# Output: One <th> per column with sortTable() JavaScript function
+	# Note: Returns literal \n strings (not newlines) for later sed substitution
+	printf '%s' "<thead>\n  <tr>\n$(awk 'NR == 1 {
+		for (i = 1; i <= NF; i++) {
+			printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
+		}
+	}' <"$1")  </tr>\n</thead>\n"
+}
+
+##
+# @brief   Convert tag table rows to HTML table body
+# @param   $1 : TAG_TABLE_FILENAME
+# @return  HTML <tbody> element with table data (literal \n for sed processing)
+_html_convert_tag_table() {
+	# AWK: Process all rows, convert each field to <td> elements
+	# Output: Complete <tbody> with one <tr> per input line
+	# Note: Returns literal \n strings (not newlines) for later sed substitution
+	printf '%s' "<tbody>$(awk '{
+		printf "\\n  <tr>\\n"
+			for (i = 1; i <= NF; i++) {
+				printf "    <td>"$i"</td>\\n"
+			}
+		printf "  </tr>"
+	} ' <"$1")\n</tbody>"
+}
+
+##
 # @brief Convert a template html file for output.html
 # @param $1 : TAG_TABLE_FILENAME
 # @param $2 : TAG_INFO_TABLE
@@ -248,29 +280,11 @@ convert_template_html() {
 		_UML_FILENAME="$3"
 		_TEMPLATE_HTML_DIR="$4"
 
-		profile_start "convert_template_html_add_header_row"
-		# Add header row with sortable columns
-		# AWK: Read first row of tag table, generate <th> elements with onclick handlers
-		# Output: One <th> per column with sortTable() JavaScript function
-		_TABLE_HTML="<thead>\n  <tr>\n$(awk 'NR == 1 {
-			for (i = 1; i <= NF; i++) {
-				printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
-			}
-		}' <"$_TAG_TABLE_FILENAME")  </tr>\n</thead>\n"
-		profile_end "convert_template_html_add_header_row"
-
-		# Prepare the tag table : Convert a tag table to a html table.
-		# AWK: Process all rows, convert each field to <td> elements
-		# Output: Complete <tbody> with one <tr> per input line
-		profile_start "convert_template_html_prepare_tag_table"
-		_TABLE_HTML="$_TABLE_HTML<tbody>$(awk '{
-			printf "\\n  <tr>\\n"
-				for (i = 1; i <= NF; i++) {
-					printf "    <td>"$i"</td>\\n"
-				}
-			printf "  </tr>"
-		} ' <"$_TAG_TABLE_FILENAME")\n</tbody>"
-		profile_end "convert_template_html_prepare_tag_table"
+		# Build HTML table (header + body)
+		profile_start "convert_template_html_build_table"
+		_TABLE_HTML="$(_html_add_table_header "$_TAG_TABLE_FILENAME")"
+		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME")"
+		profile_end "convert_template_html_build_table"
 
 		# Insert the tag table to a html template.
 		profile_start "convert_template_html_insert_tag_table"
