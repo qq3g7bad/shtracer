@@ -24,8 +24,7 @@ chmod +x ./scripts/test/shtracer*_test.sh
 
 filename                | test target
 ----------------------- | ---------------
-shtracer_util_test.sh   | `../main/shtracer_util.sh`
-shtracer_uml_test.sh    | `../main/shtracer_uml.sh`
-shtracer_func_test.sh   | `../main/shtracer_func.sh`
 shtracer_test.sh        | `../../shtracer`
+shtracer_func_test.sh   | `../main/shtracer_func.sh`
+shtracer_html_test.sh   | `../main/shtracer_html.sh`
 

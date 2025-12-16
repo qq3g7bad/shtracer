@@ -97,16 +97,33 @@ The `shtracer` file includes utility functions.
 * Read configuration file.
 * Extract each trace target information in one line. Each line has the following items.
 
+Implementation is divided into two helper functions:
+
+<!-- @IMP2.1.1@ (FROM: @ARC2.1@) -->
+##### Remove comments from config markdown
+
+* Remove HTML comment blocks from the configuration markdown file.
+* Preserve comment blocks surrounded by backticks (exceptions for code examples).
+* Remove empty lines and normalize whitespace.
+* Strip markdown bold syntax from field names.
+
+<!-- @IMP2.1.2@ (FROM: @ARC2.1@) -->
+##### Convert cleaned config to table format
+
+* Parse markdown heading hierarchy and convert to colon-separated titles (e.g., `Heading1:Heading1.1:Heading1.1.1`).
+* Extract field-value pairs from the cleaned markdown content.
+* Output tab-separated table with 10 columns per trace target configuration.
+
 column | optional  | content                                                              | quotation
 ------ | --------- | -------------------------------------------------------------------- | -------
 1      | mandatory | trace target title                                                   | "
 2      | mandatory | path (to directory or file from your config file)                    | "
-3      | optional  | extention with wildcard (BRE is acceptable)                          | "
+3      | optional  | extension with wildcard (BRE is acceptable)                          | "
 4      | optional  | ignore filter (you can use wildcards)                                | "
 5      | optional  | description                                                          | "
-6      | mandatory | tag format (for serching tags written in BRE)                        | `
-7      | mandatory | tag line format (for serching lines including tags written in BRE)   | `
-8      | optional  | tag-title offset (how many lines away from each tags, default: 1)    | none
+6      | mandatory | tag format (for searching tags written in BRE)                       | `
+7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
+8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
 9      | optional  | pre-extra-script                                                     | `
 10     | optional  | post-extra-script                                                    | `
 
@@ -115,7 +132,35 @@ column | optional  | content                                                    
 
 * Read trace targets.
   * Get each tag and its "from tags".
-  * A tag table is consisted of two column data as shown below.
+  * A tag table consists of two-column data as shown below.
+
+Implementation is divided into three helper functions:
+
+<!-- @IMP2.2.1@ (FROM: @ARC2.2@) -->
+##### Validate config file input
+
+* Validate that the config output file exists.
+* Convert relative paths to absolute paths for consistent file handling.
+* Return the absolute path or exit with an error if the file does not exist.
+
+<!-- @IMP2.2.2@ (FROM: @ARC2.2@) -->
+##### Discover target files from config
+
+* Parse the config table to extract path and extension filter information.
+* Handle both file and directory paths.
+* Build `find` commands for directory traversal with extension filters.
+* Support multiple extension filters separated by `|` (pipe).
+* Support ignore filters to exclude specific files or directories.
+* Return a sorted, unique list of files to process.
+
+<!-- @IMP2.2.3@ (FROM: @ARC2.2@) -->
+##### Extract tags from discovered files
+
+* Process each discovered file to extract tags.
+* Use AWK to parse files line by line, searching for tag patterns.
+* Extract tag IDs, FROM tags (upstream references), and associated titles.
+* Handle TAG-TITLE OFFSET to find the correct title line relative to each tag.
+* Output tag information with file paths and line numbers.
 
 ```text
 NONE @REQ1.1@
@@ -152,9 +197,39 @@ The following cases are invalid.
 * [ ] Duplicated tags.
 
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2.2@) -->
-### 📄 `shtracer_uml.sh`
+### 📄 `shtracer_html.sh`
 
-* Output text formatted UML data (e.g. plantuml, mermaid) as written below.
+* Output text-formatted UML data (e.g., PlantUML, Mermaid) and HTML visualization.
+
+Implementation is divided into three helper functions for flowchart generation:
+
+<!-- @IMP3.1.1@ (FROM: @ARC3.1@) -->
+#### Parse config and generate flowchart indices
+
+* Parse the config output data to extract unique trace target titles.
+* Detect fork patterns in the configuration (marked with `(fork)` keyword).
+* Generate hierarchical flowchart indices for each node.
+* Handle nested fork structures with proper index incrementation.
+* Output indexed configuration for flowchart generation.
+
+<!-- @IMP3.1.2@ (FROM: @ARC3.1@) -->
+#### Prepare UML declarations
+
+* Read the indexed config and generate Mermaid node declarations.
+* Create flowchart node syntax: `id<index>([<title>])`.
+* Output declarations for all nodes in the flowchart.
+
+<!-- @IMP3.1.3@ (FROM: @ARC3.1@) -->
+#### Prepare UML relationships
+
+* Parse the indexed config to determine node relationships.
+* Detect fork increments, decrements, and nested fork structures.
+* Generate Mermaid edge syntax: `node1 --> node2`.
+* Create subgraph blocks for fork sections with appropriate labels.
+* Handle closing of fork blocks at the end of the flowchart.
+* Remove empty subgraphs from the output.
+
+The generated flowchart uses Mermaid syntax as shown below:
 
 ```mermaid
 flowchart TB

