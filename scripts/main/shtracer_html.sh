@@ -446,7 +446,7 @@ convert_template_html() {
 }
 
 ##
-# @brief Convert template js file for tracing targets
+# @brief Convert template js file for tracing targets (using Base64 encoding)
 # @param $1 : TAG_INFO_TABLE
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
@@ -460,9 +460,8 @@ convert_template_js() {
 			cat <<-'EOF'
 				@TRACE_TARGET_FILENAME@: {
 				      path:"@TRACE_TARGET_PATH@",
-				      content: `
-				@TRACE_TARGET_CONTENTS@
-				`,
+				      contentBase64:"@TRACE_TARGET_CONTENTS_BASE64@",
+				      extension:"@TRACE_TARGET_EXTENSION@"
 				},
 			EOF
 		)
@@ -475,40 +474,31 @@ convert_template_js() {
 					}
 					{
 						js_template = init_js_template
-						contents = ""
 						path = $0
 						n = split($0, parts, "/");
 						filename = parts[n];
 						raw_filename = filename;
+
+						# Extract extension
+						extension_pos = match(raw_filename, /\.[^\.]+$/);
+						if (extension_pos) {
+							extension = substr(raw_filename, extension_pos + 1);
+						} else {
+							extension = "txt";
+						}
+
 						gsub(/\./, "_", filename);
 						gsub(/^/, "Target_", filename);
 
-						while (getline line < path > 0) {
-							sub(/[^\\]\\$/, "<SHTRACER_BACKSLASH>", line)    # REMOVE FROM SHTRACER PREVIEW
-							contents = contents line "\n"
-						}
-						gsub(/\\n/, "<SHTRACER_BACKSLASH>n", contents)     # REMOVE FROM SHTRACER PREVIEW
-						gsub(/&/, "\\\\&", contents)                       # REMOVE FROM SHTRACER PREVIEW
-						gsub(/`/, "\\`", contents)                         # REMOVE FROM SHTRACER PREVIEW
-						gsub(/\${/, "\\${", contents)                      # REMOVE FROM SHTRACER PREVIEW
-						for (i = 1; i <= 9; i++) {
-							gsub("\\\\" i, "<SHTRACER_BACKSLASH>" i, contents) # REMOVE FROM SHTRACER PREVIEW
-						}
-						# 大文字 \A〜\Z
-						for (i = 65; i <= 90; i++) {
-							c = sprintf("%c", i)
-							gsub("\\\\" c, "<SHTRACER_BACKSLASH>" c, contents) # REMOVE FROM SHTRACER PREVIEW
-						}
+						# Base64 encode the file content
+						cmd = "base64 -w 0 \"" path "\" 2>/dev/null || base64 \"" path "\""
+						cmd | getline base64_content
+						close(cmd)
 
-						# 小文字 \a〜\z
-						for (i = 97; i <= 122; i++) {
-							c = sprintf("%c", i)
-							gsub("\\\\" c, "<SHTRACER_BACKSLASH>" c, contents) # REMOVE FROM SHTRACER PREVIEW
-						}
-						gsub("\\\\\\\\", "<SHTRACER_BACKSLASH>" c, contents) # REMOVE FROM SHTRACER PREVIEW
 						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
 						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
-						gsub(/@TRACE_TARGET_CONTENTS@/, contents, js_template);
+						gsub(/@TRACE_TARGET_CONTENTS_BASE64@/, base64_content, js_template);
+						gsub(/@TRACE_TARGET_EXTENSION@/, extension, js_template);
 						print js_template
 					}'
 		)"
@@ -522,10 +512,7 @@ convert_template_js() {
 				printf "%s\n" "$s"
 				;;
 			esac
-		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js" |
-			sed 's/^\([[:space:]]*\).*REMOVE FROM SHTRACER PREVIEW.*/ /g' |
-			sed 's/<SHTRACER_NEWLINE>/\\\\n/g' |
-			sed 's/<SHTRACER_BACKSLASH>/\\\\/g'
+		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js"
 		profile_end "convert_template_js"
 	)
 }
