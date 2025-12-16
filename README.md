@@ -270,6 +270,17 @@ shtracer executes shell commands specified in configuration files through the fo
 
 ## ✅ TODO
 
-* Use custom css files for html output.
-* Use OR condition in the extension filter.
+### High Priority
+* Improve HTML output styling
+  * Use custom CSS files for HTML output
+  * Add responsive design
+  * Support dark mode
+* Use OR condition in the extension filter
+
+### Future Enhancements
+* Add integration tests
+* Integrate ShellCheck into CI pipeline
+* Add performance profiling mode
+* Support Excel/CSV export formats
+* Implement plugin system for custom processors
 
