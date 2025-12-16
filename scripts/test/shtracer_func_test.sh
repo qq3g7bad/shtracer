@@ -143,8 +143,8 @@ test_join_tag_pairs_with_valid_arguments() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/tags"
-		echo "@TAG1@" > "$OUTPUT_DIR/tags/test_table"
-		echo "@TAG1@ @TAG2@" > "$OUTPUT_DIR/tags/test_downstream"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table"
+		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_downstream"
 
 		# Act -------------
 		join_tag_pairs "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_downstream"
@@ -255,12 +255,12 @@ test_swap_tags_with_valid_arguments() {
 		CONFIG_DIR="$OUTPUT_DIR/test_swap"
 
 		# Create test file with tags
-		echo "<!-- @OLD_TAG@ -->" > "$OUTPUT_DIR/test_swap/testdata/testswap.md"
-		echo "Test content" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
-		echo "<!-- @OLD_TAG@ -->" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "<!-- @OLD_TAG@ -->" >"$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "Test content" >>"$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "<!-- @OLD_TAG@ -->" >>"$OUTPUT_DIR/test_swap/testdata/testswap.md"
 
 		# Create test config table
-		echo ":Test${SHTRACER_SEPARATOR}testdata/testswap.md${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}" > "$OUTPUT_DIR/test_swap/config_table"
+		echo ":Test${SHTRACER_SEPARATOR}testdata/testswap.md${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}" >"$OUTPUT_DIR/test_swap/config_table"
 
 		# Act -------------
 		swap_tags "$OUTPUT_DIR/test_swap/config_table" "@OLD_TAG@" "@NEW_TAG@"
