@@ -126,14 +126,48 @@ test_extract_tags() {
 }
 
 ##
-# @brief  Test for join_tag_table
+# @brief  Test for join_tag_pairs without arguments
 # @tag    @UT2.4@ (FROM: @IMP2.4@)
-test_join_tag_table_without_argument() {
+test_join_tag_pairs_without_argument() {
 	# Arrange ---------
 	# Act -------------
 	join_tag_pairs >/dev/null 2>&1
 	# Assert ----------
 	assertEquals 1 "$?"
+}
+
+##
+# @brief  Test for join_tag_pairs with valid arguments
+# @tag    @UT2.4.1@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_valid_arguments() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/tags"
+		echo "@TAG1@" > "$OUTPUT_DIR/tags/test_table"
+		echo "@TAG1@ @TAG2@" > "$OUTPUT_DIR/tags/test_downstream"
+
+		# Act -------------
+		join_tag_pairs "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_downstream"
+		_RESULT="$(cat "$OUTPUT_DIR/tags/test_table")"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+		assertNotEquals "" "$_RESULT"
+	)
+}
+
+##
+# @brief  Test for join_tag_pairs with non-existent file
+# @tag    @UT2.4.2@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_non_existent_file() {
+	(
+		# Arrange ---------
+		# Act -------------
+		join_tag_pairs "non_existent1" "non_existent2" >/dev/null 2>&1
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
 }
 
 ##
@@ -175,6 +209,122 @@ test_make_tag_table_with_empty_file() {
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
+}
+
+##
+# @brief  Test for swap_tags without arguments
+# @tag    @UT2.8@ (FROM: @IMP2.6@)
+test_swap_tags_without_arguments() {
+	(
+		# Arrange ---------
+		# Act -------------
+		(swap_tags "" "" "" >/dev/null 2>&1)
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
+}
+
+##
+# @brief  Test for swap_tags with non-existent file
+# @tag    @UT2.9@ (FROM: @IMP2.6@)
+test_swap_tags_with_non_existent_file() {
+	# Arrange ---------
+	# Act -------------
+	# swap_tags calls error_exit which exits the subshell
+	# We need to catch this in a separate process
+	(swap_tags "non_existent_file" "@TAG1@" "@TAG2@" >/dev/null 2>&1)
+	_EXIT_CODE=$?
+
+	# Assert ----------
+	assertEquals 1 "$_EXIT_CODE"
+}
+
+##
+# @brief  Test for swap_tags with valid arguments
+# @tag    @UT2.10@ (FROM: @IMP2.6@)
+test_swap_tags_with_valid_arguments() {
+	(
+		# Arrange ---------
+		_ORIGINAL_CONFIG_DIR="$CONFIG_DIR"
+		mkdir -p "$OUTPUT_DIR/test_swap/testdata"
+		CONFIG_DIR="$OUTPUT_DIR/test_swap"
+
+		# Create test file with tags
+		echo "<!-- @OLD_TAG@ -->" > "$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "Test content" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "<!-- @OLD_TAG@ -->" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
+
+		# Create test config table
+		echo ":Test${SHTRACER_SEPARATOR}testdata/testswap.md${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}" > "$OUTPUT_DIR/test_swap/config_table"
+
+		# Act -------------
+		swap_tags "$OUTPUT_DIR/test_swap/config_table" "@OLD_TAG@" "@NEW_TAG@"
+		_RESULT="$(cat "$OUTPUT_DIR/test_swap/testdata/testswap.md")"
+
+		# Assert ----------
+		CONFIG_DIR="$_ORIGINAL_CONFIG_DIR"
+		assertEquals 0 "$?"
+		assertNotEquals "" "$(echo "$_RESULT" | grep "@NEW_TAG@")"
+		assertEquals "" "$(echo "$_RESULT" | grep "@OLD_TAG@")"
+	)
+}
+
+##
+# @brief  Test for print_verification_result with no errors
+# @tag    @UT2.11@ (FROM: @IMP2.5@)
+test_print_verification_result_no_errors() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		touch "$OUTPUT_DIR/verified/isolated"
+		touch "$OUTPUT_DIR/verified/duplicated"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+
+		# Act -------------
+		print_verification_result "$_INPUT"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for print_verification_result with isolated tags
+# @tag    @UT2.12@ (FROM: @IMP2.5@)
+test_print_verification_result_with_isolated() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		echo "@ISOLATED_TAG@" > "$OUTPUT_DIR/verified/isolated"
+		touch "$OUTPUT_DIR/verified/duplicated"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+
+		# Act -------------
+		print_verification_result "$_INPUT" 2>/dev/null
+
+		# Assert ----------
+		assertEquals 1 "$?"
+	)
+}
+
+##
+# @brief  Test for print_verification_result with duplicated tags
+# @tag    @UT2.13@ (FROM: @IMP2.5@)
+test_print_verification_result_with_duplicated() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		touch "$OUTPUT_DIR/verified/isolated"
+		echo "@DUPLICATE_TAG@" > "$OUTPUT_DIR/verified/duplicated"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+
+		# Act -------------
+		print_verification_result "$_INPUT" 2>/dev/null
 
 		# Assert ----------
 		assertEquals 1 "$?"
