@@ -396,10 +396,9 @@ make_tag_table() {
 
 		# Make joined tag table (each row has a single trace tag chain)
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
-			join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"
-		  if [ $? -ne 0 ]; then
-		  	error_exit 1 "make_tag_table" "Error in joine_tag_pairs"
-		  fi
+			if ! join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"; then
+				error_exit 1 "make_tag_table" "Error in join_tag_pairs"
+			fi
 		else
 			error_exit 1 "make_tag_table" "No linked tags found."
 		fi
@@ -444,8 +443,7 @@ join_tag_pairs() {
 		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
 		_NF_PLUS1="$((_NF + 1))"
 
-		_JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM")"
-		if [ $? -ne 0 ]; then
+		if ! _JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM")"; then
 			error_exit 1 "join_tag_pairs" "Error in join command"
 		fi
 
