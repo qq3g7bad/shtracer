@@ -410,4 +410,28 @@ test_main_routine_output_isolated() {
 	)
 }
 
+##
+# @brief  Test for main_routine with invalid config (nonexistent paths)
+# @tag    @UT1.21@ (FROM: @IMP4.1@)
+test_main_routine_invalid_config_paths() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+		_RETURN="$(main_routine "./testdata/wrong_config.md" 2>&1)"
+		IFS=' '
+
+		# Assert ----------
+		# Should output error about no linked tags found
+		echo "$_RETURN" | grep -q "No linked tags found"
+		assertEquals 0 "$?"
+
+		# Should output find errors for nonexistent paths
+		echo "$_RETURN" | grep -q "No such file or directory"
+		assertEquals 0 "$?"
+
+	)
+}
+
 . "./shunit2/shunit2"
