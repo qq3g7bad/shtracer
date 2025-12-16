@@ -356,6 +356,68 @@ extract_tags() {
 }
 
 ##
+# @brief   Prepare upstream tag table (starting points with no parents)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for TAG_TABLE
+# @return  None (writes to file)
+_prepare_upstream_table() {
+	# Extract tags that have NODATA_STRING as parent (starting points)
+	# Pipeline: grep for NONE tags → sort → remove NONE field → trim → remove empty lines
+	grep "^$NODATA_STRING" "$1" |
+		sort |
+		awk '{$1=""; print $0}' |
+		sed 's/^[[:space:]]*//' |
+		sed '/^$/d' >"$2"
+}
+
+##
+# @brief   Prepare downstream tag table (tags with parents)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for TAG_PAIRS_DOWNSTREAM
+# @return  None (writes to file)
+_prepare_downstream_table() {
+	# Extract tags that have actual parents (not NONE)
+	# Pipeline: grep -v to exclude NONE tags → sort → remove empty lines
+	grep -v "^$NODATA_STRING" "$1" |
+		sort |
+		sed '/^$/d' >"$2"
+}
+
+##
+# @brief   Verify and detect duplicated tags
+# @param   $1 : TAG_OUTPUT_DATA file path
+# @param   $2 : Output file path for duplicates
+# @return  None (writes to file)
+_verify_duplicated_tags() {
+	# Extract all tag IDs, sort them, and find duplicates
+	# AWK: Extract tag field ($2) → sort → uniq -d finds duplicates
+	awk <"$1" \
+		-F"$SHTRACER_SEPARATOR" \
+		'{
+			print $2
+		 }' |
+		sort |
+		uniq -d >"$2"
+}
+
+##
+# @brief   Detect isolated FROM tags (tags not referenced anywhere)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for isolated tags
+# @return  None (writes to file)
+_detect_isolated_tags() {
+	# Find tags that appear only once in the entire tag pairs list
+	# Pipeline: print both columns (with $2 twice for weighting) → sort →
+	#           uniq -u finds unique → add NONE prefix → remove empty → extract tag
+	awk <"$1" '{print $1; print $2; print $2}' |
+		sort |
+		uniq -u |
+		sed 's/^/'"$NODATA_STRING"' /' |
+		sed '/^$/d' |
+		awk '{print $2}' >"$2"
+}
+
+##
 # @brief  Create tag relationship pairs and build complete traceability matrix
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
@@ -391,17 +453,9 @@ make_tag_table() {
 				}
 		}' >"$_TAG_PAIRS"
 
-		# Prepare upstream table (starting point)
-		grep "^$NODATA_STRING" "$_TAG_PAIRS" |
-			sort |
-			awk '{$1=""; print $0}' |
-			sed 's/^[[:space:]]*//' |
-			sed '/^$/d' >"$_TAG_TABLE"
-
-		# Prepare downstream tag table
-		grep -v "^$NODATA_STRING" "$_TAG_PAIRS" |
-			sort |
-			sed '/^$/d' >"$_TAG_PAIRS_DOWNSTREAM"
+		# Prepare upstream and downstream tables
+		_prepare_upstream_table "$_TAG_PAIRS" "$_TAG_TABLE"
+		_prepare_downstream_table "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
 		# Make joined tag table (each row has a single trace tag chain)
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
@@ -414,22 +468,9 @@ make_tag_table() {
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
 
-		# [Verify] Duplicated tags
-		awk <"$1" \
-			-F"$SHTRACER_SEPARATOR" \
-			'{
-				print $2
-			 }' |
-			sort |
-			uniq -d >"$_TAG_TABLE_DUPLICATED"
-
-		# [Verify] Detect isolated FROM_TAG
-		awk <"$_TAG_PAIRS" '{print $1; print $2; print $2}' |
-			sort |
-			uniq -u |
-			sed 's/^/'"$NODATA_STRING"' /' |
-			sed '/^$/d' |
-			awk '{print $2}' >"$_ISOLATED_FROM_TAG"
+		# Verify tag integrity (duplicates and isolated tags)
+		_verify_duplicated_tags "$1" "$_TAG_TABLE_DUPLICATED"
+		_detect_isolated_tags "$_TAG_PAIRS" "$_ISOLATED_FROM_TAG"
 
 		echo "$_TAG_TABLE$SHTRACER_SEPARATOR$_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
