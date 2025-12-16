@@ -74,6 +74,7 @@ uml --> html_output
 @REQ1.2@ @ARC3.1@ @IMP3.1@ @UT1.2@ @IT1.1@
 @REQ1.4@ @ARC2.1@ @IMP2.1@ @UT2.1@ @IT1.1@
 ```
+
 ### UML
 
 * Drawn by Mermaid.
@@ -283,6 +284,7 @@ shtracer executes shell commands specified in configuration files through the fo
 ```
 
 **For security-sensitive environments, consider:**
+
 * Auditing all configuration files before use
 * Running shtracer in a sandboxed environment (containers, VMs)
 * Implementing organization-specific configuration file approval processes
@@ -295,16 +297,15 @@ shtracer executes shell commands specified in configuration files through the fo
 ## ✅ TODO
 
 ### High Priority
-* Improve HTML output styling
-  * Use custom CSS files for HTML output
-  * Add responsive design
-  * Support dark mode
-* Use OR condition in the extension filter
+
+* Add integration tests
+* Suppress additional script output (pre/post) when in verify mode.
+* Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
+* Make a cross-reference table for easy reference
+* Export all trace data in Markdown format.
 
 ### Future Enhancements
-* Add integration tests
-* Integrate ShellCheck into CI pipeline
-* Add performance profiling mode
-* Support Excel/CSV export formats
-* Implement plugin system for custom processors
 
+* Use OR condition in the extension filter
+* Use custom CSS files for HTML output
+* Support Excel/CSV export formats
