@@ -99,7 +99,6 @@ The `shtracer` file includes utility functions.
 
 Implementation is divided into two helper functions:
 
-<!-- @IMP2.1.1@ (FROM: @ARC2.1@) -->
 ##### Remove comments from config markdown
 
 * Remove HTML comment blocks from the configuration markdown file.
@@ -107,7 +106,6 @@ Implementation is divided into two helper functions:
 * Remove empty lines and normalize whitespace.
 * Strip markdown bold syntax from field names.
 
-<!-- @IMP2.1.2@ (FROM: @ARC2.1@) -->
 ##### Convert cleaned config to table format
 
 * Parse markdown heading hierarchy and convert to colon-separated titles (e.g., `Heading1:Heading1.1:Heading1.1.1`).
@@ -136,14 +134,12 @@ column | optional  | content                                                    
 
 Implementation is divided into three helper functions:
 
-<!-- @IMP2.2.1@ (FROM: @ARC2.2@) -->
 ##### Validate config file input
 
 * Validate that the config output file exists.
 * Convert relative paths to absolute paths for consistent file handling.
 * Return the absolute path or exit with an error if the file does not exist.
 
-<!-- @IMP2.2.2@ (FROM: @ARC2.2@) -->
 ##### Discover target files from config
 
 * Parse the config table to extract path and extension filter information.
@@ -153,7 +149,6 @@ Implementation is divided into three helper functions:
 * Support ignore filters to exclude specific files or directories.
 * Return a sorted, unique list of files to process.
 
-<!-- @IMP2.2.3@ (FROM: @ARC2.2@) -->
 ##### Extract tags from discovered files
 
 * Process each discovered file to extract tags.
@@ -203,7 +198,6 @@ The following cases are invalid.
 
 Implementation is divided into three helper functions for flowchart generation:
 
-<!-- @IMP3.1.1@ (FROM: @ARC3.1@) -->
 #### Parse config and generate flowchart indices
 
 * Parse the config output data to extract unique trace target titles.
@@ -212,14 +206,12 @@ Implementation is divided into three helper functions for flowchart generation:
 * Handle nested fork structures with proper index incrementation.
 * Output indexed configuration for flowchart generation.
 
-<!-- @IMP3.1.2@ (FROM: @ARC3.1@) -->
 #### Prepare UML declarations
 
 * Read the indexed config and generate Mermaid node declarations.
 * Create flowchart node syntax: `id<index>([<title>])`.
 * Output declarations for all nodes in the flowchart.
 
-<!-- @IMP3.1.3@ (FROM: @ARC3.1@) -->
 #### Prepare UML relationships
 
 * Parse the indexed config to determine node relationships.

@@ -20,7 +20,6 @@ esac
 # @brief   Remove comments from config markdown file
 # @param   $1 : CONFIG_MARKDOWN_PATH
 # @return  Echoes cleaned config content to stdout
-# @tag     @IMP2.1.1@ (FROM: @IMP2.1@)
 _check_config_remove_comments() {
 	_CONFIG_MARKDOWN_PATH="$1"
 
@@ -51,7 +50,6 @@ _check_config_remove_comments() {
 # @param   $1 : Cleaned config content (from _check_config_remove_comments)
 # @param   $2 : Output file path
 # @return  None (writes to $2)
-# @tag     @IMP2.1.2@ (FROM: @IMP2.1@)
 _check_config_convert_to_table() {
 	_CONFIG_CONTENT="$1"
 	_CONFIG_TABLE="$2"
@@ -141,7 +139,6 @@ check_configfile() {
 # @param   $1 : CONFIG_OUTPUT_DATA path (may be relative)
 # @return  Echoes absolute path to stdout
 # @exit    Calls error_exit if file doesn't exist
-# @tag     @IMP2.2.1@ (FROM: @IMP2.2@)
 _extract_tags_validate_input() {
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
@@ -161,7 +158,6 @@ _extract_tags_validate_input() {
 # @brief   Parse config and discover target files
 # @param   $1 : Absolute path to config file
 # @return  Echoes separator-delimited file list to stdout (sorted, unique)
-# @tag     @IMP2.2.2@ (FROM: @IMP2.2@)
 _extract_tags_discover_files() {
 	awk <"$1" -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 		function extract_from_doublequote(string) {
@@ -238,7 +234,6 @@ _extract_tags_discover_files() {
 # @param   $1 : File list from _extract_tags_discover_files
 # @param   $2 : Output file path
 # @return  None (writes to file)
-# @tag     @IMP2.2.3@ (FROM: @IMP2.2@)
 _extract_tags_process_files() {
 	_FROM_TAG_START="FROM:"
 	_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
