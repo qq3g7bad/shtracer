@@ -3,7 +3,7 @@
 ## 📃 1. Use `config.md` for configuration
 
 <!-- @REQ1.1@ -->
-### To make a requirements traceablity matrix, use a configuration file.
+### To make a requirements traceability matrix, use a configuration file.
 
 * This file is written in markdown format.
   * e.g. `../sample/config.md`.
@@ -16,11 +16,11 @@
 * Each section indicates the target layer structure.
 * In the section, the following format information should be written.
   * Written in the listed format by writing `*` at the beginning.
-  * A field is consits of name (left) and value (right). These are separated by ":".
+  * A field consists of a name (left) and value (right). These are separated by ":".
     * The name in a field has **bold style**.
-    * The value in a field are surrounded by double quotations.
-  * Multiple `PATH` indformation are acceptable.
-* If a section name is `(fork)`, the following sub-section are separated.
+    * The value in a field is surrounded by double quotations.
+  * Multiple `PATH` information entries are acceptable.
+* If a section name is `(fork)`, the following subsections are separated.
 
 #### Field format
 
@@ -28,12 +28,12 @@ column | optional  | content                                                    
 ------ | --------- | -------------------------------------------------------------------- | -------
 1      | mandatory | trace target title                                                   | "
 2      | mandatory | path (to directory or file from your config file)                    | "
-3      | optional  | extention with wildcard (BRE is acceptable)                          | "
+3      | optional  | extension with wildcard (BRE is acceptable)                          | "
 4      | optional  | ignore filter (you can use wildcards)                                | "
 5      | optional  | description                                                          | "
-6      | mandatory | tag format (for serching tags written in BRE)                        | `
-7      | mandatory | tag line format (for serching lines including tags written in BRE)   | `
-8      | optional  | tag-title offset (how many lines away from each tags, default: 1)    | none
+6      | mandatory | tag format (for searching tags written in BRE)                       | `
+7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
+8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
 9      | optional  | pre-extra-script                                                     | `
 10     | optional  | post-extra-script                                                    | `
 
@@ -108,7 +108,7 @@ column | optional  | content                                                    
 <!-- @REQ3.1.2@ -->
 #### Make a cross-reference table for easy reference.
 
-* Cross-refernce tables are made in markdown format.
+* Cross-reference tables are made in markdown format.
 * An example is shown below.
 * Each tag has a hyperlink to the file that contains it.
 
