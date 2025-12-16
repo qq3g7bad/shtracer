@@ -55,12 +55,12 @@ function showText(event, fileName, highlightLine, language) {
   }
 
   // Split the highlighted HTML into lines and add highlight-line class to the target line
+  // Note: highlightLine is 1-based (human-readable line number), but array index is 0-based
   const lines = highlightedContent.split('\n');
   const finalText = lines.map((line, index) => {
-    return (index === highlightLine)
-      ? `<span class="highlight-line">${line}</span>`
-      : line;
-  }).join('\n');
+    const lineClass = (index === highlightLine - 1) ? ' class="highlight-line"' : '';
+    return `<div${lineClass}>${line || '&#8203;'}</div>`;
+  }).join('');
 
   textContainer.innerHTML = `<pre><code class="hljs">${finalText}</code></pre>`;
 
