@@ -266,6 +266,66 @@ _html_convert_tag_table() {
 }
 
 ##
+# @brief   Generate sed script to convert tags to clickable links
+# @param   $1 : TAG_INFO_TABLE (tag information with file paths)
+# @return  sed commands to replace plain tags with <a> elements
+_html_generate_tag_links() {
+	# AWK: For each tag, generate sed command to replace it with <a> element
+	#   - Extract filename from path ($3) and get basename
+	#   - Replace dots with underscores, add "Target_" prefix for JS identifier
+	#   - Extract file extension for syntax highlighting
+	#   - Generate sed substitution with onclick/onmouseover handlers
+	# Output: sed script that makes all tags clickable
+	echo "$1" |
+		awk -F"$SHTRACER_SEPARATOR" '{
+			n = split($3, parts, "/");
+			filename = parts[n];
+			raw_filename = filename;
+			extension_pos = match(raw_filename, /\.[^\.]+$/);
+			gsub(/\./, "_", filename);
+			gsub(/^/, "Target_", filename);
+
+			if (extension_pos) {
+				extension = substr(raw_filename, extension_pos + 1);
+			} else {
+				extension = "sh";
+			}
+			print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
+		}'
+}
+
+##
+# @brief   Generate HTML file information list for sidebar
+# @param   $1 : TAG_INFO_TABLE (tag information with file paths)
+# @return  HTML <ul> element with clickable file links
+_html_generate_file_list() {
+	# Pipeline: Extract file paths, deduplicate, then generate <li> elements
+	# AWK: Extract basename from path, transform to JS identifier
+	#   - Convert dots to underscores for valid JavaScript identifier
+	#   - Add "Target_" prefix to avoid conflicts
+	#   - Extract extension for syntax highlighting
+	# Output: <ul> list of clickable file links for the information panel
+	printf '%s' "<ul>\n$(echo "$1" |
+		awk -F"$SHTRACER_SEPARATOR" '{print $3}' |
+		sort -u |
+		awk '{
+			n = split($0, parts, "/");
+			filename = parts[n];
+			raw_filename = filename;
+			extension_pos = match(filename, /\.[^\.]+$/);
+			gsub(/\./, "_", filename);
+			gsub(/^/, "Target_", filename);
+
+			if (extension_pos) {
+				extension = substr(raw_filename, extension_pos + 1);
+			} else {
+				extension = "sh";
+			}
+			print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', ""1"", '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
+		}')\n</ul>"
+}
+
+##
 # @brief Convert a template html file for output.html
 # @param $1 : TAG_TABLE_FILENAME
 # @param $2 : TAG_INFO_TABLE
@@ -295,59 +355,14 @@ convert_template_html() {
 		)"
 		profile_end "convert_template_html_insert_tag_table"
 
-		# Convert plain tags to clickable links
-		# AWK: For each tag, generate sed command to replace it with <a> element
-		#   - Extract filename from path ($3) and get basename
-		#   - Replace dots with underscores, add "Target_" prefix for JS identifier
-		#   - Extract file extension for syntax highlighting
-		#   - Generate sed substitution with onclick/onmouseover handlers
-		# Output: sed script that makes all tags clickable
+		# Convert plain tags to clickable links using generated sed script
 		profile_start "convert_template_html_insert_tag_table_link"
-		_HTML_CONTENT="$(echo "$_HTML_CONTENT" |
-			sed "$(echo "$_TAG_INFO_TABLE" |
-				awk -F"$SHTRACER_SEPARATOR" '{
-					n = split($3, parts, "/");
-					filename = parts[n];
-					raw_filename = filename;
-					extension_pos = match(raw_filename, /\.[^\.]+$/);
-					gsub(/\./, "_", filename);
-					gsub(/^/, "Target_", filename);
-
-					if (extension_pos) {
-						extension = substr(raw_filename, extension_pos + 1);
-					} else {
-						extension = "sh";
-					}
-					print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
-				}')")"
+		_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$(_html_generate_tag_links "$_TAG_INFO_TABLE")")"
 		profile_end "convert_template_html_insert_tag_table_link"
 
-		# Prepare file information list for sidebar
-		# Pipeline: Extract file paths, deduplicate, then generate <li> elements
-		# AWK: Extract basename from path, transform to JS identifier (same as above)
-		#   - Convert dots to underscores for valid JavaScript identifier
-		#   - Add "Target_" prefix to avoid conflicts
-		#   - Extract extension for syntax highlighting
-		# Output: <ul> list of clickable file links for the information panel
+		# Generate file information list for sidebar
 		profile_start "convert_template_html_insert_information"
-		_INFORMATION="<ul>\n$(echo "$_TAG_INFO_TABLE" |
-			awk -F"$SHTRACER_SEPARATOR" '{print $3}' |
-			sort -u |
-			awk '{
-				n = split($0, parts, "/");
-				filename = parts[n];
-				raw_filename = filename;
-				extension_pos = match(filename, /\.[^\.]+$/);
-				gsub(/\./, "_", filename);
-				gsub(/^/, "Target_", filename);
-
-				if (extension_pos) {
-					extension = substr(raw_filename, extension_pos + 1);
-				} else {
-					extension = "sh";
-				}
-				print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', ""1"", '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
-			}')\n</ul>"
+		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_insert_information"
 
 		# Prepare the Mermaid UML
