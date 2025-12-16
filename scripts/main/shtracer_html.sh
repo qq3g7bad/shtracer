@@ -94,12 +94,21 @@ _make_flowchart_prepare_declarations() {
 # @param   $2 : FORK_STRING_BRE
 # @param   $3 : UML_OUTPUT_RELATIONSHIPS output path
 # @return  None (writes to $3)
+#
+# This AWK state machine generates Mermaid flowchart relationships (edges and subgraphs).
+# It handles complex fork structures where execution paths split and merge:
+#   - Case 1: Fork increment (entering nested structure) - creates new subgraph block
+#   - Case 2: Fork decrement (exiting nested structure) - closes subgraphs, merges branches
+#   - Case 3: Same fork level - handles parallel branches and sequential flow within forks
+#   - Case 4: Simple sequential flow - normal node-to-node connections
+# The script tracks fork depth, manages subgraph nesting, and ensures all branches
+# properly connect when merging.
 _make_flowchart_prepare_relationships() {
 	_UML_OUTPUT_CONFIG="$1"
 	_FORK_STRING_BRE="$2"
 	_UML_OUTPUT_RELATIONSHIPS="$3"
 
-	# Prepare relationships for UML
+	# Generate Mermaid flowchart relationships
 	awk <"$_UML_OUTPUT_CONFIG" \
 		-F ":" -v fork_string_bre="$_FORK_STRING_BRE" \
 		'BEGIN{previous="start"}
