@@ -12,10 +12,12 @@ Runs code quality checks before each commit:
 
 ## Installation
 
-To enable the pre-commit hook:
+To enable the pre-commit hook, run this command from the project root:
 
 ```bash
-ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
+# -s: create symbolic link
+# -r: use relative path (automatically calculated from link location)
+ln -sr .git-hooks/pre-commit .git/hooks/pre-commit
 ```
 
 ## Requirements
