@@ -228,6 +228,40 @@ For details, see documents in `./docs/` directory.
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
 * [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
 
+## 🔧 Development Setup
+
+For contributors and developers working on shtracer, we provide optional Git hooks to maintain code quality.
+
+### Code Quality Tools
+
+Install the following tools for local development (optional but recommended):
+
+```bash
+# Install shellcheck
+sudo apt-get install shellcheck  # Debian/Ubuntu
+brew install shellcheck          # macOS
+
+# Install shfmt
+go install mvdan.cc/sh/v3/cmd/shfmt@latest
+# or download from https://github.com/mvdan/sh/releases
+```
+
+### Git Hooks
+
+Enable the pre-commit hook to automatically check code quality before commits:
+
+```bash
+ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
+```
+
+The pre-commit hook runs:
+* **shellcheck**: Static analysis for shell scripts
+* **shfmt**: Shell script formatting checks
+
+**Note**: These hooks are optional for local development. All checks are also enforced in CI, so even if you skip the local hooks, your code will be checked during pull requests.
+
+For more details, see [.git-hooks/README.md](.git-hooks/README.md).
+
 ## ⚠️ Security Considerations
 
 **IMPORTANT: Only use trusted configuration files.**
