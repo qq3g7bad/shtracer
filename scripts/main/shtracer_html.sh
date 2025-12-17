@@ -4,16 +4,16 @@
 _SHTRACER_HTML_SH=""
 
 case "$0" in
-*shtracer)
-	: # Successfully sourced from shtracer.
-	;;
-*shtracer*test*)
-	: # Successfully sourced from shtracer.
-	;;
-*)
-	echo "This script should only be sourced, not executed directly."
-	exit 1
-	;;
+	*shtracer)
+		: # Successfully sourced from shtracer.
+		;;
+	*shtracer*test*)
+		: # Successfully sourced from shtracer.
+		;;
+	*)
+		echo "This script should only be sourced, not executed directly."
+		exit 1
+		;;
 esac
 
 ##
@@ -30,8 +30,8 @@ _make_flowchart_parse_config() {
 	# Parse config output data
 	awk <"$_CONFIG_OUTPUT_DATA" \
 		-F "$SHTRACER_SEPARATOR" \
-		'{ if(previous != $1){print $1}; previous=$1 }' |
-		awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
+		'{ if(previous != $1){print $1}; previous=$1 }' \
+		| awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
 			'BEGIN{}
 			{
 				# Fork counter
@@ -69,8 +69,8 @@ _make_flowchart_parse_config() {
 				}
 
 				print flowchart_idx, $0
-			}' |
-		sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
+			}' \
+		| sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
 }
 
 ##
@@ -188,7 +188,8 @@ _make_flowchart_prepare_relationships() {
 				print stop[End]
 				print "id"$1" --> stop"
 			}
-		}' |
+		}' \
+		|
 		# delete subgraphs without data
 		sed '/^subgraph ".*"$/{N;/^\(subgraph ".*"\)\nend$/d;}' >"$_UML_OUTPUT_RELATIONSHIPS"
 }
@@ -230,12 +231,12 @@ make_target_flowchart() {
 			@state_relationships@
 			'
 
-		echo "$_TEMPLATE_FLOWCHART" |
-			sed "/@state_declaration@/r $_UML_OUTPUT_DECLARATION" |
-			sed '/@state_declaration@/d' |
-			sed "/@state_relationships@/r $_UML_OUTPUT_RELATIONSHIPS" |
-			sed '/@state_relationships@/d' |
-			sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
+		echo "$_TEMPLATE_FLOWCHART" \
+			| sed "/@state_declaration@/r $_UML_OUTPUT_DECLARATION" \
+			| sed '/@state_declaration@/d' \
+			| sed "/@state_relationships@/r $_UML_OUTPUT_RELATIONSHIPS" \
+			| sed '/@state_relationships@/d' \
+			| sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
 
 		echo "$_UML_OUTPUT_FILENAME"
 		profile_end "make_target_flowchart"
@@ -285,8 +286,8 @@ _html_generate_tag_links() {
 	#   - Extract file extension for syntax highlighting
 	#   - Generate sed substitution with onclick/onmouseover handlers
 	# Output: sed script that makes all tags clickable
-	echo "$1" |
-		awk -F"$SHTRACER_SEPARATOR" '{
+	echo "$1" \
+		| awk -F"$SHTRACER_SEPARATOR" '{
 			n = split($3, parts, "/");
 			filename = parts[n];
 			raw_filename = filename;
@@ -314,10 +315,10 @@ _html_generate_file_list() {
 	#   - Add "Target_" prefix to avoid conflicts
 	#   - Extract extension for syntax highlighting
 	# Output: <ul> list of clickable file links for the information panel
-	printf '%s' "<ul>\n$(echo "$1" |
-		awk -F"$SHTRACER_SEPARATOR" '{print $3}' |
-		sort -u |
-		awk '{
+	printf '%s' "<ul>\n$(echo "$1" \
+		| awk -F"$SHTRACER_SEPARATOR" '{print $3}' \
+		| sort -u \
+		| awk '{
 			n = split($0, parts, "/");
 			filename = parts[n];
 			raw_filename = filename;
@@ -351,16 +352,16 @@ _html_insert_content_with_indentation() {
 	#   - Calculate proper indentation based on surrounding HTML context
 	#   - Apply consistent spacing (2 or 4 spaces depending on nesting)
 	#   - Remove marker comments after processing
-	echo "$1" |
-		awk -v information="$2" -v mermaid_script="$3" '
+	echo "$1" \
+		| awk -v information="$2" -v mermaid_script="$3" '
 			{
 				gsub(/ *<!-- INSERT INFORMATION -->/,
 					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
 				gsub(/ *<!-- INSERT MERMAID -->/,
 					"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
 				print
-			}' |
-		awk '
+			}' \
+		| awk '
 			BEGIN {
 			    add_space = 0
 			}
@@ -389,8 +390,8 @@ _html_insert_content_with_indentation() {
 					print $0
 				}
 			}
-		' |
-		sed '/<!-- SHTRACER INSERTED -->/d'
+		' \
+		| sed '/<!-- SHTRACER INSERTED -->/d'
 }
 
 ##
@@ -468,8 +469,8 @@ convert_template_js() {
 
 		# Make a JavaScript file
 		_JS_CONTENTS="$(
-			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u |
-				awk -v js_template="$_JS_TEMPLATE" 'BEGIN{
+			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u \
+				| awk -v js_template="$_JS_TEMPLATE" 'BEGIN{
 						init_js_template = js_template
 					}
 					{
@@ -505,12 +506,12 @@ convert_template_js() {
 		# Subsitute a comment block in the template js file to "$_JS_CONTENTS"
 		while read -r s; do
 			case "$s" in
-			*//\ js_contents*)
-				printf "%s\n" "$_JS_CONTENTS"
-				;;
-			*)
-				printf "%s\n" "$s"
-				;;
+				*//\ js_contents*)
+					printf "%s\n" "$_JS_CONTENTS"
+					;;
+				*)
+					printf "%s\n" "$s"
+					;;
 			esac
 		done <"${_TEMPLATE_ASSETS_DIR%/}/show_text.js"
 		profile_end "convert_template_js"

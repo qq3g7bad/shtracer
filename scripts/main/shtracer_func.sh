@@ -4,16 +4,16 @@
 _SHTRACER_FUNC_SH=""
 
 case "$0" in
-*shtracer)
-	: # Successfully sourced from shtracer.
-	;;
-*shtracer*test*)
-	: # Successfully sourced from shtracer.
-	;;
-*)
-	echo "This script should only be sourced, not executed directly."
-	exit 1
-	;;
+	*shtracer)
+		: # Successfully sourced from shtracer.
+		;;
+	*shtracer*test*)
+		: # Successfully sourced from shtracer.
+		;;
+	*)
+		echo "This script should only be sourced, not executed directly."
+		exit 1
+		;;
 esac
 
 ##
@@ -38,10 +38,16 @@ _check_config_remove_comments() {
 		/-->/ && in_comment { in_comment=0; next }
 		/<!--/,/-->/ { if (in_comment) next }
 		!in_comment { print }
-		' |
-		sed '/^[[:space:]]*$/d' |    # Delete empty lines
-		sed 's/^[[:space:]]*\* //' | # Delete start spaces
-		sed 's/[[:space:]]*$//' |    # Delete end spaces
+		' \
+		| sed '/^[[:space:]]*$/d' \
+		|
+		# Delete empty lines
+		sed 's/^[[:space:]]*\* //' \
+		|
+		# Delete start spaces
+		sed 's/[[:space:]]*$//' \
+		|
+		# Delete end spaces
 		sed 's/\*\*\(.*\)\*\*:/\1:/'
 }
 
@@ -55,10 +61,10 @@ _check_config_convert_to_table() {
 	_CONFIG_TABLE="$2"
 
 	# Convert sections to lines
-	echo "$_CONFIG_CONTENT" |
-		sed 's/:/'"$SHTRACER_SEPARATOR"'/;
-					s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
-		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
+	echo "$_CONFIG_CONTENT" \
+		| sed 's/:/'"$SHTRACER_SEPARATOR"'/;
+					s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' \
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
 			function print_data() {
 				print \
 					a["TITLE"],
@@ -249,8 +255,8 @@ _extract_tags_process_files() {
 	#      - Capture file path and line number for reference
 	#   4. Execute post-extra-script if specified
 	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
-	echo "$1" |
-		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+	echo "$1" \
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 			{
 				title = $1
 				path = $2
@@ -363,11 +369,11 @@ extract_tags() {
 _prepare_upstream_table() {
 	# Extract tags that have NODATA_STRING as parent (starting points)
 	# Pipeline: grep for NONE tags → sort → remove NONE field → trim → remove empty lines
-	grep "^$NODATA_STRING" "$1" |
-		sort |
-		awk '{$1=""; print $0}' |
-		sed 's/^[[:space:]]*//' |
-		sed '/^$/d' >"$2"
+	grep "^$NODATA_STRING" "$1" \
+		| sort \
+		| awk '{$1=""; print $0}' \
+		| sed 's/^[[:space:]]*//' \
+		| sed '/^$/d' >"$2"
 }
 
 ##
@@ -378,9 +384,9 @@ _prepare_upstream_table() {
 _prepare_downstream_table() {
 	# Extract tags that have actual parents (not NONE)
 	# Pipeline: grep -v to exclude NONE tags → sort → remove empty lines
-	grep -v "^$NODATA_STRING" "$1" |
-		sort |
-		sed '/^$/d' >"$2"
+	grep -v "^$NODATA_STRING" "$1" \
+		| sort \
+		| sed '/^$/d' >"$2"
 }
 
 ##
@@ -395,9 +401,9 @@ _verify_duplicated_tags() {
 		-F"$SHTRACER_SEPARATOR" \
 		'{
 			print $2
-		 }' |
-		sort |
-		uniq -d >"$2"
+		 }' \
+		| sort \
+		| uniq -d >"$2"
 }
 
 ##
@@ -409,12 +415,12 @@ _detect_isolated_tags() {
 	# Find tags that appear only once in the entire tag pairs list
 	# Pipeline: print both columns (with $2 twice for weighting) → sort →
 	#           uniq -u finds unique → add NONE prefix → remove empty → extract tag
-	awk <"$1" '{print $1; print $2; print $2}' |
-		sort |
-		uniq -u |
-		sed 's/^/'"$NODATA_STRING"' /' |
-		sed '/^$/d' |
-		awk '{print $2}' >"$2"
+	awk <"$1" '{print $1; print $2; print $2}' \
+		| sort \
+		| uniq -u \
+		| sed 's/^/'"$NODATA_STRING"' /' \
+		| sed '/^$/d' \
+		| awk '{print $2}' >"$2"
 }
 
 ##
@@ -497,13 +503,13 @@ join_tag_pairs() {
 			error_exit 1 "join_tag_pairs" "Error in join command"
 		fi
 
-		_JOINED_TMP="$(echo "$_JOINED_TMP" |
-			awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' |
-			awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' |
-			sort -k$_NF_PLUS1,$_NF_PLUS1)"
+		_JOINED_TMP="$(echo "$_JOINED_TMP" \
+			| awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' \
+			| awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' \
+			| sort -k$_NF_PLUS1,$_NF_PLUS1)"
 
-		_IS_LAST="$(echo "$_JOINED_TMP" |
-			awk '{if($NF != "'"$NODATA_STRING"'"){a=1}}END{if(a==1){print 0}else{print 1}}')"
+		_IS_LAST="$(echo "$_JOINED_TMP" \
+			| awk '{if($NF != "'"$NODATA_STRING"'"){a=1}}END{if(a==1){print 0}else{print 1}}')"
 
 		if [ "$_IS_LAST" -eq 1 ]; then
 			return
@@ -562,8 +568,8 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		_FILE_LIST="$(echo "$_TARGET_DATA" |
-			while read -r _DATA; do
+		_FILE_LIST="$(echo "$_TARGET_DATA" \
+			| while read -r _DATA; do
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
 				cd "$CONFIG_DIR" || error_exit 1 "swat_tags" "Cannot change directory to config path"
@@ -573,9 +579,9 @@ swap_tags() {
 					_FILE="$_PATH"
 				else # Directory (Check extension: Multiple extensions can be set by grep argument way)
 					_EXTENSION=${_EXTENSION:-*}
-					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null |
-						grep -E "$_EXTENSION" |
-						sed "s@^@$_PATH@")"
+					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null \
+						| grep -E "$_EXTENSION" \
+						| sed "s@^@$_PATH@")"
 
 					if [ "$(echo "$_FILE" | sed '/^$/d' | wc -l)" -eq 0 ]; then
 						return # There are no files to match specified extension.
@@ -586,9 +592,9 @@ swap_tags() {
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
-			echo "$_FILE_LIST" |
-				sort -u |
-				while read -r t; do
+			echo "$_FILE_LIST" \
+				| sort -u \
+				| while read -r t; do
 					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
 					sed -i "s/${3}/${2}/g" "$t"
 					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
@@ -596,4 +602,3 @@ swap_tags() {
 		)
 	)
 }
-

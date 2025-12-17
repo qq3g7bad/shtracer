@@ -1,7 +1,9 @@
 #!/bin/sh
 
 # Source test targets
+# shellcheck source=../../shtracer
 . "../../shtracer"
+# shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
 sh -c "./shtracer_func_test.sh"
@@ -21,8 +23,8 @@ oneTimeSetUp() {
 #
 setUp() {
 	set +u
-	SCRIPT_DIR="../../"
-	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	export SCRIPT_DIR="../../"
+	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 }
 
 ##
@@ -434,4 +436,5 @@ test_main_routine_invalid_config_paths() {
 	)
 }
 
+# shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

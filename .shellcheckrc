@@ -1,0 +1,8 @@
+# shellcheck configuration file
+# See: https://github.com/koalaman/shellcheck/wiki/Directive
+
+# SC1091: Not following external source files
+# Rationale: We use shellcheck source directives to indicate external files,
+# but shellcheck doesn't always follow them. The source directives are sufficient
+# for documentation purposes.
+disable=SC1091

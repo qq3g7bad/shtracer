@@ -3,7 +3,9 @@
 # Source test target
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# shellcheck source=../main/shtracer_func.sh
 . "../main/shtracer_func.sh"
+# shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
 ##
@@ -21,10 +23,10 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
-	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
-	NODATA_STRING="NONE"
-	OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
-	CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
+	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	export NODATA_STRING="NONE"
+	export OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
+	export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
 	cd "${SCRIPT_DIR}" || exit 1
 }
 
@@ -191,7 +193,7 @@ test_make_tag_table() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.6@ (FROM: @IMP2.3@)
 test_make_tag_table_without_argument() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table >/dev/null 2>&1)
@@ -205,7 +207,7 @@ test_make_tag_table_without_argument() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.7@ (FROM: @IMP2.3@)
 test_make_tag_table_with_empty_file() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
@@ -219,7 +221,7 @@ test_make_tag_table_with_empty_file() {
 # @brief  Test for swap_tags without arguments
 # @tag    @UT2.8@ (FROM: @IMP2.6@)
 test_swap_tags_without_arguments() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(swap_tags "" "" "" >/dev/null 2>&1)
@@ -330,4 +332,5 @@ test_print_verification_result_with_duplicated() {
 	)
 }
 
+# shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

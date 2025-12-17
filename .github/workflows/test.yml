@@ -78,7 +78,51 @@ jobs:
             ./scripts/test/output/
           retention-days: 7
 
-  # Job 2: Run verification checks
+  # Job 2: Code quality checks
+  code-quality:
+    name: Code quality checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Install shellcheck and shfmt
+      - name: Install code quality tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+          # Install shfmt
+          SHFMT_VERSION="3.8.0"
+          wget -qO- "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" -O /tmp/shfmt
+          sudo install /tmp/shfmt /usr/local/bin/shfmt
+          rm /tmp/shfmt
+
+      # Run shellcheck on all shell scripts
+      - name: Run shellcheck
+        run: |
+          echo "Running shellcheck on main scripts..."
+          shellcheck ./shtracer
+          shellcheck ./scripts/main/*.sh
+          shellcheck ./scripts/test/*.sh
+          echo "Shellcheck passed!"
+
+      # Check shell script formatting with shfmt
+      - name: Check formatting with shfmt
+        run: |
+          echo "Checking shell script formatting..."
+          # Check formatting (exit code 1 if formatting is needed)
+          # Exclude shunit2 submodule from formatting checks
+          shfmt -d -ci -bn \
+            ./shtracer \
+            $(find ./scripts/main -name "*.sh") \
+            $(find ./scripts/test -maxdepth 1 -name "*.sh")
+          echo "Formatting check passed!"
+
+  # Job 3: Run verification checks
   verify:
     name: Run verification checks
     runs-on: ubuntu-latest
