@@ -248,19 +248,9 @@ go install mvdan.cc/sh/v3/cmd/shfmt@latest
 
 ### Git Hooks
 
-Enable the pre-commit hook to automatically check code quality before commits:
+Optional pre-commit hooks are available to automatically check code quality (shellcheck, shfmt) before commits. These hooks are optional for local development as all checks are also enforced in CI.
 
-```bash
-ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
-```
-
-The pre-commit hook runs:
-* **shellcheck**: Static analysis for shell scripts
-* **shfmt**: Shell script formatting checks
-
-**Note**: These hooks are optional for local development. All checks are also enforced in CI, so even if you skip the local hooks, your code will be checked during pull requests.
-
-For more details, see [.git-hooks/README.md](.git-hooks/README.md).
+For installation and usage, see [.git-hooks/README.md](.git-hooks/README.md).
 
 ## ⚠️ Security Considerations
 
