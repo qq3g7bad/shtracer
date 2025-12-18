@@ -46,7 +46,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/test_config1.md")"
+		_RETURN_VALUE="$(check_configfile "./testdata/unit_test/test_config1.md")"
 
 		# Assert ----------
 
@@ -60,7 +60,7 @@ test_check_configfile() {
 		assertEquals "01_config_table" "${_RETURN_VALUE##*/}"
 
 		# config table
-		_ANSWER="$(cat ./testdata/answer/config/config_table)"
+		_ANSWER="$(cat ./testdata/answer/unit_test/config/config_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/01_config_table")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
@@ -86,7 +86,7 @@ test_extract_tags_without_argument() {
 		)"
 
 		# output filename
-		assertEquals "[shtracer_func_test.sh][error][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
+		assertEquals "[shtracer_func_unittest.sh][error][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 
@@ -96,9 +96,11 @@ test_extract_tags_without_argument() {
 test_extract_tags() {
 	(
 		# Arrange ---------
+		export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/unit_test/"
+
 		# Act -------------
 
-		_RETURN_VALUE="$(extract_tags "./testdata/answer/config/config_table")"
+		_RETURN_VALUE="$(extract_tags "./testdata/answer/unit_test/config/config_table")"
 
 		# Assert ----------
 
@@ -112,7 +114,7 @@ test_extract_tags() {
 		assertEquals "01_tags" "${_RETURN_VALUE##*/}"
 
 		# Level1
-		_ANSWER="$(awk <"./testdata/answer/tags/tags" -F"$SHTRACER_SEPARATOR" '
+		_ANSWER="$(awk <"./testdata/answer/unit_test/tags/tags" -F"$SHTRACER_SEPARATOR" '
 			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
 			{
 				cmd	=	"basename	\""$5"\"";	cmd	|	getline	filename_result;	close(cmd)
@@ -233,12 +235,12 @@ test_make_tag_table() {
 	(
 		# Arrange ---------
 		# Act -------------
-		make_tag_table "./testdata/answer/tags/tags" >/dev/null
+		make_tag_table "./testdata/answer/unit_test/tags/tags" >/dev/null
 
 		# Assert ----------
 		assertEquals 0 "$?"
 
-		_ANSWER="$(cat ./testdata/answer/tags/tag_table)"
+		_ANSWER="$(cat ./testdata/answer/unit_test/tags/tag_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/04_tag_table")"
 	)
 }
@@ -264,7 +266,7 @@ test_make_tag_table_with_empty_file() {
 	(
 		# Arrange ---------
 		# Act -------------
-		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
+		(make_tag_table "./testdata/unit_test/empty" >/dev/null 2>&1)
 
 		# Assert ----------
 		assertEquals 1 "$?"

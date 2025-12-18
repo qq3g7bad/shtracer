@@ -135,7 +135,7 @@ main_routine() {
 
 	# Test mode
 	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_unittest.sh"
 		return 0
 	fi
 

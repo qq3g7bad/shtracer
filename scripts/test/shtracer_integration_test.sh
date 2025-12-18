@@ -37,7 +37,7 @@ tearDown() {
 
 ##
 # @brief  Integration test for normal mode
-# @tag    @IT1.1@ (FROM: @REQ5.1@)
+# @tag    @IT1.1@ (FROM: @UT1.18@)
 test_integration_normal_mode() {
 	(
 		# Arrange ---------
@@ -73,7 +73,7 @@ test_integration_normal_mode() {
 
 ##
 # @brief  Integration test for verify mode
-# @tag    @IT1.2@ (FROM: @REQ5.1@)
+# @tag    @IT1.2@ (FROM: @UT1.18@)
 test_integration_verify_mode() {
 	(
 		# Arrange ---------
@@ -103,7 +103,7 @@ test_integration_verify_mode() {
 
 ##
 # @brief  Integration test for change mode
-# @tag    @IT1.3@ (FROM: @REQ4.1@)
+# @tag    @IT1.3@ (FROM: @UT1.18@)
 test_integration_change_mode() {
 	(
 		# Arrange ---------
@@ -146,7 +146,7 @@ EOF
 
 ##
 # @brief  Integration test for multi-file traceability
-# @tag    @IT1.4@ (FROM: @REQ5.1@)
+# @tag    @IT1.4@ (FROM: @UT1.18@)
 test_integration_multiple_files() {
 	(
 		# Arrange ---------
@@ -179,7 +179,7 @@ test_integration_multiple_files() {
 
 ##
 # @brief  Integration test for error handling
-# @tag    @IT1.5@ (FROM: @REQ5.1@)
+# @tag    @IT1.5@ (FROM: @UT1.18@)
 test_integration_error_handling() {
 	(
 		# Arrange ---------
