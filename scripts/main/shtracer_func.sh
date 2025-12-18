@@ -269,6 +269,20 @@ _extract_tags_process_files() {
 				# Execute pre_extra_script
 				system(pre_extra_script)
 
+				# Calculate absolute path once per file (optimization for Windows/Git Bash)
+				filename = path; gsub(".*/", "", filename);
+				dirname = path; gsub("/[^/]*$", "", dirname)
+				if (dirname == "") dirname = "."
+				cmd = "cd \""dirname"\" 2>/dev/null && pwd";
+				if ((cmd | getline absolute_path) > 0) {
+					close(cmd)
+					absolute_file_path = absolute_path "/" filename
+				} else {
+					close(cmd)
+					# Fallback if cd fails
+					absolute_file_path = path
+				}
+
 				line_num = 0
 				counter = -1
 				while (getline line < path > 0) {
@@ -300,13 +314,7 @@ _extract_tags_process_files() {
 					if (counter == 0) {
 						sub(/^#+[[:space:]]*/, "", line)
 						printf("%s%s", line, separator)                        # column 4: title
-
-						filename = path; gsub(".*/", "", filename);
-						dirname = path; gsub("/[^/]*$", "", dirname)
-						cmd = "cd "dirname";PWD=\"$(pwd)\"; \
-							echo \"${PWD%/}/\""; \
-							cmd | getline absolute_path; close(cmd)
-						printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
+						printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
 						printf("%s%s", line_num, separator)                    # column 6: line number including title
 						printf("%s\n", NR, separator)                          # column 7: file num
 					}

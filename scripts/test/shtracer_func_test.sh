@@ -247,7 +247,7 @@ test_make_tag_table() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.6@ (FROM: @IMP2.3@)
 test_make_tag_table_without_argument() {
-	( 
+	(
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table >/dev/null 2>&1)
@@ -261,7 +261,7 @@ test_make_tag_table_without_argument() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.7@ (FROM: @IMP2.3@)
 test_make_tag_table_with_empty_file() {
-	( 
+	(
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
@@ -275,7 +275,7 @@ test_make_tag_table_with_empty_file() {
 # @brief  Test for swap_tags without arguments
 # @tag    @UT2.8@ (FROM: @IMP2.6@)
 test_swap_tags_without_arguments() {
-	( 
+	(
 		# Arrange ---------
 		# Act -------------
 		(swap_tags "" "" "" >/dev/null 2>&1)
