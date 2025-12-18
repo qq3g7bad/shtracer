@@ -162,8 +162,11 @@ main_routine() {
 	fi
 
 	if print_verification_result "$_VERIFICATION_FILENAME"; then
-		# cat "$_TAG_TABLE_FILENAME"
-		:
+		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+			:
+		else
+			cat "$_TAG_TABLE_FILENAME"
+		fi
 	fi
 }
 
