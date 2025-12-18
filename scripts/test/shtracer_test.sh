@@ -8,6 +8,7 @@
 
 sh -c "./shtracer_func_test.sh"
 sh -c "./shtracer_html_test.sh"
+sh -c "./shtracer_integration_test.sh"
 
 ##
 # @brief

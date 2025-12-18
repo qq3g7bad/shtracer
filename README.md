@@ -298,7 +298,6 @@ shtracer executes shell commands specified in configuration files through the fo
 
 ### High Priority
 
-* Add integration tests
 * Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
 * Make a cross-reference table for easy reference
 * Export all trace data in Markdown format.
