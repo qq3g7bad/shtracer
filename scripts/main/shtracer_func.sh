@@ -486,15 +486,27 @@ make_tag_table() {
 # @brief  Recursively join tag pairs to build complete traceability chains
 # @param  $1 : filename of the tag table
 # @param  $2 : filename of tag pairs without starting points
+# @param  $3 : (optional) current recursion depth (default: 0)
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
 join_tag_pairs() {
 	(
-		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
+		if [ ! -r "$1" ] || [ ! -r "$2" ]; then
+			error_exit 1 "join_tag_pairs" "Incorrect argument."
+		fi
+
+		if [ $# -lt 2 ] || [ $# -gt 3 ]; then
 			error_exit 1 "join_tag_pairs" "Incorrect argument."
 		fi
 
 		_TAG_TABLE="$1"
 		_TAG_TABLE_DOWNSTREAM="$2"
+		_DEPTH="${3:-0}"
+		_MAX_DEPTH=100
+
+		# Check for circular reference by depth limit
+		if [ "$_DEPTH" -ge "$_MAX_DEPTH" ]; then
+			error_exit 1 "join_tag_pairs" "Circular reference detected: Maximum recursion depth ($_MAX_DEPTH) exceeded. Please check your tag relationships for cycles (e.g., A -> B -> A)."
+		fi
 
 		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
 		_NF_PLUS1="$((_NF + 1))"
@@ -515,7 +527,8 @@ join_tag_pairs() {
 			return
 		else
 			echo "$_JOINED_TMP" >"$_TAG_TABLE"
-			join_tag_pairs "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+			_NEXT_DEPTH=$((_DEPTH + 1))
+			join_tag_pairs "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM" "$_NEXT_DEPTH"
 		fi
 	)
 }

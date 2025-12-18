@@ -173,6 +173,60 @@ test_join_tag_pairs_with_non_existent_file() {
 }
 
 ##
+# @brief  Test for join_tag_pairs with circular reference
+# @tag    @UT2.4.3@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_circular_reference() {
+	(
+		# Arrange ---------
+		# Create a circular reference scenario
+		# TAG1 -> TAG2 -> TAG1 (circular)
+		mkdir -p "$OUTPUT_DIR/tags"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table_circular"
+		{
+			echo "@TAG1@ @TAG2@"
+			echo "@TAG2@ @TAG1@"
+		} >"$OUTPUT_DIR/tags/test_downstream_circular"
+
+		# Act -------------
+		join_tag_pairs "$OUTPUT_DIR/tags/test_table_circular" "$OUTPUT_DIR/tags/test_downstream_circular" 2>"$OUTPUT_DIR/error_output.txt"
+		_EXIT_CODE=$?
+		_ERROR_OUTPUT="$(cat "$OUTPUT_DIR/error_output.txt")"
+
+		# Assert ----------
+		assertEquals 1 "$_EXIT_CODE"
+		assertContains "$_ERROR_OUTPUT" "Circular reference detected"
+	)
+}
+
+##
+# @brief  Test for join_tag_pairs with deep recursion but no circular reference
+# @tag    @UT2.4.4@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_deep_recursion() {
+	(
+		# Arrange ---------
+		# Create a deep but valid chain: TAG1 -> TAG2 -> TAG3 -> TAG4 -> TAG5
+		mkdir -p "$OUTPUT_DIR/tags"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table_deep"
+		{
+			echo "@TAG1@ @TAG2@"
+			echo "@TAG2@ @TAG3@"
+			echo "@TAG3@ @TAG4@"
+			echo "@TAG4@ @TAG5@"
+		} >"$OUTPUT_DIR/tags/test_downstream_deep"
+
+		# Act -------------
+		join_tag_pairs "$OUTPUT_DIR/tags/test_table_deep" "$OUTPUT_DIR/tags/test_downstream_deep" 2>/dev/null
+		_EXIT_CODE=$?
+		_RESULT="$(cat "$OUTPUT_DIR/tags/test_table_deep")"
+
+		# Assert ----------
+		assertEquals 0 "$_EXIT_CODE"
+		assertContains "$_RESULT" "@TAG1@"
+		assertContains "$_RESULT" "@TAG5@"
+	)
+}
+
+##
 # @brief  Test for make_tag_table
 # @tag    @UT2.5@ (FROM: @IMP2.3@)
 test_make_tag_table() {
@@ -193,7 +247,7 @@ test_make_tag_table() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.6@ (FROM: @IMP2.3@)
 test_make_tag_table_without_argument() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table >/dev/null 2>&1)
@@ -207,7 +261,7 @@ test_make_tag_table_without_argument() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.7@ (FROM: @IMP2.3@)
 test_make_tag_table_with_empty_file() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
@@ -221,7 +275,7 @@ test_make_tag_table_with_empty_file() {
 # @brief  Test for swap_tags without arguments
 # @tag    @UT2.8@ (FROM: @IMP2.6@)
 test_swap_tags_without_arguments() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(swap_tags "" "" "" >/dev/null 2>&1)
