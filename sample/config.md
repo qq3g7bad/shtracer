@@ -80,6 +80,8 @@
 
 ## Integration test
 
-* **PATH**: "../scripts/test/integration/"
-  * **EXTENSION FILTER**: "*.sh"
-  * **BRIEF**: "Not implemented yet"
+* **PATH**: "../scripts/test/shtracer_integration_test.sh"
+  * **BRIEF**: "End-to-end integration tests for shtracer functionality"
+  * **TAG FORMAT**: `@IT[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
+  * **TAG-TITLE OFFSET**: 0
