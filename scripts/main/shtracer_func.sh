@@ -267,7 +267,14 @@ _extract_tags_process_files() {
 				post_extra_script = $10
 
 				# Execute pre_extra_script
-				system(pre_extra_script)
+				# Suppress output in verify mode
+				if (pre_extra_script != "") {
+					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
+						system(pre_extra_script " >/dev/null 2>&1")
+					} else {
+						system(pre_extra_script)
+					}
+				}
 
 				# Calculate absolute path once per file (optimization for Windows/Git Bash)
 				filename = path; gsub(".*/", "", filename);
@@ -324,7 +331,14 @@ _extract_tags_process_files() {
 
 				}
 				# Execute post_extra_script
-				system(post_extra_script)
+				# Suppress output in verify mode
+				if (post_extra_script != "") {
+					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
+						system(post_extra_script " >/dev/null 2>&1")
+					} else {
+						system(post_extra_script)
+					}
+				}
 			}
 			' >"$2"
 }

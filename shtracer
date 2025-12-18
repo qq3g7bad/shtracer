@@ -125,6 +125,9 @@ main_routine() {
 	init_environment
 	parse_arguments "$@"
 
+	# Export mode for use in sub-functions
+	export SHTRACER_MODE
+
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
 		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
