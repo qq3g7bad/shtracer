@@ -244,25 +244,21 @@ test_integration_json_export() {
 		# Assert ----------
 		assertEquals "Shtracer should exit successfully with JSON export" 0 "${_EXIT_CODE}"
 
-		# Check JSON output exists
-		assertTrue "JSON output should exist" "[ -f output/output.json ]"
-
-		# Verify JSON is valid (basic structure check)
-		_JSON_CONTENT=$(cat output/output.json)
-		echo "${_JSON_CONTENT}" | grep -q '"metadata"'
+		# Verify JSON is output to stdout (basic structure check)
+		echo "${_OUTPUT}" | grep -q '"metadata"'
 		assertEquals "JSON should contain metadata" 0 $?
 
-		echo "${_JSON_CONTENT}" | grep -q '"nodes"'
+		echo "${_OUTPUT}" | grep -q '"nodes"'
 		assertEquals "JSON should contain nodes" 0 $?
 
-		echo "${_JSON_CONTENT}" | grep -q '"links"'
+		echo "${_OUTPUT}" | grep -q '"links"'
 		assertEquals "JSON should contain links" 0 $?
 
-		echo "${_JSON_CONTENT}" | grep -q '"chains"'
+		echo "${_OUTPUT}" | grep -q '"chains"'
 		assertEquals "JSON should contain chains" 0 $?
 
-		# HTML should still be generated
-		assertTrue "HTML should still be generated with --json" "[ -f output/output.html ]"
+		# HTML should NOT be generated when --json is specified
+		assertTrue "HTML should not be generated with --json" "[ ! -f output/output.html ]"
 	)
 }
 
