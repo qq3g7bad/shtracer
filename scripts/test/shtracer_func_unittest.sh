@@ -96,6 +96,7 @@ test_extract_tags_without_argument() {
 test_extract_tags() {
 	(
 		# Arrange ---------
+		# shellcheck disable=SC2030  # Intentional subshell modification for test isolation
 		export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/unit_test/"
 
 		# Act -------------
@@ -249,7 +250,7 @@ test_make_tag_table() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.6@ (FROM: @IMP2.3@)
 test_make_tag_table_without_argument() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table >/dev/null 2>&1)
@@ -263,7 +264,7 @@ test_make_tag_table_without_argument() {
 # @brief  Test for make_tag_table
 # @tag    @UT2.7@ (FROM: @IMP2.3@)
 test_make_tag_table_with_empty_file() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(make_tag_table "./testdata/unit_test/empty" >/dev/null 2>&1)
@@ -277,7 +278,7 @@ test_make_tag_table_with_empty_file() {
 # @brief  Test for swap_tags without arguments
 # @tag    @UT2.8@ (FROM: @IMP2.6@)
 test_swap_tags_without_arguments() {
-	(
+	( 
 		# Arrange ---------
 		# Act -------------
 		(swap_tags "" "" "" >/dev/null 2>&1)
@@ -308,6 +309,7 @@ test_swap_tags_with_non_existent_file() {
 test_swap_tags_with_valid_arguments() {
 	(
 		# Arrange ---------
+		# shellcheck disable=SC2031  # CONFIG_DIR modification is intentional in test subshell
 		_ORIGINAL_CONFIG_DIR="$CONFIG_DIR"
 		mkdir -p "$OUTPUT_DIR/test_swap/testdata"
 		CONFIG_DIR="$OUTPUT_DIR/test_swap"

@@ -47,7 +47,7 @@
 * **PATH**: "../scripts/test/"
   * **BRIEF**: "All files are shell scripts."
   * **EXTENSION FILTER**: "*.sh"
-  * **IGNORE FILTER**: "shunit2|unittest_sample" <!-- Multiple conditions are acceptable by using "|". -->
+  * **IGNORE FILTER**: "shunit2|unittest_sample|testdata|*integration*" <!-- Multiple conditions are acceptable by using "|". -->
   * **TAG FORMAT**: `@UT[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
 
@@ -80,8 +80,6 @@
 
 ## Integration test
 
-* **PATH**: "../scripts/test/shtracer_integration_test.sh"
-  * **BRIEF**: "End-to-end integration tests for shtracer functionality"
-  * **TAG FORMAT**: `@IT[0-9\.]+@`
-  * **TAG LINE FORMAT**: `#.*`
-  * **TAG-TITLE OFFSET**: 0
+* **PATH**: "../scripts/test/integration/"
+  * **EXTENSION FILTER**: "*.sh"
+  * **BRIEF**: "Not implemented yet"
