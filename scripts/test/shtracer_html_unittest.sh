@@ -45,6 +45,10 @@ test_convert_template_html_with_valid_inputs() {
 	(
 		# Arrange ---------
 		SCRIPT_DIR="../../"
+		mkdir -p "$OUTPUT_DIR"
+		cat >"$OUTPUT_DIR/output.json" <<'EOF'
+{"metadata":{},"nodes":[],"links":[],"direct_links":[],"chains":[]}
+EOF
 		mkdir -p "$OUTPUT_DIR/tags"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
@@ -99,6 +103,10 @@ test_make_html_with_valid_inputs() {
 		# Arrange ---------
 		SCRIPT_DIR="../../"
 		export CONFIG_PATH="./testdata/unit_test/test_config1.md"
+		mkdir -p "$OUTPUT_DIR"
+		cat >"$OUTPUT_DIR/output.json" <<'EOF'
+{"metadata":{},"nodes":[],"links":[],"direct_links":[],"chains":[]}
+EOF
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
@@ -123,7 +131,7 @@ test_make_html_with_valid_inputs() {
 			echo "$?"
 		)"
 		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/assets/sankey.js" ]
+			[ -f "$OUTPUT_DIR/assets/traceability_diagrams.js" ]
 			echo "$?"
 		)"
 
@@ -140,8 +148,8 @@ test_make_html_with_valid_inputs() {
 		grep -q "sankey-diagram" "$OUTPUT_DIR/output.html"
 		assertEquals "HTML should contain Sankey diagram container" 0 $?
 
-		grep -q "sankey.js" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should include sankey.js" 0 $?
+		grep -q "traceability_diagrams.js" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should include traceability_diagrams.js" 0 $?
 	)
 }
 

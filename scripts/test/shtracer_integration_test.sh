@@ -77,8 +77,8 @@ test_integration_normal_mode() {
 		grep -q "sankey-diagram" output/output.html
 		assertEquals "HTML should contain Sankey diagram container" 0 $?
 
-		grep -q "sankey.js" output/output.html
-		assertEquals "HTML should include sankey.js" 0 $?
+		grep -q "traceability_diagrams.js" output/output.html
+		assertEquals "HTML should include traceability_diagrams.js" 0 $?
 
 		# Check JSON is valid
 		python3 -m json.tool output/output.json >/dev/null 2>&1
@@ -231,7 +231,7 @@ EOF
 
 ##
 # @brief  Integration test for JSON export
-# @tag    @IT1.4@ (FROM: @UT1.18@)
+# @tag    @IT2.1@ (FROM: @UT1.18@)
 test_integration_json_export() {
 	(
 		# Arrange ---------
@@ -259,6 +259,36 @@ test_integration_json_export() {
 
 		# HTML should NOT be generated when --json is specified
 		assertTrue "HTML should not be generated with --json" "[ ! -f output/output.html ]"
+	)
+}
+
+##
+# @brief  Integration test for summary export
+test_integration_summary_export() {
+	(
+		# Arrange ---------
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		# Act -------------
+		_OUTPUT=$("${SHTRACER_BIN}" ./config_integration.md --summary 2>&1)
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Shtracer should exit successfully with summary" 0 "${_EXIT_CODE}"
+
+		# Basic format checks
+		echo "${_OUTPUT}" | grep -q "^total "
+		assertEquals "Summary should contain total lines" 0 $?
+		echo "${_OUTPUT}" | grep -q "%$"
+		assertEquals "Summary lines should end with %" 0 $?
+
+		# Extra scripts should be suppressed in summary output
+		echo "${_OUTPUT}" | grep -q "pre-extra-script\|post-extra-script"
+		assertNotEquals "Summary should not contain extra script output" 0 $?
+
+		# HTML/JSON should NOT be generated in summary mode
+		assertTrue "HTML should not be generated with --summary" "[ ! -f output/output.html ]"
+		assertTrue "JSON should not be generated with --summary" "[ ! -f output/output.json ]"
 	)
 }
 

@@ -297,6 +297,21 @@ test_parse_arguments_verify_mode() {
 }
 
 ##
+# @brief  Test for parse_arguments with --summary
+test_parse_arguments_summary_mode() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_SUMMARY='false'
+		# Act -------------
+		parse_arguments "$0" "--summary"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_SUMMARY" "true"
+	)
+}
+
+##
 # @brief  Test for parse_arguments in change mode
 # @tag    @UT1.15@ (FROM: @IMP1.3@)
 test_parse_arguments_change_mode() {

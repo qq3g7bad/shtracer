@@ -556,6 +556,127 @@ join_tag_pairs() {
 }
 
 ##
+# @brief  Print traceability summary based on direct links only (02_tag_pairs)
+# @param  $1 : TAG_OUTPUT_DATA path (01_tags)
+# @param  $2 : TAG_PAIRS path (02_tag_pairs)
+# @return  Prints summary lines to stdout
+print_summary_direct_links() {
+	if [ $# -ne 2 ] || [ ! -r "$1" ] || [ ! -r "$2" ]; then
+		error_exit 1 "print_summary_direct_links" "incorrect argument."
+	fi
+
+	_TAGS_FILE="$1"
+	_TAG_PAIRS_FILE="$2"
+
+	# Output format:
+	#   total <layer>:xx.xx%
+	#   <layer>-<target layer>:xx.xx%
+	# Notes:
+	# - Uses direct links only.
+	# - Treats links as undirected (any cross-layer connection counts).
+	# - For nodes connected to multiple target layers, split 1 equally across distinct target layers.
+	awk \
+		-v SEP="$SHTRACER_SEPARATOR" \
+		-v TAGS_FILE="$_TAGS_FILE" \
+		'
+		function trim(s) {
+			gsub(/^[[:space:]]+/, "", s)
+			gsub(/[[:space:]]+$/, "", s)
+			return s
+		}
+		function layer_suffix(s,   n, a, t) {
+			n = split(s, a, ":")
+			t = a[n]
+			return trim(t)
+		}
+		BEGIN {
+			# First pass: load tag->layer from 01_tags
+			while ((getline line < TAGS_FILE) > 0) {
+				n = split(line, f, SEP)
+				if (n < 2) { continue }
+				tag = trim(f[2])
+				if (tag == "" || tag == "NONE") { continue }
+				layer = layer_suffix(f[1])
+				if (layer == "") { continue }
+				if (!(tag in tag2layer)) {
+					tag2layer[tag] = layer
+					layerN[layer]++
+					layers[layer] = 1
+				}
+			}
+			close(TAGS_FILE)
+		}
+		{
+			# Second pass (main input): 02_tag_pairs (space separated)
+			a = $1
+			b = $2
+			if (a == "" || b == "") { next }
+			if (a == "NONE" || b == "NONE") { next }
+			if (!(a in tag2layer) || !(b in tag2layer)) { next }
+			la = tag2layer[a]
+			lb = tag2layer[b]
+			if (la == "" || lb == "") { next }
+			if (la == lb) { next }
+
+			# Undirected: register each endpoint as targeting the other layer (distinct per tag)
+			k1 = a SUBSEP lb
+			if (!(k1 in hasTarget)) {
+				hasTarget[k1] = 1
+				tcnt[a]++
+			}
+			k2 = b SUBSEP la
+			if (!(k2 in hasTarget)) {
+				hasTarget[k2] = 1
+				tcnt[b]++
+			}
+		}
+		END {
+			# Covered nodes per layer
+			for (tag in tag2layer) {
+				l = tag2layer[tag]
+				if (tcnt[tag] > 0) { covered[l]++ }
+			}
+
+			# Accumulate mass per layer->target
+			for (k in hasTarget) {
+				split(k, parts, SUBSEP)
+				tag = parts[1]
+				tgt = parts[2]
+				src = tag2layer[tag]
+				if (src == "" || tgt == "") { continue }
+				if (tcnt[tag] <= 0) { continue }
+				acc[src SUBSEP tgt] += (1.0 / tcnt[tag])
+				tgtsBySrc[src SUBSEP tgt] = 1
+			}
+
+			# Preferred stable order (matches existing diagrams)
+			order[1] = "Requirement"
+			order[2] = "Architecture"
+			order[3] = "Implementation"
+			order[4] = "Unit test"
+			order[5] = "Integration test"
+
+			# Emit totals and projections
+			for (i = 1; i <= 5; i++) {
+				src = order[i]
+				N = layerN[src] + 0
+				if (N <= 0) { continue }
+				c = covered[src] + 0
+				printf "total %s:%.2f%%\n", src, (100.0 * c / N)
+
+				# Emit projections in stable target order
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					key = src SUBSEP tgt
+					if (!(key in tgtsBySrc)) { continue }
+					printf "%s-%s:%.2f%%\n", src, tgt, (100.0 * acc[key] / N)
+				}
+			}
+		}
+		' <"$_TAG_PAIRS_FILE"
+}
+
+##
 # @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
@@ -587,7 +708,6 @@ print_verification_result() {
 # @param  $5 : CONFIG_TABLE (01_config_table file path)
 # @param  $6 : CONFIG_PATH (config file path)
 # @return JSON_OUTPUT_FILENAME
-# @tag    @IMP2.7@ (FROM: @ARC2.6@)
 make_json() {
 	_TAG_OUTPUT_DATA="$1"
 	_TAG_PAIRS="$2"
@@ -612,13 +732,23 @@ make_json() {
 
 		# Generate nodes array from 01_tags
 		printf '  "nodes": [\n'
-		awk -F"$SHTRACER_SEPARATOR" '
-		BEGIN { first=1 }
-		NF >= 6 {
+		awk -v sep="$SHTRACER_SEPARATOR" '
+		BEGIN { FS = "(\\t|" sep ")"; first=1 }
+		# Skip header row if present
+		$1 == "trace_target" && $2 == "tag_id" { next }
+		NF >= 5 {
 			if (!first) printf ",\n"
 			first=0
 			# Escape quotes and backslashes in description
-			desc = $4
+			if (NF >= 6) {
+				desc = $4
+				file = $5
+				line = $6
+			} else {
+				desc = $3
+				file = $4
+				line = $5
+			}
 			gsub(/"/, "\\\"", desc)
 			gsub(/\\/, "\\\\", desc)
 			gsub(/\n/, "\\n", desc)
@@ -628,8 +758,8 @@ make_json() {
 			printf "      \"id\": \"%s\",\n", $2
 			printf "      \"label\": \"%s\",\n", $2
 			printf "      \"description\": \"%s\",\n", desc
-			printf "      \"file\": \"%s\",\n", $5
-			printf "      \"line\": %d,\n", $6
+			printf "      \"file\": \"%s\",\n", file
+			printf "      \"line\": %d,\n", line
 			printf "      \"trace_target\": \"%s\"\n", $1
 			printf "    }"
 		}
@@ -637,24 +767,72 @@ make_json() {
 		' "$_TAG_OUTPUT_DATA"
 		printf '  ],\n'
 
-		# Generate links array from tag pairs (exclude NONE)
+		# Generate links array from tag pairs (exclude NONE and validate nodes exist)
 		printf '  "links": [\n'
+		# Create temporary file with node list
+		_NODE_TEMP_FILE="${OUTPUT_DIR%/}/nodes.tmp"
+		awk -v sep="$SHTRACER_SEPARATOR" '
+		BEGIN { FS = "(\\t|" sep ")" }
+		$1 == "trace_target" && $2 == "tag_id" { next }
+		NF >= 2 { print $2 }
+		' "$_TAG_OUTPUT_DATA" >"$_NODE_TEMP_FILE"
+
+		# Generate links using node validation
 		awk '
 		BEGIN { first=1 }
-		$1 != "NONE" && $2 != "NONE" {
-			key = $1 "," $2
-			if (!seen[key]++) {
-				if (!first) printf ",\n"
-				first=0
-				printf "    {\n"
-				printf "      \"source\": \"%s\",\n", $1
-				printf "      \"target\": \"%s\",\n", $2
-				printf "      \"value\": 1\n"
-				printf "    }"
+		# Read nodes into array
+		ARGIND == 1 {
+			nodes[$1] = 1
+			next
+		}
+		# Process tag pairs
+		ARGIND >= 2 && $1 != "NONE" && $2 != "NONE" {
+			if ($1 in nodes && $2 in nodes) {
+				key = $1 "," $2
+				if (!seen[key]++) {
+					if (!first) printf ",\n"
+					first=0
+					printf "    {\n"
+					printf "      \"source\": \"%s\",\n", $1
+					printf "      \"target\": \"%s\",\n", $2
+					printf "      \"value\": 1\n"
+					printf "    }"
+				}
 			}
 		}
-		' "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
+		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
+
 		printf '\n  ],\n'
+
+		# Generate direct links array from 02_tag_pairs only (exclude NONE and validate nodes exist)
+		printf '  "direct_links": [\n'
+		awk '
+		BEGIN { first=1 }
+		# Read nodes into array
+		ARGIND == 1 {
+			nodes[$1] = 1
+			next
+		}
+		# Process direct tag pairs only
+		ARGIND == 2 && $1 != "NONE" && $2 != "NONE" {
+			if ($1 in nodes && $2 in nodes) {
+				key = $1 "," $2
+				if (!seen[key]++) {
+					if (!first) printf ",\n"
+					first=0
+					printf "    {\n"
+					printf "      \"source\": \"%s\",\n", $1
+					printf "      \"target\": \"%s\",\n", $2
+					printf "      \"value\": 1\n"
+					printf "    }"
+				}
+			}
+		}
+		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS"
+		printf '\n  ],\n'
+
+		# Clean up temp file
+		rm -f "$_NODE_TEMP_FILE"
 
 		# Generate chains array from tag table
 		printf '  "chains": [\n'

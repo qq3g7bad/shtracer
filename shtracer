@@ -9,6 +9,7 @@ SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
 EXPORT_JSON='false'
+EXPORT_SUMMARY='false'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -47,6 +48,7 @@ print_usage() {
 		  -v                               Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
 		  --json                           Export traceability data in JSON format
+		  --summary                        Print traceability summary to stdout (direct links only)
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -61,6 +63,9 @@ print_usage() {
 
 		  4. Test mode
 		     $ ./shtracer -t
+
+		  5. Summary mode
+		     $ ./shtracer ./sample/config.md --summary
 
 		Note:
 		  - The <configfile> argument must always be specified before options.
@@ -100,6 +105,10 @@ parse_arguments() {
 			SHTRACER_MODE='NORMAL'
 			EXPORT_JSON='true'
 			;;
+		2*--summary) # Normal mode with summary output
+			SHTRACER_MODE='NORMAL'
+			EXPORT_SUMMARY='true'
+			;;
 		4*-c*) # Change mode
 			SHTRACER_MODE='CHANGE'
 			BEFORE_TAG="$3"
@@ -134,6 +143,7 @@ main_routine() {
 	# Export mode for use in sub-functions
 	export SHTRACER_MODE
 	export EXPORT_JSON
+	export EXPORT_SUMMARY
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
@@ -147,17 +157,35 @@ main_routine() {
 	fi
 
 	# Normal mode or Verify mode
+	# In --summary mode we want stdout to be only the summary, so suppress extra-script output
+	# during tag extraction by temporarily using the VERIFY behavior.
+	_SUMMARY_SAVED_MODE=""
+	if [ "$EXPORT_SUMMARY" = 'true' ]; then
+		_SUMMARY_SAVED_MODE="$SHTRACER_MODE"
+		SHTRACER_MODE='VERIFY'
+		export SHTRACER_MODE
+	fi
 	if ! _TAGS=$(extract_tags "$CONFIG_OUTPUT"); then
 		error_exit 1 "main_routine" "Error in extract_tags"
 	fi
 	if ! _TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS"); then
 		error_exit 1 "main_routine" "Error in make_tag_table"
 	fi
+	if [ "$EXPORT_SUMMARY" = 'true' ]; then
+		SHTRACER_MODE="$_SUMMARY_SAVED_MODE"
+		export SHTRACER_MODE
+	fi
 
 	_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
 	_VERIFICATION_FILENAME=${_TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
 	if [ "$SHTRACER_MODE" = 'NORMAL' ]; then
+		# If --summary flag is specified, print summary to stdout and exit
+		if [ "$EXPORT_SUMMARY" = 'true' ]; then
+			_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
+			print_summary_direct_links "$_TAGS" "${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
+			return 0
+		fi
 
 		# Generate JSON (now mandatory for visualization)
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"

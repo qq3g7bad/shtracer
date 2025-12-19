@@ -204,6 +204,22 @@ convert_template_html() {
 		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_insert_information"
 
+		# Read JSON data for embedding
+		profile_start "convert_template_html_read_json"
+		_JSON_PATH="${OUTPUT_DIR%/}/output.json"
+		if [ ! -f "$_JSON_PATH" ]; then
+			error_exit 1 "convert_template_html" "Cannot find $_JSON_PATH"
+			exit 1
+		fi
+		_JSON_DATA_B64="$(base64 <"$_JSON_PATH" | tr -d '\n')"
+		_JSON_SCRIPT="const traceabilityData = JSON.parse(atob('${_JSON_DATA_B64}'));"
+		profile_end "convert_template_html_read_json"
+
+		# Insert JSON data into HTML
+		profile_start "convert_template_html_insert_json"
+		_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "s|<!-- INSERT JSON DATA -->|${_JSON_SCRIPT}|")"
+		profile_end "convert_template_html_insert_json"
+
 		# Insert file information and Mermaid UML with proper indentation
 		profile_start "convert_template_html_insert_mermaid"
 		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
@@ -317,6 +333,6 @@ make_html() {
 		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
 		convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
-		cat "${_TEMPLTE_ASSETS_DIR%/}/sankey.js" >"${_OUTPUT_ASSETS_DIR%/}/sankey.js"
+		cat "${_TEMPLTE_ASSETS_DIR%/}/traceability_diagrams.js" >"${_OUTPUT_ASSETS_DIR%/}/traceability_diagrams.js"
 	)
 }
