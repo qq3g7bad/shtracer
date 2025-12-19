@@ -298,6 +298,8 @@ shtracer executes shell commands specified in configuration files through the fo
 
 ### High Priority
 
+* Support json export formats
+* Change images from Mermaid.js to D3.js and use a Sankey diagram to express the complex trace flow
 * Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
 * Make a cross-reference table for easy reference
 * Export all trace data in Markdown format.
@@ -305,5 +307,4 @@ shtracer executes shell commands specified in configuration files through the fo
 ### Future Enhancements
 
 * Use OR condition in the extension filter
-* Use custom CSS files for HTML output
 * Support Excel/CSV export formats
