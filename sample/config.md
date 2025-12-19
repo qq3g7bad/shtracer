@@ -80,6 +80,8 @@
 
 ## Integration test
 
-* **PATH**: "../scripts/test/integration/"
+* **PATH**: "../scripts/test/"
   * **EXTENSION FILTER**: "*.sh"
-  * **BRIEF**: "Not implemented yet"
+  * **IGNORE FILTER**: "shunit2|testdata" <!-- Multiple conditions are acceptable by using "|". -->
+  * **TAG FORMAT**: `@IT[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
