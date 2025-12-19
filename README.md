@@ -74,6 +74,7 @@ uml --> html_output
 @REQ1.2@ @ARC3.1@ @IMP3.1@ @UT1.2@ @IT1.1@
 @REQ1.4@ @ARC2.1@ @IMP2.1@ @UT2.1@ @IT1.1@
 ```
+
 ### UML
 
 * Drawn by Mermaid.
@@ -228,6 +229,30 @@ For details, see documents in `./docs/` directory.
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
 * [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
 
+## 🔧 Development Setup
+
+For contributors and developers working on shtracer, we provide optional Git hooks to maintain code quality.
+
+### Code Quality Tools
+
+Install the following tools for local development (optional but recommended):
+
+```bash
+# Install shellcheck
+sudo apt-get install shellcheck  # Debian/Ubuntu
+brew install shellcheck          # macOS
+
+# Install shfmt
+go install mvdan.cc/sh/v3/cmd/shfmt@latest
+# or download from https://github.com/mvdan/sh/releases
+```
+
+### Git Hooks
+
+Optional pre-commit hooks are available to automatically check code quality (shellcheck, shfmt) before commits. These hooks are optional for local development as all checks are also enforced in CI.
+
+For installation and usage, see [.git-hooks/README.md](.git-hooks/README.md).
+
 ## ⚠️ Security Considerations
 
 **IMPORTANT: Only use trusted configuration files.**
@@ -259,6 +284,7 @@ shtracer executes shell commands specified in configuration files through the fo
 ```
 
 **For security-sensitive environments, consider:**
+
 * Auditing all configuration files before use
 * Running shtracer in a sandboxed environment (containers, VMs)
 * Implementing organization-specific configuration file approval processes
@@ -270,6 +296,14 @@ shtracer executes shell commands specified in configuration files through the fo
 
 ## ✅ TODO
 
-* Use custom css files for html output.
-* Use OR condition in the extension filter.
+### High Priority
 
+* Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
+* Make a cross-reference table for easy reference
+* Export all trace data in Markdown format.
+
+### Future Enhancements
+
+* Use OR condition in the extension filter
+* Use custom CSS files for HTML output
+* Support Excel/CSV export formats

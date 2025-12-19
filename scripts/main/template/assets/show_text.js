@@ -14,7 +14,7 @@ const files = {
 
 /**
  * @brief Show text data in the right side of the output html (text-container).
- * @param event          : [MoueseEvent]
+ * @param event          : [MouseEvent]
  * @param fileName       : [str] filename used in files (different from the real filename).
  * @param highlightLine  : [int] a line number to highlight
  * @param language       : [str] language for syntax highlighting (highlight.js)
@@ -23,30 +23,52 @@ function showText(event, fileName, highlightLine, language) {
   event.preventDefault();
   const file = files[fileName];
   const textContainer = document.getElementById('text-container');
-  const lines = file.content.split('\n');
-  const highlightedText = lines.map((line, index) => {
-    let encodedLine;
+  const outputElement = document.getElementById("file-information");
 
+  // Decode Base64 content (UTF-8 compatible)
+  const binaryString = atob(file.contentBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const content = new TextDecoder('utf-8').decode(bytes);
+
+  // Skip syntax highlighting for markdown files
+  let highlightedContent;
+  if (language === 'md' || language === 'markdown' || language === 'txt') {
+    // For markdown and text files, escape HTML and add basic formatting
+    highlightedContent = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+      // Add color to markdown headings
+      .replace(/^(#{1,6})\s+(.+)$/gm, '<span style="color: #0969da; font-weight: bold;">$1 $2</span>');
+  } else {
+    // For code files, use syntax highlighting
     if (hljs.getLanguage(language)) {
-      encodedLine = hljs.highlight(line, { language }).value;
+      highlightedContent = hljs.highlight(content, { language }).value;
+    } else {
+      highlightedContent = hljs.highlightAuto(content).value;
     }
-    else {
-      encodedLine = hljs.highlightAuto(line).value;
-    }
+  }
 
-    return (index === highlightLine)
-      ? `<span class="highlight-line">${encodedLine}</span>`
-      : encodedLine;
-  }).join('\n');
+  // Split the highlighted HTML into lines and add highlight-line class to the target line
+  // Note: highlightLine is 1-based (human-readable line number), but array index is 0-based
+  const lines = highlightedContent.split('\n');
+  const finalText = lines.map((line, index) => {
+    const lineClass = (index === highlightLine - 1) ? ' class="highlight-line"' : '';
+    return `<div${lineClass}>${line || '&#8203;'}</div>`;
+  }).join('');
 
-  textContainer.innerHTML = `<pre><code class="hljs">${highlightedText}</code></pre>`;
+  textContainer.innerHTML = `<pre><code class="hljs">${finalText}</code></pre>`;
 
   const highlightedElement = textContainer.querySelector('.highlight-line');
   if (highlightedElement) {
     highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  const outputElement = document.getElementById("file-information");
   outputElement.textContent = file.path;
 }
 

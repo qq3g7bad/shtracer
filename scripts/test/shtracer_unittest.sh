@@ -1,18 +1,21 @@
 #!/bin/sh
 
 # Source test targets
+# shellcheck source=../../shtracer
 . "../../shtracer"
+# shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
-sh -c "./shtracer_func_test.sh"
-sh -c "./shtracer_html_test.sh"
+sh -c "./shtracer_func_unittest.sh"
+sh -c "./shtracer_html_unittest.sh"
+sh -c "./shtracer_integration_test.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : $0"
+	echo " UNIT TEST : $0"
 	echo "----------------------------------------"
 }
 
@@ -21,8 +24,8 @@ oneTimeSetUp() {
 #
 setUp() {
 	set +u
-	SCRIPT_DIR="../../"
-	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	export SCRIPT_DIR="../../"
+	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 }
 
 ##
@@ -130,7 +133,7 @@ test_error_exit() {
 		)"
 		# Assert ----------
 		assertEquals 2 "$?"
-		assertEquals "[shtracer_test.sh][error][function_name]: test_error" "$_RETURN_VALUE"
+		assertEquals "[shtracer_unittest.sh][error][function_name]: test_error" "$_RETURN_VALUE"
 	)
 }
 
@@ -180,7 +183,7 @@ test_parse_arguments_version3() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -261,7 +264,7 @@ test_parse_arguments_undefined_option() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -318,7 +321,7 @@ test_parse_arguments_with_non_existent_config_file() {
 			parse_arguments "non_existent_file" 2>&1
 		)"
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][error][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
+		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
 	)
 }
 
@@ -349,7 +352,7 @@ test_main_routine() {
 		set -u
 
 		# Act -------------
-		main_routine "../../sample/config.md" >/dev/null
+		main_routine "./testdata/unit_test/test_config4.md" >/dev/null 2>&1
 		IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 		IFS=' '
 
@@ -383,11 +386,11 @@ test_main_routine_multiple_directories() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')" "[shtracer_test.sh]" # Error occur
+		assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')" "[shtracer_unittest.sh]" # Error occur
 
 	)
 }
@@ -401,11 +404,11 @@ test_main_routine_output_isolated() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "[shtracer_test.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_unittest.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
@@ -419,7 +422,7 @@ test_main_routine_invalid_config_paths() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/wrong_config.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/wrong_config.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -434,4 +437,46 @@ test_main_routine_invalid_config_paths() {
 	)
 }
 
+##
+# @brief  Test for verify mode - extra scripts should not output
+# @tag    @UT1.22@ (FROM: @IMP1.4@)
+test_verify_mode_suppresses_extra_script_output() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+		# Run in verify mode and capture all output
+		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" "-v" 2>&1)"
+
+		# Assert ----------
+		# Should NOT contain pre-extra-script or post-extra-script output
+		echo "$_RETURN" | grep -q "pre-extra-script"
+		assertNotEquals 0 "$?"
+
+		echo "$_RETURN" | grep -q "post-extra-script"
+		assertNotEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for normal mode - extra scripts should output
+# @tag    @UT1.23@ (FROM: @IMP1.4@)
+test_normal_mode_shows_extra_script_output() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+		# Run in normal mode and capture stderr
+		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" 2>&1)"
+
+		# Assert ----------
+		# Should contain pre-extra-script or post-extra-script output
+		echo "$_RETURN" | grep -q "pre-extra-script\|post-extra-script"
+		assertEquals 0 "$?"
+	)
+}
+
+# shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

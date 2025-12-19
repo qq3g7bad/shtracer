@@ -3,7 +3,9 @@
 # Source test target
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# shellcheck source=../main/shtracer_func.sh
 . "../main/shtracer_func.sh"
+# shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
 ##
@@ -21,10 +23,10 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
-	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
-	NODATA_STRING="NONE"
-	OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
-	CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
+	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	export NODATA_STRING="NONE"
+	export OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
+	export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
 	cd "${SCRIPT_DIR}" || exit 1
 }
 
@@ -44,7 +46,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/test_config1.md")"
+		_RETURN_VALUE="$(check_configfile "./testdata/unit_test/test_config1.md")"
 
 		# Assert ----------
 
@@ -58,7 +60,7 @@ test_check_configfile() {
 		assertEquals "01_config_table" "${_RETURN_VALUE##*/}"
 
 		# config table
-		_ANSWER="$(cat ./testdata/answer/config/config_table)"
+		_ANSWER="$(cat ./testdata/answer/unit_test/config/config_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/01_config_table")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
@@ -84,7 +86,7 @@ test_extract_tags_without_argument() {
 		)"
 
 		# output filename
-		assertEquals "[shtracer_func_test.sh][error][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
+		assertEquals "[shtracer_func_unittest.sh][error][extract_tags]: Cannot find a config output data." "${_RETURN_VALUE##*/}"
 	)
 }
 
@@ -94,9 +96,12 @@ test_extract_tags_without_argument() {
 test_extract_tags() {
 	(
 		# Arrange ---------
+		# shellcheck disable=SC2030  # Intentional subshell modification for test isolation
+		export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/unit_test/"
+
 		# Act -------------
 
-		_RETURN_VALUE="$(extract_tags "./testdata/answer/config/config_table")"
+		_RETURN_VALUE="$(extract_tags "./testdata/answer/unit_test/config/config_table")"
 
 		# Assert ----------
 
@@ -110,7 +115,7 @@ test_extract_tags() {
 		assertEquals "01_tags" "${_RETURN_VALUE##*/}"
 
 		# Level1
-		_ANSWER="$(awk <"./testdata/answer/tags/tags" -F"$SHTRACER_SEPARATOR" '
+		_ANSWER="$(awk <"./testdata/answer/unit_test/tags/tags" -F"$SHTRACER_SEPARATOR" '
 			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
 			{
 				cmd	=	"basename	\""$5"\"";	cmd	|	getline	filename_result;	close(cmd)
@@ -143,8 +148,8 @@ test_join_tag_pairs_with_valid_arguments() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/tags"
-		echo "@TAG1@" > "$OUTPUT_DIR/tags/test_table"
-		echo "@TAG1@ @TAG2@" > "$OUTPUT_DIR/tags/test_downstream"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table"
+		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_downstream"
 
 		# Act -------------
 		join_tag_pairs "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_downstream"
@@ -171,18 +176,72 @@ test_join_tag_pairs_with_non_existent_file() {
 }
 
 ##
+# @brief  Test for join_tag_pairs with circular reference
+# @tag    @UT2.4.3@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_circular_reference() {
+	(
+		# Arrange ---------
+		# Create a circular reference scenario
+		# TAG1 -> TAG2 -> TAG1 (circular)
+		mkdir -p "$OUTPUT_DIR/tags"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table_circular"
+		{
+			echo "@TAG1@ @TAG2@"
+			echo "@TAG2@ @TAG1@"
+		} >"$OUTPUT_DIR/tags/test_downstream_circular"
+
+		# Act -------------
+		join_tag_pairs "$OUTPUT_DIR/tags/test_table_circular" "$OUTPUT_DIR/tags/test_downstream_circular" 2>"$OUTPUT_DIR/error_output.txt"
+		_EXIT_CODE=$?
+		_ERROR_OUTPUT="$(cat "$OUTPUT_DIR/error_output.txt")"
+
+		# Assert ----------
+		assertEquals 1 "$_EXIT_CODE"
+		assertContains "$_ERROR_OUTPUT" "Circular reference detected"
+	)
+}
+
+##
+# @brief  Test for join_tag_pairs with deep recursion but no circular reference
+# @tag    @UT2.4.4@ (FROM: @IMP2.4@)
+test_join_tag_pairs_with_deep_recursion() {
+	(
+		# Arrange ---------
+		# Create a deep but valid chain: TAG1 -> TAG2 -> TAG3 -> TAG4 -> TAG5
+		mkdir -p "$OUTPUT_DIR/tags"
+		echo "@TAG1@" >"$OUTPUT_DIR/tags/test_table_deep"
+		{
+			echo "@TAG1@ @TAG2@"
+			echo "@TAG2@ @TAG3@"
+			echo "@TAG3@ @TAG4@"
+			echo "@TAG4@ @TAG5@"
+		} >"$OUTPUT_DIR/tags/test_downstream_deep"
+
+		# Act -------------
+		join_tag_pairs "$OUTPUT_DIR/tags/test_table_deep" "$OUTPUT_DIR/tags/test_downstream_deep" 2>/dev/null
+		_EXIT_CODE=$?
+		_RESULT="$(cat "$OUTPUT_DIR/tags/test_table_deep")"
+
+		# Assert ----------
+		assertEquals 0 "$_EXIT_CODE"
+		assertContains "$_RESULT" "@TAG1@"
+		assertContains "$_RESULT" "@TAG5@"
+	)
+}
+
+##
 # @brief  Test for make_tag_table
 # @tag    @UT2.5@ (FROM: @IMP2.3@)
 test_make_tag_table() {
 	(
 		# Arrange ---------
 		# Act -------------
-		make_tag_table "./testdata/answer/tags/tags" >/dev/null
+		make_tag_table "./testdata/answer/unit_test/tags/tags" >/dev/null
 
 		# Assert ----------
 		assertEquals 0 "$?"
 
-		_ANSWER="$(cat ./testdata/answer/tags/tag_table)"
+		_ANSWER="$(cat ./testdata/answer/unit_test/tags/tag_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/04_tag_table")"
 	)
 }
@@ -208,7 +267,7 @@ test_make_tag_table_with_empty_file() {
 	(
 		# Arrange ---------
 		# Act -------------
-		(make_tag_table "./testdata/empty" >/dev/null 2>&1)
+		(make_tag_table "./testdata/unit_test/empty" >/dev/null 2>&1)
 
 		# Assert ----------
 		assertEquals 1 "$?"
@@ -250,17 +309,18 @@ test_swap_tags_with_non_existent_file() {
 test_swap_tags_with_valid_arguments() {
 	(
 		# Arrange ---------
+		# shellcheck disable=SC2031  # CONFIG_DIR modification is intentional in test subshell
 		_ORIGINAL_CONFIG_DIR="$CONFIG_DIR"
 		mkdir -p "$OUTPUT_DIR/test_swap/testdata"
 		CONFIG_DIR="$OUTPUT_DIR/test_swap"
 
 		# Create test file with tags
-		echo "<!-- @OLD_TAG@ -->" > "$OUTPUT_DIR/test_swap/testdata/testswap.md"
-		echo "Test content" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
-		echo "<!-- @OLD_TAG@ -->" >> "$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "<!-- @OLD_TAG@ -->" >"$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "Test content" >>"$OUTPUT_DIR/test_swap/testdata/testswap.md"
+		echo "<!-- @OLD_TAG@ -->" >>"$OUTPUT_DIR/test_swap/testdata/testswap.md"
 
 		# Create test config table
-		echo ":Test${SHTRACER_SEPARATOR}testdata/testswap.md${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}" > "$OUTPUT_DIR/test_swap/config_table"
+		echo ":Test${SHTRACER_SEPARATOR}testdata/testswap.md${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}${SHTRACER_SEPARATOR}" >"$OUTPUT_DIR/test_swap/config_table"
 
 		# Act -------------
 		swap_tags "$OUTPUT_DIR/test_swap/config_table" "@OLD_TAG@" "@NEW_TAG@"
@@ -300,9 +360,8 @@ test_print_verification_result_with_isolated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
-		echo "@ISOLATED_TAG@" > "$OUTPUT_DIR/verified/isolated"
-		touch "$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+		echo "@ISOLATED_TAG@" >"$OUTPUT_DIR/verified/isolated"
+		_INPUT="$OUTPUT_DIR/verified/isolated"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
@@ -319,9 +378,9 @@ test_print_verification_result_with_duplicated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
-		touch "$OUTPUT_DIR/verified/isolated"
-		echo "@DUPLICATE_TAG@" > "$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
+		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
+		_INPUT="$OUTPUT_DIR/verified/duplicated"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
@@ -331,4 +390,5 @@ test_print_verification_result_with_duplicated() {
 	)
 }
 
+# shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

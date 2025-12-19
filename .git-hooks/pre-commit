@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Pre-commit hook for shtracer project
+# This hook runs shellcheck and shfmt on staged shell script files
+#
+# To enable this hook:
+#   ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
+#
+# To bypass this hook (not recommended):
+#   git commit --no-verify
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# Get list of staged shell script files (exclude shunit2 submodule)
+STAGED_SH_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(sh)$|^shtracer$' | grep -v 'shunit2/' || true)
+
+if [ -z "$STAGED_SH_FILES" ]; then
+  echo "No shell script files to check."
+  exit 0
+fi
+
+# Check if shellcheck is installed
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "Warning: shellcheck is not installed. Skipping shellcheck."
+else
+  echo "Running shellcheck..."
+  for file in $STAGED_SH_FILES; do
+    if [ -f "$file" ]; then
+      echo "  Checking $file"
+      shellcheck "$file" || {
+        echo "Shellcheck failed for $file"
+        echo "Please fix the issues above or use 'git commit --no-verify' to bypass."
+        exit 1
+      }
+    fi
+  done
+  echo "Shellcheck passed!"
+fi
+
+# Check if shfmt is installed
+if ! command -v shfmt >/dev/null 2>&1; then
+  echo "Warning: shfmt is not installed. Skipping formatting check."
+  echo "Install shfmt: https://github.com/mvdan/sh#shfmt"
+else
+  echo "Checking formatting with shfmt..."
+  for file in $STAGED_SH_FILES; do
+    if [ -f "$file" ]; then
+      echo "  Checking $file"
+      if ! shfmt -d -ci -bn "$file" >/dev/null 2>&1; then
+        echo "Formatting issues found in $file"
+        echo "Run 'shfmt -w -ci -bn $file' to fix."
+        echo "Or use 'git commit --no-verify' to bypass."
+        exit 1
+      fi
+    fi
+  done
+  echo "Formatting check passed!"
+fi
+
+echo "All pre-commit checks passed!"
+exit 0

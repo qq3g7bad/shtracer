@@ -4,7 +4,9 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "${SCRIPT_DIR}" || exit 1
 
+# shellcheck source=../main/shtracer_html.sh
 . "../main/shtracer_html.sh"
+# shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
 ##
@@ -22,10 +24,10 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
-	NODATA_STRING="NONE"
-	OUTPUT_DIR="./output/"
-	CONFIG_DIR="./testdata/"
-	SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	export NODATA_STRING="NONE"
+	export OUTPUT_DIR="./output/"
+	export CONFIG_DIR="./testdata/"
+	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
 }
 
@@ -66,7 +68,7 @@ test_make_target_flowchart_with_valid_config() {
 		# Arrange ---------
 		SCRIPT_DIR="../../"
 		mkdir -p "$OUTPUT_DIR/config"
-		echo ":Requirement" > "$OUTPUT_DIR/config/test_config"
+		echo ":Requirement" >"$OUTPUT_DIR/config/test_config"
 
 		# Act -------------
 		_RESULT="$(make_target_flowchart "$OUTPUT_DIR/config/test_config")"
@@ -74,7 +76,10 @@ test_make_target_flowchart_with_valid_config() {
 		# Assert ----------
 		assertEquals 0 "$?"
 		assertNotEquals "" "$_RESULT"
-		assertEquals 0 "$([ -f "$_RESULT" ]; echo "$?")"
+		assertEquals 0 "$(
+			[ -f "$_RESULT" ]
+			echo "$?"
+		)"
 		assertNotEquals "" "$(grep "flowchart TB" "$_RESULT")"
 	)
 }
@@ -106,9 +111,9 @@ test_convert_template_html_with_valid_inputs() {
 		SCRIPT_DIR="../../"
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
-		echo "@TAG1@ @TAG2@" > "$OUTPUT_DIR/tags/test_table"
-		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" > "$OUTPUT_DIR/tags/test_info"
-		echo "flowchart TB" > "$OUTPUT_DIR/uml/test_uml"
+		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
+		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
+		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 		_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 
 		# Act -------------
@@ -129,11 +134,11 @@ test_convert_template_js_with_valid_inputs() {
 		# Arrange ---------
 		SCRIPT_DIR="../../"
 		mkdir -p "$OUTPUT_DIR/test_dir"
-		echo "test content" > "$OUTPUT_DIR/test_dir/test_file.md"
+		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 
 		# Use absolute path for test file
 		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
-		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" > "$OUTPUT_DIR/test_info"
+		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
 		_TEMPLATE_ASSETS_DIR="${SCRIPT_DIR%/}/scripts/main/template/assets"
 
 		# Act -------------
@@ -159,22 +164,32 @@ test_make_html_with_valid_inputs() {
 	(
 		# Arrange ---------
 		SCRIPT_DIR="../../"
-		CONFIG_PATH="./testdata/test_config1.md"
+		export CONFIG_PATH="./testdata/unit_test/test_config1.md"
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
-		echo "@TAG1@ @TAG2@" > "$OUTPUT_DIR/tags/test_table"
-		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./testdata/testdata1.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" > "$OUTPUT_DIR/tags/test_tags"
-		echo "flowchart TB" > "$OUTPUT_DIR/uml/test_uml"
+		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
+		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./testdata/unit_test/testdata1.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
+		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 
 		# Act -------------
 		make_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_tags" "$OUTPUT_DIR/uml/test_uml"
 
 		# Assert ----------
 		assertEquals 0 "$?"
-		assertEquals 0 "$([ -f "$OUTPUT_DIR/output.html" ]; echo "$?")"
-		assertEquals 0 "$([ -f "$OUTPUT_DIR/assets/show_text.js" ]; echo "$?")"
-		assertEquals 0 "$([ -f "$OUTPUT_DIR/assets/template.css" ]; echo "$?")"
+		assertEquals 0 "$(
+			[ -f "$OUTPUT_DIR/output.html" ]
+			echo "$?"
+		)"
+		assertEquals 0 "$(
+			[ -f "$OUTPUT_DIR/assets/show_text.js" ]
+			echo "$?"
+		)"
+		assertEquals 0 "$(
+			[ -f "$OUTPUT_DIR/assets/template.css" ]
+			echo "$?"
+		)"
 	)
 }
 
+# shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

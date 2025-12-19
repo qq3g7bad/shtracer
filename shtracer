@@ -9,10 +9,12 @@ SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
 SHTRACER_SEPARATOR="<shtracer_separator>"
-NODATA_STRING="NONE"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
+
+# Export variables used in external scripts
+export NODATA_STRING="NONE"
+export OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 ##
 # @}
 #
@@ -23,8 +25,11 @@ OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
 load_functions() {
 	_PREVIOUS_DIR="$(pwd)"
 	cd "${SCRIPT_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
+	# shellcheck source=scripts/main/shtracer_util.sh
 	. "./scripts/main/shtracer_util.sh"
+	# shellcheck source=scripts/main/shtracer_func.sh
 	. "./scripts/main/shtracer_func.sh"
+	# shellcheck source=scripts/main/shtracer_html.sh
 	. "./scripts/main/shtracer_html.sh"
 	cd "${_PREVIOUS_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
 }
@@ -59,7 +64,7 @@ print_usage() {
 		  - The <configfile> argument must always be specified before options.
 
 		Version:
-		  - 0.0.3
+		  - 0.1.1
 
 	USAGE
 	exit 1
@@ -70,33 +75,33 @@ print_usage() {
 # @tag    @IMP1.3@ (FROM: @ARC1.2@)
 parse_arguments() {
 	case "$#${1:-}${2:-}${3:-}${4:-}" in
-	1-h | 1-v | 1--help | 1--version) # Print usage
-		print_usage
-		;;
-	1-t) # Test mode
-		SHTRACER_MODE='TEST'
-		return
-		;;
-	1-*) # Undefined option
-		error_exit 1 "parse_arguments" "Invalid argument"
-		;;
-	1*) # Normal mode
-		SHTRACER_MODE='NORMAL'
-		;;
-	2*-C) # Normal mode with color
-		SHTRACER_MODE='NORMAL'
-		;;
-	2*-v) # Verify mode
-		SHTRACER_MODE='VERIFY'
-		;;
-	4*-c*) # Change mode
-		SHTRACER_MODE='CHANGE'
-		BEFORE_TAG="$3"
-		AFTER_TAG="$4"
-		;;
-	*)
-		error_exit 1 "parse_arguments" "Invalid argument"
-		;;
+		1-h | 1-v | 1--help | 1--version) # Print usage
+			print_usage
+			;;
+		1-t) # Test mode
+			SHTRACER_MODE='TEST'
+			return
+			;;
+		1-*) # Undefined option
+			error_exit 1 "parse_arguments" "Invalid argument"
+			;;
+		1*) # Normal mode
+			SHTRACER_MODE='NORMAL'
+			;;
+		2*-C) # Normal mode with color
+			SHTRACER_MODE='NORMAL'
+			;;
+		2*-v) # Verify mode
+			SHTRACER_MODE='VERIFY'
+			;;
+		4*-c*) # Change mode
+			SHTRACER_MODE='CHANGE'
+			BEFORE_TAG="$3"
+			AFTER_TAG="$4"
+			;;
+		*)
+			error_exit 1 "parse_arguments" "Invalid argument"
+			;;
 	esac
 
 	# Check if config file exists
@@ -120,6 +125,9 @@ main_routine() {
 	init_environment
 	parse_arguments "$@"
 
+	# Export mode for use in sub-functions
+	export SHTRACER_MODE
+
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
 		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
@@ -127,7 +135,7 @@ main_routine() {
 
 	# Test mode
 	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_test.sh"
+		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./shtracer_unittest.sh"
 		return 0
 	fi
 
@@ -154,15 +162,19 @@ main_routine() {
 	fi
 
 	if print_verification_result "$_VERIFICATION_FILENAME"; then
-		cat "$_TAG_TABLE_FILENAME"
+		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+			:
+		else
+			cat "$_TAG_TABLE_FILENAME"
+		fi
 	fi
 }
 
 case "$0" in
-*shtracer)
-	main_routine "$@"
-	;;
-*)
-	:
-	;;
+	*shtracer)
+		main_routine "$@"
+		;;
+	*)
+		:
+		;;
 esac

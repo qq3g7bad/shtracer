@@ -4,16 +4,16 @@
 _SHTRACER_FUNC_SH=""
 
 case "$0" in
-*shtracer)
-	: # Successfully sourced from shtracer.
-	;;
-*shtracer*test*)
-	: # Successfully sourced from shtracer.
-	;;
-*)
-	echo "This script should only be sourced, not executed directly."
-	exit 1
-	;;
+	*shtracer)
+		: # Successfully sourced from shtracer.
+		;;
+	*shtracer*test*)
+		: # Successfully sourced from shtracer.
+		;;
+	*)
+		echo "This script should only be sourced, not executed directly."
+		exit 1
+		;;
 esac
 
 ##
@@ -38,10 +38,16 @@ _check_config_remove_comments() {
 		/-->/ && in_comment { in_comment=0; next }
 		/<!--/,/-->/ { if (in_comment) next }
 		!in_comment { print }
-		' |
-		sed '/^[[:space:]]*$/d' |    # Delete empty lines
-		sed 's/^[[:space:]]*\* //' | # Delete start spaces
-		sed 's/[[:space:]]*$//' |    # Delete end spaces
+		' \
+		| sed '/^[[:space:]]*$/d' \
+		|
+		# Delete empty lines
+		sed 's/^[[:space:]]*\* //' \
+		|
+		# Delete start spaces
+		sed 's/[[:space:]]*$//' \
+		|
+		# Delete end spaces
 		sed 's/\*\*\(.*\)\*\*:/\1:/'
 }
 
@@ -55,10 +61,10 @@ _check_config_convert_to_table() {
 	_CONFIG_TABLE="$2"
 
 	# Convert sections to lines
-	echo "$_CONFIG_CONTENT" |
-		sed 's/:/'"$SHTRACER_SEPARATOR"'/;
-					s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' |
-		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
+	echo "$_CONFIG_CONTENT" \
+		| sed 's/:/'"$SHTRACER_SEPARATOR"'/;
+					s/[[:space:]]*'"$SHTRACER_SEPARATOR"'[[:space:]]*/'"$SHTRACER_SEPARATOR"'/' \
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '\
 			function print_data() {
 				print \
 					a["TITLE"],
@@ -109,7 +115,7 @@ _check_config_convert_to_table() {
 }
 
 ##
-# @brief
+# @brief  Parse config markdown file and convert to tab-separated table format
 # @param  $1 : CONFIG_MARKDOWN_PATH
 # @return CONFIG_OUTPUT_DATA
 # @tag    @IMP2.1@ (FROM: @ARC2.1@)
@@ -238,9 +244,19 @@ _extract_tags_process_files() {
 	_FROM_TAG_START="FROM:"
 	_FROM_TAG_REGEX="\(""$_FROM_TAG_START"".*\)"
 
-	echo "$1" |
-		awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
-			# For title offset, extract only the offset line
+	# Process each discovered file to extract tags and associated information
+	# AWK: Parse config line by line, read each target file, extract tags with context
+	# Process:
+	#   1. Parse config fields (title, path, tag format, offset)
+	#   2. Execute pre-extra-script if specified
+	#   3. Scan file line by line:
+	#      - When tag pattern matches: extract tag ID and FROM tags
+	#      - Count down from TAG_TITLE_OFFSET to find associated title
+	#      - Capture file path and line number for reference
+	#   4. Execute post-extra-script if specified
+	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
+	echo "$1" \
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
 			{
 				title = $1
 				path = $2
@@ -251,7 +267,28 @@ _extract_tags_process_files() {
 				post_extra_script = $10
 
 				# Execute pre_extra_script
-				system(pre_extra_script)
+				# Suppress output in verify mode
+				if (pre_extra_script != "") {
+					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
+						system(pre_extra_script " >/dev/null 2>&1")
+					} else {
+						system(pre_extra_script)
+					}
+				}
+
+				# Calculate absolute path once per file (optimization for Windows/Git Bash)
+				filename = path; gsub(".*/", "", filename);
+				dirname = path; gsub("/[^/]*$", "", dirname)
+				if (dirname == "") dirname = "."
+				cmd = "cd \""dirname"\" 2>/dev/null && pwd";
+				if ((cmd | getline absolute_path) > 0) {
+					close(cmd)
+					absolute_file_path = absolute_path "/" filename
+				} else {
+					close(cmd)
+					# Fallback if cd fails
+					absolute_file_path = path
+				}
 
 				line_num = 0
 				counter = -1
@@ -284,13 +321,7 @@ _extract_tags_process_files() {
 					if (counter == 0) {
 						sub(/^#+[[:space:]]*/, "", line)
 						printf("%s%s", line, separator)                        # column 4: title
-
-						filename = path; gsub(".*/", "", filename);
-						dirname = path; gsub("/[^/]*$", "", dirname)
-						cmd = "cd "dirname";PWD=\"$(pwd)\"; \
-							echo \"${PWD%/}/\""; \
-							cmd | getline absolute_path; close(cmd)
-						printf("%s%s%s", absolute_path, filename, separator)   # column 5: file absolute path
+						printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
 						printf("%s%s", line_num, separator)                    # column 6: line number including title
 						printf("%s\n", NR, separator)                          # column 7: file num
 					}
@@ -300,13 +331,20 @@ _extract_tags_process_files() {
 
 				}
 				# Execute post_extra_script
-				system(post_extra_script)
+				# Suppress output in verify mode
+				if (post_extra_script != "") {
+					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
+						system(post_extra_script " >/dev/null 2>&1")
+					} else {
+						system(post_extra_script)
+					}
+				}
 			}
 			' >"$2"
 }
 
 ##
-# @brief
+# @brief  Extract traceability tags and their relationships from all target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @return TAG_OUTPUT_DATA
 # @tag    @IMP2.2@ (FROM: @ARC2.2@)
@@ -346,7 +384,69 @@ extract_tags() {
 }
 
 ##
-# @brief
+# @brief   Prepare upstream tag table (starting points with no parents)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for TAG_TABLE
+# @return  None (writes to file)
+_prepare_upstream_table() {
+	# Extract tags that have NODATA_STRING as parent (starting points)
+	# Pipeline: grep for NONE tags → sort → remove NONE field → trim → remove empty lines
+	grep "^$NODATA_STRING" "$1" \
+		| sort \
+		| awk '{$1=""; print $0}' \
+		| sed 's/^[[:space:]]*//' \
+		| sed '/^$/d' >"$2"
+}
+
+##
+# @brief   Prepare downstream tag table (tags with parents)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for TAG_PAIRS_DOWNSTREAM
+# @return  None (writes to file)
+_prepare_downstream_table() {
+	# Extract tags that have actual parents (not NONE)
+	# Pipeline: grep -v to exclude NONE tags → sort → remove empty lines
+	grep -v "^$NODATA_STRING" "$1" \
+		| sort \
+		| sed '/^$/d' >"$2"
+}
+
+##
+# @brief   Verify and detect duplicated tags
+# @param   $1 : TAG_OUTPUT_DATA file path
+# @param   $2 : Output file path for duplicates
+# @return  None (writes to file)
+_verify_duplicated_tags() {
+	# Extract all tag IDs, sort them, and find duplicates
+	# AWK: Extract tag field ($2) → sort → uniq -d finds duplicates
+	awk <"$1" \
+		-F"$SHTRACER_SEPARATOR" \
+		'{
+			print $2
+		 }' \
+		| sort \
+		| uniq -d >"$2"
+}
+
+##
+# @brief   Detect isolated FROM tags (tags not referenced anywhere)
+# @param   $1 : TAG_PAIRS file path
+# @param   $2 : Output file path for isolated tags
+# @return  None (writes to file)
+_detect_isolated_tags() {
+	# Find tags that appear only once in the entire tag pairs list
+	# Pipeline: print both columns (with $2 twice for weighting) → sort →
+	#           uniq -u finds unique → add NONE prefix → remove empty → extract tag
+	awk <"$1" '{print $1; print $2; print $2}' \
+		| sort \
+		| uniq -u \
+		| sed 's/^/'"$NODATA_STRING"' /' \
+		| sed '/^$/d' \
+		| awk '{print $2}' >"$2"
+}
+
+##
+# @brief  Create tag relationship pairs and build complete traceability matrix
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
 # @tag    @IMP2.3@ (FROM: @ARC2.2@)
@@ -367,6 +467,10 @@ make_tag_table() {
 		mkdir -p "$_TAG_OUTPUT_DIR"
 		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR"
 
+		# Parse tag relationships into pairs
+		# AWK: Split FROM tags (field $3, comma-separated) and pair with TO tag (field $2)
+		# Input: TAG_ID <sep> FROM_TAG1,FROM_TAG2 <sep> ...
+		# Output: FROM_TAG1 TAG_ID\nFROM_TAG2 TAG_ID (space-separated pairs)
 		awk <"$1" \
 			-F"$SHTRACER_SEPARATOR" \
 			'{
@@ -377,17 +481,9 @@ make_tag_table() {
 				}
 		}' >"$_TAG_PAIRS"
 
-		# Prepare upstream table (starting point)
-		grep "^$NODATA_STRING" "$_TAG_PAIRS" |
-			sort |
-			awk '{$1=""; print $0}' |
-			sed 's/^[[:space:]]*//' |
-			sed '/^$/d' >"$_TAG_TABLE"
-
-		# Prepare downstream tag table
-		grep -v "^$NODATA_STRING" "$_TAG_PAIRS" |
-			sort |
-			sed '/^$/d' >"$_TAG_PAIRS_DOWNSTREAM"
+		# Prepare upstream and downstream tables
+		_prepare_upstream_table "$_TAG_PAIRS" "$_TAG_TABLE"
+		_prepare_downstream_table "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
 		# Make joined tag table (each row has a single trace tag chain)
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
@@ -400,40 +496,39 @@ make_tag_table() {
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
 
-		# [Verify] Duplicated tags
-		awk <"$1" \
-			-F"$SHTRACER_SEPARATOR" \
-			'{
-				print $2
-			 }' |
-			sort |
-			uniq -d >"$_TAG_TABLE_DUPLICATED"
-
-		# [Verify] Detect isolated FROM_TAG
-		awk <"$_TAG_PAIRS" '{print $1; print $2; print $2}' |
-			sort |
-			uniq -u |
-			sed 's/^/'"$NODATA_STRING"' /' |
-			sed '/^$/d' |
-			awk '{print $2}' >"$_ISOLATED_FROM_TAG"
+		# Verify tag integrity (duplicates and isolated tags)
+		_verify_duplicated_tags "$1" "$_TAG_TABLE_DUPLICATED"
+		_detect_isolated_tags "$_TAG_PAIRS" "$_ISOLATED_FROM_TAG"
 
 		echo "$_TAG_TABLE$SHTRACER_SEPARATOR$_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
 	)
 }
 
 ##
-# @brief
+# @brief  Recursively join tag pairs to build complete traceability chains
 # @param  $1 : filename of the tag table
 # @param  $2 : filename of tag pairs without starting points
+# @param  $3 : (optional) current recursion depth (default: 0)
 # @tag    @IMP2.4@ (FROM: @ARC2.3@)
 join_tag_pairs() {
 	(
-		if [ ! -r "$1" ] || [ ! -r "$2" ] || [ $# -ne 2 ]; then
+		if [ ! -r "$1" ] || [ ! -r "$2" ]; then
+			error_exit 1 "join_tag_pairs" "Incorrect argument."
+		fi
+
+		if [ $# -lt 2 ] || [ $# -gt 3 ]; then
 			error_exit 1 "join_tag_pairs" "Incorrect argument."
 		fi
 
 		_TAG_TABLE="$1"
 		_TAG_TABLE_DOWNSTREAM="$2"
+		_DEPTH="${3:-0}"
+		_MAX_DEPTH=100
+
+		# Check for circular reference by depth limit
+		if [ "$_DEPTH" -ge "$_MAX_DEPTH" ]; then
+			error_exit 1 "join_tag_pairs" "Circular reference detected: Maximum recursion depth ($_MAX_DEPTH) exceeded. Please check your tag relationships for cycles (e.g., A -> B -> A)."
+		fi
 
 		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
 		_NF_PLUS1="$((_NF + 1))"
@@ -442,25 +537,26 @@ join_tag_pairs() {
 			error_exit 1 "join_tag_pairs" "Error in join command"
 		fi
 
-		_JOINED_TMP="$(echo "$_JOINED_TMP" |
-			awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' |
-			awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' |
-			sort -k$_NF_PLUS1,$_NF_PLUS1)"
+		_JOINED_TMP="$(echo "$_JOINED_TMP" \
+			| awk '{if($'"$_NF_PLUS1"'=="") $'"$_NF_PLUS1"'="'"$NODATA_STRING"'"; print}' \
+			| awk '{for (i=2; i<=(NF-1); i++){printf("%s ", $i)}; printf("%s %s\n", $1, $NF)}' \
+			| sort -k$_NF_PLUS1,$_NF_PLUS1)"
 
-		_IS_LAST="$(echo "$_JOINED_TMP" |
-			awk '{if($NF != "'"$NODATA_STRING"'"){a=1}}END{if(a==1){print 0}else{print 1}}')"
+		_IS_LAST="$(echo "$_JOINED_TMP" \
+			| awk '{if($NF != "'"$NODATA_STRING"'"){a=1}}END{if(a==1){print 0}else{print 1}}')"
 
 		if [ "$_IS_LAST" -eq 1 ]; then
 			return
 		else
 			echo "$_JOINED_TMP" >"$_TAG_TABLE"
-			join_tag_pairs "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM"
+			_NEXT_DEPTH=$((_DEPTH + 1))
+			join_tag_pairs "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM" "$_NEXT_DEPTH"
 		fi
 	)
 }
 
 ##
-# @brief
+# @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
@@ -483,7 +579,7 @@ print_verification_result() {
 }
 
 ##
-# @brief
+# @brief  Swap or rename tags across all trace target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
@@ -507,8 +603,8 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		_FILE_LIST="$(echo "$_TARGET_DATA" |
-			while read -r _DATA; do
+		_FILE_LIST="$(echo "$_TARGET_DATA" \
+			| while read -r _DATA; do
 				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
 				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
 				cd "$CONFIG_DIR" || error_exit 1 "swat_tags" "Cannot change directory to config path"
@@ -518,9 +614,9 @@ swap_tags() {
 					_FILE="$_PATH"
 				else # Directory (Check extension: Multiple extensions can be set by grep argument way)
 					_EXTENSION=${_EXTENSION:-*}
-					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null |
-						grep -E "$_EXTENSION" |
-						sed "s@^@$_PATH@")"
+					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null \
+						| grep -E "$_EXTENSION" \
+						| sed "s@^@$_PATH@")"
 
 					if [ "$(echo "$_FILE" | sed '/^$/d' | wc -l)" -eq 0 ]; then
 						return # There are no files to match specified extension.
@@ -531,9 +627,9 @@ swap_tags() {
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
-			echo "$_FILE_LIST" |
-				sort -u |
-				while read -r t; do
+			echo "$_FILE_LIST" \
+				| sort -u \
+				| while read -r t; do
 					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
 					sed -i "s/${3}/${2}/g" "$t"
 					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
@@ -541,4 +637,3 @@ swap_tags() {
 		)
 	)
 }
-

@@ -22,9 +22,10 @@ chmod +x ./scripts/test/shtracer*_test.sh
 
 ## Test scripts
 
-filename                | test target
------------------------ | ---------------
-shtracer_test.sh        | `../../shtracer`
-shtracer_func_test.sh   | `../main/shtracer_func.sh`
-shtracer_html_test.sh   | `../main/shtracer_html.sh`
+filename                     | test target
+---------------------------- | ---------------
+shtracer_test.sh             | `../../shtracer`
+shtracer_func_test.sh        | `../main/shtracer_func.sh`
+shtracer_html_test.sh        | `../main/shtracer_html.sh`
+shtracer_integration_test.sh | End-to-end integration tests
 

@@ -2,7 +2,7 @@
 
 ## Requirement
 
-* **PATH**: "../docs/01_requirements.md"                     <!-- It can be a relative or absolute path. If you use a relative path, this file (config.md) is the starting point. -->
+* **PATH**: "../docs/100_requirements.md"                     <!-- It can be a relative or absolute path. If you use a relative path, this file (config.md) is the starting point. -->
   * **BRIEF**: "Describes requirements as specifications."
   * **TAG FORMAT**: `@REQ[0-9\.]+@`                          <!-- Tag format must be written in ERE (Extended regular expressions) and surrounded backquotes for discriminating other comment blocks in markdown. -->
   * **TAG LINE FORMAT**: `<!--.*-->`
@@ -47,7 +47,7 @@
 * **PATH**: "../scripts/test/"
   * **BRIEF**: "All files are shell scripts."
   * **EXTENSION FILTER**: "*.sh"
-  * **IGNORE FILTER**: "shunit2|unittest_sample|testdata|*integration*" <!-- Multiple conditions are acceptable by using "|". -->
+  * **IGNORE FILTER**: "shunit2|unittest_sample" <!-- Multiple conditions are acceptable by using "|". -->
   * **TAG FORMAT**: `@UT[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
 
