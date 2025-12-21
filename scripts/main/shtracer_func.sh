@@ -608,26 +608,26 @@ print_summary_direct_links() {
 		}
 		{
 			# Second pass (main input): 02_tag_pairs (space separated)
-			a = $1
-			b = $2
-			if (a == "" || b == "") { next }
-			if (a == "NONE" || b == "NONE") { next }
-			if (!(a in tag2layer) || !(b in tag2layer)) { next }
-			la = tag2layer[a]
-			lb = tag2layer[b]
+			tagA = $1
+			tagB = $2
+			if (tagA == "" || tagB == "") { next }
+			if (tagA == "NONE" || tagB == "NONE") { next }
+			if (!(tagA in tag2layer) || !(tagB in tag2layer)) { next }
+			la = tag2layer[tagA]
+			lb = tag2layer[tagB]
 			if (la == "" || lb == "") { next }
 			if (la == lb) { next }
 
 			# Undirected: register each endpoint as targeting the other layer (distinct per tag)
-			k1 = a SUBSEP lb
+			k1 = tagA SUBSEP lb
 			if (!(k1 in hasTarget)) {
 				hasTarget[k1] = 1
-				tcnt[a]++
+				tcnt[tagA]++
 			}
-			k2 = b SUBSEP la
+			k2 = tagB SUBSEP la
 			if (!(k2 in hasTarget)) {
 				hasTarget[k2] = 1
-				tcnt[b]++
+				tcnt[tagB]++
 			}
 		}
 		END {
@@ -732,23 +732,13 @@ make_json() {
 
 		# Generate nodes array from 01_tags
 		printf '  "nodes": [\n'
-		awk -v sep="$SHTRACER_SEPARATOR" '
-		BEGIN { FS = "(\\t|" sep ")"; first=1 }
-		# Skip header row if present
-		$1 == "trace_target" && $2 == "tag_id" { next }
-		NF >= 5 {
+		awk -F"$SHTRACER_SEPARATOR" '
+		BEGIN { first=1 }
+		NF >= 6 {
 			if (!first) printf ",\n"
 			first=0
 			# Escape quotes and backslashes in description
-			if (NF >= 6) {
-				desc = $4
-				file = $5
-				line = $6
-			} else {
-				desc = $3
-				file = $4
-				line = $5
-			}
+			desc = $4
 			gsub(/"/, "\\\"", desc)
 			gsub(/\\/, "\\\\", desc)
 			gsub(/\n/, "\\n", desc)
@@ -758,8 +748,8 @@ make_json() {
 			printf "      \"id\": \"%s\",\n", $2
 			printf "      \"label\": \"%s\",\n", $2
 			printf "      \"description\": \"%s\",\n", desc
-			printf "      \"file\": \"%s\",\n", file
-			printf "      \"line\": %d,\n", line
+			printf "      \"file\": \"%s\",\n", $5
+			printf "      \"line\": %d,\n", $6
 			printf "      \"trace_target\": \"%s\"\n", $1
 			printf "    }"
 		}
@@ -771,10 +761,10 @@ make_json() {
 		printf '  "links": [\n'
 		# Create temporary file with node list
 		_NODE_TEMP_FILE="${OUTPUT_DIR%/}/nodes.tmp"
-		awk -v sep="$SHTRACER_SEPARATOR" '
-		BEGIN { FS = "(\\t|" sep ")" }
-		$1 == "trace_target" && $2 == "tag_id" { next }
-		NF >= 2 { print $2 }
+		awk -F'<shtracer_separator>' '
+		NF >= 6 {
+			print $2
+		}
 		' "$_TAG_OUTPUT_DATA" >"$_NODE_TEMP_FILE"
 
 		# Generate links using node validation
@@ -802,37 +792,9 @@ make_json() {
 		}
 		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
-		printf '\n  ],\n'
-
-		# Generate direct links array from 02_tag_pairs only (exclude NONE and validate nodes exist)
-		printf '  "direct_links": [\n'
-		awk '
-		BEGIN { first=1 }
-		# Read nodes into array
-		ARGIND == 1 {
-			nodes[$1] = 1
-			next
-		}
-		# Process direct tag pairs only
-		ARGIND == 2 && $1 != "NONE" && $2 != "NONE" {
-			if ($1 in nodes && $2 in nodes) {
-				key = $1 "," $2
-				if (!seen[key]++) {
-					if (!first) printf ",\n"
-					first=0
-					printf "    {\n"
-					printf "      \"source\": \"%s\",\n", $1
-					printf "      \"target\": \"%s\",\n", $2
-					printf "      \"value\": 1\n"
-					printf "    }"
-				}
-			}
-		}
-		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS"
-		printf '\n  ],\n'
-
 		# Clean up temp file
 		rm -f "$_NODE_TEMP_FILE"
+		printf '\n  ],\n'
 
 		# Generate chains array from tag table
 		printf '  "chains": [\n'

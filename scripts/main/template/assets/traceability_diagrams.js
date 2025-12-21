@@ -597,9 +597,8 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
         // apply immediately so we can compute positions relative to this height
         const finalHeight = Math.max(height, requiredHeight);
         svg.attr('height', finalHeight);
-        // Reserve at least the SVG height, but allow the container to grow
-        // (e.g., legend div) so following sections never overlap.
-        container.style.height = 'auto';
+        // Match container height to SVG height and keep spacing so following sections never overlap.
+        container.style.height = finalHeight + 'px';
         container.style.minHeight = finalHeight + 'px';
         container.style.marginBottom = '20px';
 
@@ -805,9 +804,9 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
             const padding = 40; // space for labels/legend
             const currentSvgHeight = +svg.attr('height') || height;
             const requiredHeight = Math.max(currentSvgHeight, height, Math.ceil(yMax + padding));
-            // Update svg and reserve at least that height; allow container to grow for legend.
+            // Update svg and container to the required height (never shrink), preventing overlap.
             svg.attr('height', requiredHeight);
-            container.style.height = 'auto';
+            container.style.height = requiredHeight + 'px';
             container.style.minHeight = requiredHeight + 'px';
             container.style.marginBottom = '20px';
         }

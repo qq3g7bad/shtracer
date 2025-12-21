@@ -86,7 +86,6 @@ EOF
 	assertTrue "JSON should contain metadata" "echo '$_JSON_CONTENT' | grep -q 'metadata'"
 	assertTrue "JSON should contain nodes" "echo '$_JSON_CONTENT' | grep -q 'nodes'"
 	assertTrue "JSON should contain links" "echo '$_JSON_CONTENT' | grep -q 'links'"
-	assertTrue "JSON should contain direct_links" "echo '$_JSON_CONTENT' | grep -q 'direct_links'"
 	assertTrue "JSON should contain chains" "echo '$_JSON_CONTENT' | grep -q 'chains'"
 }
 
@@ -210,10 +209,6 @@ EOF
 	assertTrue "Should contain REQ->ARC link" "grep -A3 -B1 '\"source\": \"@REQ1.1@\"' '$_JSON_OUTPUT' | grep -q '\"target\": \"@ARC1.1@\"'"
 	assertTrue "Should contain ARC->IMP link" "grep -A3 -B1 '\"source\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"target\": \"@IMP1.1@\"'"
 	assertTrue "Should contain value field" "grep -q '\"value\": 1' '$_JSON_OUTPUT'"
-
-	# Verify direct_links contains only direct tag pairs (02_tag_pairs)
-	assertTrue "direct_links should contain REQ->ARC link" "grep -A3 -B1 '\"direct_links\":' '$_JSON_OUTPUT' | grep -q '\"source\": \"@REQ1.1@\"'"
-	assertFalse "direct_links should not contain ARC->IMP link" "grep -A20 -B1 '\"direct_links\":' '$_JSON_OUTPUT' | grep -q '\"source\": \"@ARC1.1@\"'"
 }
 
 ##

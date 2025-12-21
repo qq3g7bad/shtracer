@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sample execution validation
 - Comprehensive test cases for core functions ([#11](https://github.com/qq3g7bad/shtracer/pull/11))
   - 15 tests for shtracer_func.sh
-  - 6 tests for shtracer_html.sh
+  - 6 tests for viewer HTML helpers
   - 21 tests for main shtracer script
 - Ignore filter functionality for excluding files/directories
 - PRE-EXTRA-SCRIPT and POST-EXTRA-SCRIPT execution support ([#9](https://github.com/qq3g7bad/shtracer/pull/9))

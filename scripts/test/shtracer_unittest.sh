@@ -7,7 +7,7 @@
 . "../main/shtracer_util.sh"
 
 sh -c "./shtracer_func_unittest.sh"
-sh -c "./shtracer_html_unittest.sh"
+sh -c "./shtracer_viewer_unittest.sh"
 sh -c "./shtracer_integration_test.sh"
 
 ##
@@ -95,11 +95,6 @@ test_load_functions() {
 		# Assert ----------
 		(
 			echo "$_SHTRACER_FUNC_SH" >/dev/null
-		) 2>/dev/null
-		assertEquals 0 "$?"
-
-		(
-			echo "$_SHTRACER_HTML_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 	)

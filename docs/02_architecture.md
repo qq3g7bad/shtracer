@@ -192,9 +192,9 @@ The following cases are invalid.
 * [ ] Duplicated tags.
 
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2.2@) -->
-### 📄 `shtracer_html.sh`
+### 📄 `shtracer_viewer.sh`
 
-* Output text-formatted UML data (e.g., PlantUML, Mermaid) and HTML visualization.
+* Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
 
 Implementation is divided into three helper functions for flowchart generation:
 

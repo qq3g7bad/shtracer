@@ -4,8 +4,8 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "${SCRIPT_DIR}" || exit 1
 
-# shellcheck source=../main/shtracer_html.sh
-. "../main/shtracer_html.sh"
+# shellcheck source=../main/shtracer_viewer.sh
+. "../main/shtracer_viewer.sh"
 # shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
@@ -45,10 +45,6 @@ test_convert_template_html_with_valid_inputs() {
 	(
 		# Arrange ---------
 		SCRIPT_DIR="../../"
-		mkdir -p "$OUTPUT_DIR"
-		cat >"$OUTPUT_DIR/output.json" <<'EOF'
-{"metadata":{},"nodes":[],"links":[],"direct_links":[],"chains":[]}
-EOF
 		mkdir -p "$OUTPUT_DIR/tags"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
@@ -103,10 +99,6 @@ test_make_html_with_valid_inputs() {
 		# Arrange ---------
 		SCRIPT_DIR="../../"
 		export CONFIG_PATH="./testdata/unit_test/test_config1.md"
-		mkdir -p "$OUTPUT_DIR"
-		cat >"$OUTPUT_DIR/output.json" <<'EOF'
-{"metadata":{},"nodes":[],"links":[],"direct_links":[],"chains":[]}
-EOF
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
@@ -150,6 +142,49 @@ EOF
 
 		grep -q "traceability_diagrams.js" "$OUTPUT_DIR/output.html"
 		assertEquals "HTML should include traceability_diagrams.js" 0 $?
+	)
+}
+
+##
+# @brief  Test for shtracer_viewer.sh (stdin JSON -> stdout HTML)
+test_shtracer_viewer_single_file_output() {
+	(
+		# Arrange ---------
+		SHTRACER_VIEWER="../main/shtracer_viewer.sh"
+		SCRIPT_DIR="../../"
+		mkdir -p "$OUTPUT_DIR/test_dir"
+		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
+		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
+		cat >"$OUTPUT_DIR/output.json" <<EOF
+{
+  "metadata": {"version": "0.0.0", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
+  "nodes": [
+    {"id": "@TAG1@", "label": "@TAG1@", "index": 0, "description": "desc", "file": "$_TEST_FILE", "line": 1, "type": "Requirement", "trace_target": "x:Requirement"}
+  ],
+  "links": [],
+  "chains": [
+    ["@TAG1@", "NONE", "NONE", "NONE", "NONE"]
+  ]
+}
+EOF
+
+		# Act -------------
+		"$SHTRACER_VIEWER" <"$OUTPUT_DIR/output.json" >"$OUTPUT_DIR/output.html"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+		assertEquals 0 "$(
+			[ -f "$OUTPUT_DIR/output.html" ]
+			echo "$?"
+		)"
+		grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should have DOCTYPE" 0 "$?"
+		grep -q "const files =" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should inline show_text.js" 0 "$?"
+		grep -q "traceabilityData" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should embed JSON" 0 "$?"
+		grep -q "\./assets/show_text.js" "$OUTPUT_DIR/output.html"
+		assertNotEquals "HTML should not reference external assets" 0 "$?"
 	)
 }
 

@@ -122,8 +122,19 @@ id4 --> stop
 # Change mode
 chmod +x ./shtracer
 
-# Read a configuration file and create a traceability matrix
+# Optional viewer
+chmod +x ./scripts/main/shtracer_viewer.sh
+
+# Read a configuration file and create traceability artifacts (tag table + JSON)
 ./shtracer ./sample/config.md
+
+# Create a single self-contained HTML report (stdin JSON -> stdout HTML)
+./shtracer ./sample/config.md --json \
+  | ./scripts/main/shtracer_viewer.sh \
+  > ./sample/output/output.html
+
+# Or, generate HTML directly (JSON -> viewer internally)
+./shtracer ./sample/config.md --html > ./sample/output/output.html
 ```
 
 ## 🚀 Usage
@@ -135,19 +146,28 @@ Options:
   -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
   -v                               Verify mode: detect duplicate or isolated tags
   -t                               Test mode: execute unit tests
+  --json                           Export traceability data in JSON format (stdout)
+  --html                           Export a single HTML document to stdout
+  --summary                        Print traceability summary to stdout (direct links only)
   -h, --help                       Show this help message
 
 Examples:
   1. Normal mode
      $ ./shtracer ./sample/config.md
 
-  2. Change mode (swap or rename tags).
+  2. Generate HTML via viewer (recommended)
+    $ ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+
+  3. Generate HTML directly
+    $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
+
+  3. Change mode (swap or rename tags).
      $ ./shtracer ./sample/config.md -c old_tag new_tag.
 
-  3. Verify mode (check for duplicate or isolated tags).
+  4. Verify mode (check for duplicate or isolated tags).
      $ ./shtracer ./sample/config.md -v
 
-  4. Test mode
+  5. Test mode
      $ ./shtracer -t
 
 Note:

@@ -10,6 +10,7 @@ BEFORE_TAG=''
 AFTER_TAG=''
 EXPORT_JSON='false'
 EXPORT_SUMMARY='false'
+EXPORT_HTML='false'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -31,8 +32,6 @@ load_functions() {
 	. "./scripts/main/shtracer_util.sh"
 	# shellcheck source=scripts/main/shtracer_func.sh
 	. "./scripts/main/shtracer_func.sh"
-	# shellcheck source=scripts/main/shtracer_html.sh
-	. "./scripts/main/shtracer_html.sh"
 	cd "${_PREVIOUS_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
 }
 
@@ -48,6 +47,7 @@ print_usage() {
 		  -v                               Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
 		  --json                           Export traceability data in JSON format
+		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --summary                        Print traceability summary to stdout (direct links only)
 		  -h, --help                       Show this help message
 
@@ -66,6 +66,9 @@ print_usage() {
 
 		  5. Summary mode
 		     $ ./shtracer ./sample/config.md --summary
+
+		  6. HTML mode
+		     $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
 
 		Note:
 		  - The <configfile> argument must always be specified before options.
@@ -104,6 +107,10 @@ parse_arguments() {
 		2*--json) # Normal mode with JSON export
 			SHTRACER_MODE='NORMAL'
 			EXPORT_JSON='true'
+			;;
+		2*--html) # Normal mode with HTML export (via viewer)
+			SHTRACER_MODE='NORMAL'
+			EXPORT_HTML='true'
 			;;
 		2*--summary) # Normal mode with summary output
 			SHTRACER_MODE='NORMAL'
@@ -144,6 +151,7 @@ main_routine() {
 	export SHTRACER_MODE
 	export EXPORT_JSON
 	export EXPORT_SUMMARY
+	export EXPORT_HTML
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
@@ -157,23 +165,11 @@ main_routine() {
 	fi
 
 	# Normal mode or Verify mode
-	# In --summary mode we want stdout to be only the summary, so suppress extra-script output
-	# during tag extraction by temporarily using the VERIFY behavior.
-	_SUMMARY_SAVED_MODE=""
-	if [ "$EXPORT_SUMMARY" = 'true' ]; then
-		_SUMMARY_SAVED_MODE="$SHTRACER_MODE"
-		SHTRACER_MODE='VERIFY'
-		export SHTRACER_MODE
-	fi
 	if ! _TAGS=$(extract_tags "$CONFIG_OUTPUT"); then
 		error_exit 1 "main_routine" "Error in extract_tags"
 	fi
 	if ! _TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS"); then
 		error_exit 1 "main_routine" "Error in make_tag_table"
-	fi
-	if [ "$EXPORT_SUMMARY" = 'true' ]; then
-		SHTRACER_MODE="$_SUMMARY_SAVED_MODE"
-		export SHTRACER_MODE
 	fi
 
 	_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
@@ -206,8 +202,13 @@ main_routine() {
 			return 0
 		fi
 
-		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS"; then
-			error_exit 1 "main_routine" "Error in make_html"
+		# If --html flag is specified, generate HTML to stdout via viewer and exit
+		if [ "$EXPORT_HTML" = 'true' ]; then
+			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" ]; then
+				error_exit 1 "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
+			fi
+			sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"
+			return $?
 		fi
 	fi
 

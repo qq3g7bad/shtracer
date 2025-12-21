@@ -34,5 +34,5 @@ filename                     | test target
 ---------------------------- | ---------------
 shtracer_test.sh             | `../../shtracer`
 shtracer_func_test.sh        | `../main/shtracer_func.sh`
-shtracer_html_test.sh        | `../main/shtracer_html.sh`
+shtracer_viewer_unittest.sh  | `../main/shtracer_viewer.sh`
 shtracer_integration_test.sh | End-to-end integration tests
