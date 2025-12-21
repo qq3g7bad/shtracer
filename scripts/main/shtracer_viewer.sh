@@ -217,50 +217,144 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function renderSankey(data) {
-    // Color scale for trace targets - more distinct colors
-    const colorScale = d3.scaleOrdinal()
-        .domain(['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'])
-        .range(['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']); // More distinct colors
+function traceTypeFromTraceTarget(traceTarget) {
+    if (!traceTarget) return 'Unknown';
+    const parts = String(traceTarget).split(':');
+    return parts[parts.length - 1].trim() || 'Unknown';
+}
 
-    // Function to extract type from trace_target (safe)
-    const getTraceType = (traceTarget) => {
-        if (!traceTarget) return 'Unknown';
-        const parts = String(traceTarget).split(':');
-        return parts[parts.length - 1].trim();
-    };
+function traceTypeColor(type) {
+    switch (type) {
+        case 'Requirement': return '#e74c3c';
+        case 'Architecture': return '#3498db';
+        case 'Implementation': return '#2ecc71';
+        case 'Unit test': return '#f39c12';
+        case 'Integration test': return '#9b59b6';
+        default: return '#7f8c8d';
+    }
+}
 
-    // Prepare nodes and links for full diagram
-    const sankeyNodes = data.nodes.map((d, i) => ({ ...d, index: i }));
-    const nodeIndexMap = new Map(sankeyNodes.map((node, i) => [node.id, i]));
-    
+function renderLegend(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
 
-    const sankeyLinks = data.links.map(d => ({
-        ...d,
-        source: nodeIndexMap.get(d.source),
-        target: nodeIndexMap.get(d.target)
-    }));
-    
-    sankeyLinks.forEach((link, i) => {
-        if (link.source === undefined || link.target === undefined) {
-            console.error(`Link ${i} has undefined source/target:`, link);
-        }
+    const legendData = [
+        {type: 'Requirement', color: traceTypeColor('Requirement')},
+        {type: 'Architecture', color: traceTypeColor('Architecture')},
+        {type: 'Implementation', color: traceTypeColor('Implementation')},
+        {type: 'Unit test', color: traceTypeColor('Unit test')},
+        {type: 'Integration test', color: traceTypeColor('Integration test')},
+        {type: 'Unknown', color: traceTypeColor('Unknown')}
+    ];
+
+    el.innerHTML = legendData.map(d =>
+        `<span class="legend-item"><span class="legend-swatch" style="background:${d.color}"></span><span>${d.type}</span></span>`
+    ).join('');
+}
+
+function annotateTraceTargets(data) {
+    const fileToTypes = new Map();
+    (data.nodes || []).forEach(n => {
+        if (!n || !n.file) return;
+        const base = String(n.file).split('/').pop();
+        const t = traceTypeFromTraceTarget(n.trace_target);
+        if (!fileToTypes.has(base)) fileToTypes.set(base, new Set());
+        fileToTypes.get(base).add(t);
     });
 
-    // Render full diagram
-    renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true);
+    const anchors = document.querySelectorAll('#trace-targets a');
+    anchors.forEach(a => {
+        if (!a || !a.textContent) return;
+        const name = a.textContent.trim();
+        const types = fileToTypes.has(name) ? Array.from(fileToTypes.get(name)) : [];
+        const cleaned = types.filter(t => t && t !== 'Unknown').sort();
+        const finalTypes = cleaned.length ? cleaned : ['Unknown'];
 
-    // Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
-    const directLinksRaw = Array.isArray(data.direct_links) ? data.direct_links : data.links;
-    const directLinks = directLinksRaw
-        .map(d => ({
-            ...d,
-            source: nodeIndexMap.get(d.source),
-            target: nodeIndexMap.get(d.target)
-        }))
-        .filter(l => typeof l.source === 'number' && typeof l.target === 'number');
+        if (!a.parentElement) return;
+        if (a.parentElement.querySelector('.trace-target-type')) return;
 
-    renderParallelSetsRequirements('sankey-diagram-type', sankeyNodes, directLinks, colorScale, getTraceType);
+        finalTypes.forEach(t => {
+            const span = document.createElement('span');
+            span.className = 'trace-target-type';
+            span.textContent = t;
+            span.style.backgroundColor = traceTypeColor(t);
+            span.style.borderColor = traceTypeColor(t);
+            a.insertAdjacentElement('afterend', span);
+        });
+    });
+}
+
+function annotateMatrixBadges() {
+    const badges = document.querySelectorAll('.matrix-tag-badge');
+    badges.forEach(span => {
+        if (!span) return;
+        const t = span.getAttribute('data-type') || 'Unknown';
+        const c = traceTypeColor(t);
+        span.style.backgroundColor = c;
+        span.style.borderColor = c;
+    });
+}
+
+function renderSummary(data) {
+    const el = document.getElementById('trace-summary');
+    if (!el) return;
+
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const links = Array.isArray(data.direct_links) ? data.direct_links : (Array.isArray(data.links) ? data.links : []);
+
+    const nodeType = new Map();
+    const typeItemCount = new Map();
+    nodes.forEach(n => {
+        const t = traceTypeFromTraceTarget(n.trace_target);
+        nodeType.set(n.id, t);
+        if (t !== 'pad') typeItemCount.set(t, (typeItemCount.get(t) || 0) + 1);
+    });
+
+    const totalFrom = new Map();
+    const pairFrom = new Map();
+
+    links.forEach(l => {
+        const fromId = l.source;
+        const toId = l.target;
+        const fromType = nodeType.get(fromId);
+        const toType = nodeType.get(toId);
+        if (!fromType || !toType) return;
+        if (fromType === 'pad' || toType === 'pad') return;
+
+        if (!totalFrom.has(fromType)) totalFrom.set(fromType, new Set());
+        totalFrom.get(fromType).add(fromId);
+
+        const key = fromType + '->' + toType;
+        if (!pairFrom.has(key)) pairFrom.set(key, new Set());
+        pairFrom.get(key).add(fromId);
+    });
+
+    function pct(num, den) {
+        if (!den) return '0.00%';
+        return (Math.round((num / den) * 10000) / 100).toFixed(2) + '%';
+    }
+
+    const fromTypes = Array.from(typeItemCount.keys()).sort();
+    let html = '<table class="summary-table">' +
+        '<thead><tr><th>From</th><th>To</th><th>Coverage</th></tr></thead><tbody>';
+
+    fromTypes.forEach(ft => {
+        const den = typeItemCount.get(ft) || 0;
+        const total = totalFrom.has(ft) ? totalFrom.get(ft).size : 0;
+        html += `<tr class="summary-total-row"><td>${ft}</td><td>Total</td><td>${pct(total, den)}</td></tr>`;
+
+        const pairs = Array.from(pairFrom.keys())
+            .filter(k => k.startsWith(ft + '->'))
+            .sort();
+        pairs.forEach(k => {
+            const to = k.split('->')[1];
+            const num = pairFrom.get(k).size;
+            html += `<tr><td>${ft}</td><td>${to}</td><td>${pct(num, den)}</td></tr>`;
+        });
+    });
+
+    html += '</tbody></table>';
+    el.innerHTML = html;
 }
 
 function renderParallelSetsRequirements(containerId, nodes, links, colorScale, getTraceType) {
@@ -1085,47 +1179,6 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
         .attr('font-size', '10px')
         .attr('fill', '#333')
         .text(d => d.id);
-
-    // Add legend as an HTML element below the SVG to avoid adding extra whitespace inside the SVG
-    const legendData = [
-        {type: 'Requirement', color: '#e74c3c'},
-        {type: 'Architecture', color: '#3498db'},
-        {type: 'Implementation', color: '#2ecc71'},
-        {type: 'Unit test', color: '#f39c12'},
-        {type: 'Integration test', color: '#9b59b6'},
-        {type: 'Unknown', color: '#7f8c8d'}
-    ];
-
-    const containerDiv = d3.select('#' + containerId);
-    const legendDiv = containerDiv.append('div')
-        .attr('class', 'sankey-legend')
-        .style('display', 'flex')
-        .style('gap', '12px')
-        .style('flex-wrap', 'wrap')
-        .style('margin-top', '10px')
-        .style('align-items', 'center');
-
-    const legendItems = legendDiv.selectAll('.legend-item')
-        .data(legendData)
-        .enter()
-        .append('div')
-        .attr('class', 'legend-item')
-        .style('display', 'flex')
-        .style('align-items', 'center')
-        .style('margin-right', '12px');
-
-    legendItems.append('span')
-        .style('display', 'inline-block')
-        .style('width', '12px')
-        .style('height', '12px')
-        .style('background-color', d => d.color)
-        .style('margin-right', '6px')
-        .style('border', '1px solid #333');
-
-    legendItems.append('span')
-        .style('font-size', '11px')
-        .style('color', '#333')
-        .text(d => d.type);
 }
 
 function renderSankey(data) {
@@ -1135,11 +1188,14 @@ function renderSankey(data) {
 				.range(['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']); // More distinct colors
 
 		// Function to extract type from trace_target (safe)
-		const getTraceType = (traceTarget) => {
-				if (!traceTarget) return 'Unknown';
-				const parts = String(traceTarget).split(':');
-				return parts[parts.length - 1].trim();
-		};
+        const getTraceType = traceTypeFromTraceTarget;
+
+        // Legends and top-of-page metadata
+        renderLegend('sankey-legend-full');
+        renderLegend('sankey-legend-type');
+        annotateTraceTargets(data);
+        annotateMatrixBadges();
+        renderSummary(data);
 
 		// Prepare nodes and links for full diagram
 		const sankeyNodes = data.nodes.map((d, i) => ({ ...d, index: i }));
@@ -1182,13 +1238,15 @@ EOF
 # @param   $1 : TAG_TABLE_FILENAME
 # @return  HTML <thead> element with sort buttons (literal \n for sed processing)
 _html_add_table_header() {
-	# AWK: Read first row of tag table, generate <th> elements with onclick handlers
-	# Note: Returns literal \n strings (not newlines) for later sed substitution
-	printf '%s' "<thead>\n  <tr>\n$(awk 'NR == 1 {
-		for (i = 1; i <= NF; i++) {
-			printf "    <th><a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\\n", i - 1;
-		}
-	}' <"$1")  </tr>\n</thead>\n"
+    # Fixed layer columns for the matrix.
+    # Note: Returns literal \n strings (not newlines) for later sed substitution
+    printf '%s' '<thead>\n  <tr>\n'
+    printf '%s' '    <th>Requirement <a href="#" onclick="sortTable(0)">sort</a></th>\n'
+    printf '%s' '    <th>Architecture <a href="#" onclick="sortTable(1)">sort</a></th>\n'
+    printf '%s' '    <th>Implementation <a href="#" onclick="sortTable(2)">sort</a></th>\n'
+    printf '%s' '    <th>Unit test <a href="#" onclick="sortTable(3)">sort</a></th>\n'
+    printf '%s' '    <th>Integration test <a href="#" onclick="sortTable(4)">sort</a></th>\n'
+    printf '%s' '  </tr>\n</thead>\n'
 }
 
 ##
@@ -1196,15 +1254,102 @@ _html_add_table_header() {
 # @param   $1 : TAG_TABLE_FILENAME
 # @return  HTML <tbody> element with table data (literal \n for sed processing)
 _html_convert_tag_table() {
-	# AWK: Process all rows, convert each field to <td> elements
-	# Note: Returns literal \n strings (not newlines) for later sed substitution
-	printf '%s' "<tbody>$(awk '{
-		printf "\\n  <tr>\\n"
-			for (i = 1; i <= NF; i++) {
-				printf "    <td>"$i"</td>\\n"
-			}
-		printf "  </tr>"
-	} ' <"$1")\n</tbody>"
+    # Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
+    # $1: TAG_TABLE_FILENAME (space-separated tags per line)
+    # $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
+    # Note: Returns literal \n strings (not newlines) for later sed substitution
+    _TAG_TABLE_FILENAME="$1"
+    _TAG_INFO_TABLE="$2"
+    _sep="$SHTRACER_SEPARATOR"
+    _nodata="$NODATA_STRING"
+
+    printf '%s' "<tbody>$({
+                if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+			cat "$_TAG_INFO_TABLE"
+		else
+			printf '%s\n' "$_TAG_INFO_TABLE"
+		fi
+        printf '%s\n' '__SHTRACER_TAG_INFO_END__'
+        cat "$_TAG_TABLE_FILENAME"
+    } | awk -v sep="$_sep" -v nodata="$_nodata" '
+        BEGIN {
+            ndims = split("Requirement|Architecture|Implementation|Unit test|Integration test", dims, "|")
+            for (i = 1; i <= ndims; i++) dimIndex[dims[i]] = i
+            mode = 0
+        }
+        function field1(s, delim,   p1) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return s
+            return substr(s, 1, p1 - 1)
+        }
+        function field4(s, delim,   rest, p1, p2, p3) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return ""
+            rest = substr(s, p1 + length(delim))
+            p2 = index(rest, delim)
+            if (p2 <= 0) return ""
+            rest = substr(rest, p2 + length(delim))
+            p3 = index(rest, delim)
+            if (p3 <= 0) return ""
+            return substr(rest, p3 + length(delim))
+        }
+        function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+        function type_from_trace_target(tt,   n, p, t) {
+            if (tt == "") return "Unknown"
+            n = split(tt, p, ":")
+            t = trim(p[n])
+            return t == "" ? "Unknown" : t
+        }
+        function escape_attr(s,   t) {
+            t = s
+            gsub(/&/, "&amp;", t)
+            gsub(/</, "&lt;", t)
+            gsub(/>/, "&gt;", t)
+            gsub(/"/, "&quot;", t)
+            return t
+        }
+        function badge(tag, typ,   safeTyp) {
+            safeTyp = escape_attr(typ)
+            return "<span class=\\\"matrix-tag-badge\\\" data-type=\\\"" safeTyp "\\\">" tag "</span>"
+        }
+        $0 == "__SHTRACER_TAG_INFO_END__" {
+            mode = 1
+            next
+        }
+        mode == 0 {
+            if ($0 == "") next
+            tag = trim(field1($0, sep))
+            trace_target = trim(field4($0, sep))
+            tagType[tag] = type_from_trace_target(trace_target)
+            next
+        }
+        {
+            for (i = 1; i <= ndims; i++) { cell[i] = nodata; html[i] = "" }
+            nextSlot = 1
+            nt = split($0, tags, /[[:space:]]+/)
+            for (k = 1; k <= nt; k++) {
+                t = trim(tags[k])
+                if (t == "" || t == nodata) continue
+                typ = tagType[t]
+                if (typ == "") typ = "Unknown"
+                if (typ in dimIndex) {
+                    col = dimIndex[typ]
+                } else {
+                    while (nextSlot <= ndims && cell[nextSlot] != nodata) nextSlot++
+                    col = (nextSlot <= ndims) ? nextSlot : ndims
+                }
+                frag = badge(t, typ)
+                if (cell[col] == nodata) { cell[col] = t; html[col] = frag }
+                else { cell[col] = cell[col] " " t; html[col] = html[col] "<br>" frag }
+            }
+            printf "\\n  <tr>\\n"
+            for (i = 1; i <= ndims; i++) {
+                if (cell[i] == nodata) printf "    <td>%s</td>\\n", nodata
+                else printf "    <td>%s</td>\\n", html[i]
+            }
+            printf "  </tr>"
+        }
+    ')\n</tbody>"
 }
 
 ##
@@ -1235,24 +1380,28 @@ _html_generate_tag_links() {
 # @param   $1 : TAG_INFO_TABLE (tag information with file paths)
 # @return  HTML <ul> element with clickable file links
 _html_generate_file_list() {
-	printf '%s' "<ul>\n$(echo "$1" \
-		| awk -F"$SHTRACER_SEPARATOR" '{print $3}' \
+	printf '%s\n' '<div id="trace-targets">'
+	printf '%s\n' '<ul>'
+	echo "$1" \
+		| awk -F"$SHTRACER_SEPARATOR" '$1 != "@CONFIG@" {print $3}' \
 		| sort -u \
 		| awk '{
-			n = split($0, parts, "/");
-			filename = parts[n];
-			raw_filename = filename;
-			extension_pos = match(filename, /\.[^\.]+$/);
-			gsub(/\./, "_", filename);
-			gsub(/^/, "Target_", filename);
+            n = split($0, parts, "/");
+            filename = parts[n];
+            raw_filename = filename;
+            extension_pos = match(raw_filename, /\.[^\.]+$/);
+            gsub(/\./, "_", filename);
+            gsub(/^/, "Target_", filename);
 
-			if (extension_pos) {
-				extension = substr(raw_filename, extension_pos + 1);
-			} else {
-				extension = "sh";
-			}
+            if (extension_pos) {
+                extension = substr(raw_filename, extension_pos + 1);
+            } else {
+                extension = "sh";
+            }
             print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', 1, '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
-		}')\n</ul>"
+        }'
+	printf '%s\n' '</ul>'
+	printf '%s\n' '</div>'
 }
 
 ##
@@ -1316,7 +1465,7 @@ convert_template_html() {
 
 		profile_start "convert_template_html_build_table"
 		_TABLE_HTML="$(_html_add_table_header "$_TAG_TABLE_FILENAME")"
-		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME")"
+        _TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
 		profile_start "convert_template_html_insert_tag_table"
@@ -1418,18 +1567,23 @@ tag_info_table_from_json_file() {
 					file = ""
 					ln = ""
 					idx = ""
+                    trace_target = ""
+                    type = ""
 				}
 
 				if (in_obj) {
 					v = grab_str(t, "id"); if (v != "") { id = v }
 					v = grab_str(t, "file"); if (v != "") { file = v }
+                    v = grab_str(t, "trace_target"); if (v != "") { trace_target = v }
+                    v = grab_str(t, "type"); if (v != "") { type = v }
 					v = grab_int(t, "line"); if (v != "") { ln = v }
 					v = grab_int(t, "index"); if (v != "") { idx = v }
 
 					if (t ~ /\}/) {
 						if (idx == "") { idx = 999999999 }
 						if (id != "" && file != "" && ln != "") {
-							print idx "\t" id "\t" ln "\t" file
+                            if (trace_target == "" && type != "") { trace_target = type }
+                            print idx "\t" id "\t" ln "\t" file "\t" trace_target
 						}
 						in_obj = 0
 					}
@@ -1444,15 +1598,15 @@ tag_info_table_from_json_file() {
 		| sort -k1,1n \
 			>"$_tmp_sort"
 
-	awk -F '\t' -v sep="$_sep" -v OFS="" '
+    awk -F '\t' -v sep="$_sep" -v OFS="" '
 		!seen[$2]++ {
-			print $2, sep, $3, sep, $4
+            print $2, sep, $3, sep, $4, sep, $5
 		}
 	' <"$_tmp_sort" >"$_tmp_file"
 
 	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
 	if [ -n "$_config_path" ]; then
-		printf '%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" >>"$_tmp_file"
+        printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
 	fi
 
 	cat "$_tmp_file"
@@ -1613,13 +1767,14 @@ make_html() {
 				OFS = separator;
 			}
 			{
+                trace_target = $1;
 				tag = $2;
 				path = $5
 				line = $6
-				print tag, line, path
+                print tag, line, path, trace_target
 			}
 			END {
-				print "@CONFIG@", "1", config_path
+                print "@CONFIG@", "1", config_path, ""
 			}')"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
@@ -1687,6 +1842,9 @@ shtracer_viewer_main() {
 
 	SHTRACER_SEPARATOR="${SHTRACER_SEPARATOR:=<shtracer_separator>}"
 	export SHTRACER_SEPARATOR
+
+    NODATA_STRING="${NODATA_STRING:=NONE}"
+    export NODATA_STRING
 
 	_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 	_TEMPLATE_ASSETS_DIR="${_TEMPLATE_DIR%/}/assets"
