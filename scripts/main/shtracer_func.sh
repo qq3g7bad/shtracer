@@ -74,9 +74,7 @@ _check_config_convert_to_table() {
 					a["BRIEF"],
 					a["TAG FORMAT"],
 					a["TAG LINE FORMAT"],
-					a["TAG-TITLE OFFSET"],
-					a["PRE-EXTRA-SCRIPT"],
-					a["POST-EXTRA-SCRIPT"];
+					a["TAG-TITLE OFFSET"];
 			}
 
 			BEGIN {
@@ -196,14 +194,13 @@ _extract_tags_discover_files() {
 			tag_format = extract_from_backtick($6)
 			tag_line_format = extract_from_backtick($7)
 			tag_title_offset = $8 == "" ? 1 : $8
-			pre_extra_script = extract_from_backtick($9)
-			post_extra_script = extract_from_backtick($10)
+			if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
 
 			if (tag_format == "") { next }
 
 			cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 			if (is_file_exist == 0) {
-				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
+				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset
 			}
 			else {
 				# for multiple extension filter
@@ -230,7 +227,7 @@ _extract_tags_discover_files() {
 				else {
 					cmd = "find \"" path "\" -type f " ext_expr ""
 				}
-				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
+				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset; } close(cmd);
 			}
 		}' | sort -u
 }
@@ -248,12 +245,10 @@ _extract_tags_process_files() {
 	# AWK: Parse config line by line, read each target file, extract tags with context
 	# Process:
 	#   1. Parse config fields (title, path, tag format, offset)
-	#   2. Execute pre-extra-script if specified
 	#   3. Scan file line by line:
 	#      - When tag pattern matches: extract tag ID and FROM tags
 	#      - Count down from TAG_TITLE_OFFSET to find associated title
 	#      - Capture file path and line number for reference
-	#   4. Execute post-extra-script if specified
 	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
 	echo "$1" \
 		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
@@ -262,19 +257,8 @@ _extract_tags_process_files() {
 				path = $2
 				tag_format = $6
 				tag_line_format = $7
-				tag_title_offset = $8 ? $8 > 0 : 0
-				pre_extra_script = $9
-				post_extra_script = $10
-
-				# Execute pre_extra_script
-				# Suppress output in verify mode
-				if (pre_extra_script != "") {
-					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
-						system(pre_extra_script " >/dev/null 2>&1")
-					} else {
-						system(pre_extra_script)
-					}
-				}
+				tag_title_offset = ($8 == "" ? 1 : $8)
+				if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
 
 				# Calculate absolute path once per file (optimization for Windows/Git Bash)
 				filename = path; gsub(".*/", "", filename);
@@ -331,15 +315,6 @@ _extract_tags_process_files() {
 
 				}
 				close(path)
-				# Execute post_extra_script
-				# Suppress output in verify mode
-				if (post_extra_script != "") {
-					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
-						system(post_extra_script " >/dev/null 2>&1")
-					} else {
-						system(post_extra_script)
-					}
-				}
 			}
 			' >"$2"
 }

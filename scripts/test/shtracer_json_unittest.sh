@@ -60,9 +60,8 @@ test_make_json_basic() {
 
 	# Create test data
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-trace_target	tag_id	description	file	line
-Requirement	@REQ1.1@	First requirement	/path/to/file1.md	10
-Architecture	@ARC1.1@	First architecture	/path/to/file2.md	20
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>First requirement<shtracer_separator>/path/to/file1.md<shtracer_separator>10<shtracer_separator>1
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>First architecture<shtracer_separator>/path/to/file2.md<shtracer_separator>20<shtracer_separator>1
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -186,10 +185,9 @@ test_make_json_links() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-trace_target	tag_id	description	file	line
-Requirement	@REQ1.1@	Req	/file1	1
-Architecture	@ARC1.1@	Arc	/file2	2
-Implementation	@IMP1.1@	Imp	/file3	3
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>2<shtracer_separator>1
+Implementation<shtracer_separator>@IMP1.1@<shtracer_separator>NONE<shtracer_separator>Imp<shtracer_separator>/file3<shtracer_separator>3<shtracer_separator>1
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -229,8 +227,7 @@ test_make_json_chains() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-trace_target	tag_id	description	file	line
-Requirement	@REQ1.1@	Req	/file1	1
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'

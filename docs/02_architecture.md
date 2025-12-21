@@ -35,7 +35,7 @@ end note
 [*] --> input
 [*] --> opt_input
 
-opt_input --> targetfiles : pre-extra-scripts
+opt_input --> targetfiles
 opt_output:Optional output files
 
 state output {
@@ -54,7 +54,7 @@ state opt_output {
 
 
 input --> output : shtracer
-rtm --> opt_output : post-extra-scripts
+rtm --> opt_output
 rtm --> html_output
 uml --> html_output
 
@@ -122,8 +122,6 @@ column | optional  | content                                                    
 6      | mandatory | tag format (for searching tags written in BRE)                       | `
 7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
-9      | optional  | pre-extra-script                                                     | `
-10     | optional  | post-extra-script                                                    | `
 
 <!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.1.1@) -->
 #### Make tag table

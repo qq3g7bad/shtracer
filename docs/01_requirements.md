@@ -34,8 +34,6 @@ column | optional  | content                                                    
 6      | mandatory | tag format (for searching tags written in BRE)                       | `
 7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
-9      | optional  | pre-extra-script                                                     | `
-10     | optional  | post-extra-script                                                    | `
 
 * **[BRE](https://www.gnu.org/software/sed/manual/html_node/BRE-syntax.html)**: Basic regular expressions.
 

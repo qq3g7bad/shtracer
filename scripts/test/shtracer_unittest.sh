@@ -454,46 +454,5 @@ test_main_routine_invalid_config_paths() {
 	)
 }
 
-##
-# @brief  Test for verify mode - extra scripts should not output
-# @tag    @UT1.22@ (FROM: @IMP1.4@)
-test_verify_mode_suppresses_extra_script_output() {
-	(
-		# Arrange ---------
-		set -u
-
-		# Act -------------
-		# Run in verify mode and capture all output
-		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" "-v" 2>&1)"
-
-		# Assert ----------
-		# Should NOT contain pre-extra-script or post-extra-script output
-		echo "$_RETURN" | grep -q "pre-extra-script"
-		assertNotEquals 0 "$?"
-
-		echo "$_RETURN" | grep -q "post-extra-script"
-		assertNotEquals 0 "$?"
-	)
-}
-
-##
-# @brief  Test for normal mode - extra scripts should output
-# @tag    @UT1.23@ (FROM: @IMP1.4@)
-test_normal_mode_shows_extra_script_output() {
-	(
-		# Arrange ---------
-		set -u
-
-		# Act -------------
-		# Run in normal mode and capture stderr
-		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" 2>&1)"
-
-		# Assert ----------
-		# Should contain pre-extra-script or post-extra-script output
-		echo "$_RETURN" | grep -q "pre-extra-script\|post-extra-script"
-		assertEquals 0 "$?"
-	)
-}
-
 # shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"
