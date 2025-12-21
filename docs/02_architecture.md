@@ -196,53 +196,7 @@ The following cases are invalid.
 
 * Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
 
-Implementation is divided into three helper functions for flowchart generation:
-
-#### Parse config and generate flowchart indices
-
-* Parse the config output data to extract unique trace target titles.
-* Detect fork patterns in the configuration (marked with `(fork)` keyword).
-* Generate hierarchical flowchart indices for each node.
-* Handle nested fork structures with proper index incrementation.
-* Output indexed configuration for flowchart generation.
-
-#### Prepare UML declarations
-
-* Read the indexed config and generate Mermaid node declarations.
-* Create flowchart node syntax: `id<index>([<title>])`.
-* Output declarations for all nodes in the flowchart.
-
-#### Prepare UML relationships
-
-* Parse the indexed config to determine node relationships.
-* Detect fork increments, decrements, and nested fork structures.
-* Generate Mermaid edge syntax: `node1 --> node2`.
-* Create subgraph blocks for fork sections with appropriate labels.
-* Handle closing of fork blocks at the end of the flowchart.
-* Remove empty subgraphs from the output.
-
-The generated flowchart uses Mermaid syntax as shown below:
-
-```mermaid
-flowchart TB
-
-start[Start]
-id1([Requirement])
-id2([Architecture])
-id3_1_1([Implementation])
-id3_1_2([Unit test])
-id3_2_1([Implementation])
-id3_2_2([Unit test])
-id4([Integration test])
-stop[End]
-
-start --> id1
-id1 --> id2
-id2 --> id3_1_1
-subgraph "Main scripts"
-id3_1_1 --> id3_1_2
-end
-id2 --> id3_2_1
+The viewer renders the diagrams and summary directly from the JSON payload (nodes/links/chains).
 subgraph "Optional scripts"
 id3_2_1 --> id3_2_2
 end

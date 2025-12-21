@@ -1,7 +1,13 @@
 #!/bin/sh
 
 # Source test target
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$SCRIPT_DIR" ]; then
+	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+fi
+
+# Ensure relative sources resolve regardless of caller CWD
+cd "${SCRIPT_DIR}" || exit 1
 
 # shellcheck source=../main/shtracer_func.sh
 . "../main/shtracer_func.sh"

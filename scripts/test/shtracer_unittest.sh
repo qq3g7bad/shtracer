@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# Ensure paths resolve regardless of caller CWD
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$SCRIPT_DIR" ]; then
+	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+fi
+cd "${SCRIPT_DIR}" || exit 1
+
 # Source test targets
 # shellcheck source=../../shtracer
 . "../../shtracer"

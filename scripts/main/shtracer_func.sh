@@ -330,6 +330,7 @@ _extract_tags_process_files() {
 					}
 
 				}
+				close(path)
 				# Execute post_extra_script
 				# Suppress output in verify mode
 				if (post_extra_script != "") {

@@ -5,6 +5,12 @@
 # @brief   Unit tests for JSON export functionality
 #
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$SCRIPT_DIR" ]; then
+	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+fi
+cd "${SCRIPT_DIR}" || exit 1
+
 # shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
@@ -101,7 +107,7 @@ test_make_json_metadata() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-:(fork):Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/home/qq3g7bad/Desktop/repo/shtracer/scripts/main/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1
+:Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/home/qq3g7bad/Desktop/repo/shtracer/scripts/main/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1
 Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1
 EOF
 

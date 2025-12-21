@@ -18,16 +18,9 @@
   * **TAG LINE FORMAT**: `<!--.*-->`
   * **TAG-TITLE OFFSET**: 1
 
-## (fork)
+## Main scripts
 
-<!-- TO SPLIT THE TRACE TARGET FLOW, USE "(fork)" AS A SECTION TITLE -->
-
-### Main scripts
-
-#### Implementation
-
-<!-- IF THERE ARE MULTIPLE TRACE TARGETS BUT YOU DON'T WANT TO SPLIT THE TRACE FLOW, -->
-<!-- YOU DON'T NEED TO USE "(fork)" AND JUST ENTER MULTIPLE PATHS. -->
+### Implementation
 
 * **PATH**: "../shtracer"
   * **TAG FORMAT**: `@IMP[0-9\.]+@`
@@ -39,7 +32,7 @@
   * **TAG LINE FORMAT**: `#.*`
   * **BRIEF**: "All files are shell scripts."
 
-#### Unit test
+### Unit test
 
 <!-- IF THERE ARE TOO MANY TRACE TARGET LIKE SOFTWARE REPOSITORY, -->
 <!-- USE DIRECTORY PATHS TO TRACE. -->
@@ -51,12 +44,9 @@
   * **TAG FORMAT**: `@UT[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
 
-### Optional scripts
+## Optional scripts
 
-#### Implementation
-
-<!-- IF THERE ARE MULTIPLE TRACE TARGETS BUT YOU DON'T WANT TO SPLIT THE TRACE FLOW, -->
-<!-- YOU DON'T NEED TO USE "(fork)" AND JUST ENTER MULTIPLE PATHS. -->
+### Implementation
 
 * **PATH**: "../shtracer"
   * **EXTENSION FILTER**: "*.sh"
@@ -68,7 +58,7 @@
   * **EXTENSION FILTER**: "*.py"
   * **BRIEF**: "Not implemented yet"
 
-#### Unit test
+### Unit test
 
 <!-- IF THERE ARE TOO MANY TRACE TARGET LIKE SOFTWARE REPOSITORY, USE DIRECTORY PATHS TO TRACE. -->
 

@@ -20,7 +20,7 @@
     * The name in a field has **bold style**.
     * The value in a field is surrounded by double quotations.
   * Multiple `PATH` information entries are acceptable.
-* If a section name is `(fork)`, the following subsections are separated.
+
 
 #### Field format
 
