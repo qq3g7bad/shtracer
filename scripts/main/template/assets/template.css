@@ -95,3 +95,15 @@ thead tr:hover {
     transition: opacity 0.2s;
     white-space: pre-wrap;
 }
+
+/* Prevent Sankey SVG from overlapping headings */
+#sankey-diagram-full,
+#sankey-diagram-type {
+    position: relative;
+    overflow: hidden;
+}
+
+#sankey-diagram-full svg,
+#sankey-diagram-type svg {
+    display: block;
+}

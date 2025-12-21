@@ -142,6 +142,10 @@ test_make_html_with_valid_inputs() {
 
 		grep -q "traceability_diagrams.js" "$OUTPUT_DIR/output.html"
 		assertEquals "HTML should include traceability_diagrams.js" 0 $?
+
+		# Regression: file list links must not contain invalid ""1"" token
+		grep -q '""1""' "$OUTPUT_DIR/output.html"
+		assertNotEquals "Trace target links should use numeric line 1" 0 $?
 	)
 }
 
@@ -185,6 +189,10 @@ EOF
 		assertEquals "HTML should embed JSON" 0 "$?"
 		grep -q "\./assets/show_text.js" "$OUTPUT_DIR/output.html"
 		assertNotEquals "HTML should not reference external assets" 0 "$?"
+
+		# Regression: Trace targets list should call showText(..., 1, ...)
+		grep -q '""1""' "$OUTPUT_DIR/output.html"
+		assertNotEquals "Trace target links should use numeric line 1" 0 "$?"
 	)
 }
 
