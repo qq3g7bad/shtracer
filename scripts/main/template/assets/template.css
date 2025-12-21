@@ -21,6 +21,7 @@ ul {
     color: #fff;
     background: #7f8c8d;
 }
+
 .summary-type-badge {
     display: inline-block;
     margin: 0;
@@ -53,22 +54,7 @@ ul {
 #trace-summary {
     margin-bottom: 10px;
 }
-.summary-list {
-    margin: 0 0 10px;
-    padding-left: 18px;
-}
 
-.summary-list > li {
-    margin: 6px 0;
-}
-
-.summary-sublist {
-    margin-top: 4px;
-    padding-left: 18px;
-    font-weight: bold;
-}
-
-=======
 .summary-list {
     margin: 0 0 10px;
     padding-left: 18px;
@@ -85,6 +71,19 @@ ul {
 
 .summary-sublist > li {
     margin: 3px 0;
+}
+
+.summary-target-list {
+    margin-top: 4px;
+    padding-left: 18px;
+}
+
+.summary-target-item {
+    margin: 2px 0;
+}
+
+.summary-target-cov {
+    margin-left: 6px;
 }
 
 .summary-pct {

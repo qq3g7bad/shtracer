@@ -569,12 +569,15 @@ print_summary_direct_links() {
 	_TAG_PAIRS_FILE="$2"
 
 	# Output format:
-	#   total <layer>:xx.xx%
-	#   <layer>-<target layer>:xx.xx%
+	#   <layer>
+	#     upstream: <target layer> <pct>, ...
+	#     downstream: <target layer> <pct>, ...
 	# Notes:
 	# - Uses direct links only.
-	# - Treats links as undirected (any cross-layer connection counts).
-	# - For nodes connected to multiple target layers, split 1 equally across distinct target layers.
+	# - Treats links as undirected.
+	# - Computes upstream/downstream projections independently (relative to layer order).
+	# - For nodes connected to multiple target layers on a side, split 1 equally across distinct target layers.
+	# - Percent formatting matches the Type diagram labels.
 	awk \
 		-v SEP="$SHTRACER_SEPARATOR" \
 		-v TAGS_FILE="$_TAGS_FILE" \
@@ -588,6 +591,15 @@ print_summary_direct_links() {
 			n = split(s, a, ":")
 			t = a[n]
 			return trim(t)
+		}
+		function fmt_pct(value, total,   p, s) {
+			if (total <= 0) { return "" }
+			p = (value / total) * 100
+			if (p > 0 && p < 0.5) { return "<1%" }
+			if (p >= 10) { s = sprintf("%.0f", p) }
+			else { s = sprintf("%.1f", p) }
+			sub(/\.0$/, "", s)
+			return s "%"
 		}
 		BEGIN {
 			# First pass: load tag->layer from 01_tags
@@ -605,6 +617,16 @@ print_summary_direct_links() {
 				}
 			}
 			close(TAGS_FILE)
+
+			# Preferred stable order
+			order[1] = "Requirement"
+			order[2] = "Architecture"
+			order[3] = "Implementation"
+			order[4] = "Unit test"
+			order[5] = "Integration test"
+			for (i = 1; i <= 5; i++) {
+				ord[order[i]] = i
+			}
 		}
 		{
 			# Second pass (main input): 02_tag_pairs (space separated)
@@ -617,59 +639,99 @@ print_summary_direct_links() {
 			lb = tag2layer[tagB]
 			if (la == "" || lb == "") { next }
 			if (la == lb) { next }
+			if (!(la in ord) || !(lb in ord)) { next }
 
-			# Undirected: register each endpoint as targeting the other layer (distinct per tag)
-			k1 = tagA SUBSEP lb
-			if (!(k1 in hasTarget)) {
-				hasTarget[k1] = 1
-				tcnt[tagA]++
+			# Undirected, but categorize per endpoint as upstream/downstream by layer order.
+			# Endpoint A
+			if (ord[lb] < ord[la]) {
+				k = tagA SUBSEP lb
+				if (!(k in hasUp)) { hasUp[k] = 1; upcnt[tagA]++ }
+			} else if (ord[lb] > ord[la]) {
+				k = tagA SUBSEP lb
+				if (!(k in hasDown)) { hasDown[k] = 1; downcnt[tagA]++ }
 			}
-			k2 = tagB SUBSEP la
-			if (!(k2 in hasTarget)) {
-				hasTarget[k2] = 1
-				tcnt[tagB]++
+			# Endpoint B
+			if (ord[la] < ord[lb]) {
+				k = tagB SUBSEP la
+				if (!(k in hasUp)) { hasUp[k] = 1; upcnt[tagB]++ }
+			} else if (ord[la] > ord[lb]) {
+				k = tagB SUBSEP la
+				if (!(k in hasDown)) { hasDown[k] = 1; downcnt[tagB]++ }
 			}
 		}
 		END {
-			# Covered nodes per layer
-			for (tag in tag2layer) {
-				l = tag2layer[tag]
-				if (tcnt[tag] > 0) { covered[l]++ }
-			}
-
-			# Accumulate mass per layer->target
-			for (k in hasTarget) {
+			# Accumulate split-mass per layer side (up/down) and target layer
+			for (k in hasUp) {
 				split(k, parts, SUBSEP)
 				tag = parts[1]
 				tgt = parts[2]
 				src = tag2layer[tag]
 				if (src == "" || tgt == "") { continue }
-				if (tcnt[tag] <= 0) { continue }
-				acc[src SUBSEP tgt] += (1.0 / tcnt[tag])
-				tgtsBySrc[src SUBSEP tgt] = 1
+				if (upcnt[tag] <= 0) { continue }
+				accUp[src SUBSEP tgt] += (1.0 / upcnt[tag])
+				hasAccUp[src SUBSEP tgt] = 1
+			}
+			for (k in hasDown) {
+				split(k, parts, SUBSEP)
+				tag = parts[1]
+				tgt = parts[2]
+				src = tag2layer[tag]
+				if (src == "" || tgt == "") { continue }
+				if (downcnt[tag] <= 0) { continue }
+				accDown[src SUBSEP tgt] += (1.0 / downcnt[tag])
+				hasAccDown[src SUBSEP tgt] = 1
 			}
 
-			# Preferred stable order (matches existing diagrams)
-			order[1] = "Requirement"
-			order[2] = "Architecture"
-			order[3] = "Implementation"
-			order[4] = "Unit test"
-			order[5] = "Integration test"
-
-			# Emit totals and projections
+			# Emit summary per layer (no totals). Upstream and downstream in stable order.
 			for (i = 1; i <= 5; i++) {
 				src = order[i]
 				N = layerN[src] + 0
 				if (N <= 0) { continue }
-				c = covered[src] + 0
-				printf "total %s:%.2f%%\n", src, (100.0 * c / N)
 
-				# Emit projections in stable target order
+				# Determine if this layer has any upstream/downstream targets
+				hasLine = 0
 				for (j = 1; j <= 5; j++) {
 					tgt = order[j]
+					if (j >= i) { continue }
+					if ((src SUBSEP tgt) in hasAccUp) { hasLine = 1 }
+				}
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					if (j <= i) { continue }
+					if ((src SUBSEP tgt) in hasAccDown) { hasLine = 1 }
+				}
+				if (!hasLine) { continue }
+
+				print src
+
+				# upstream: reverse order (closest previous layer first visually)
+				upStr = ""
+				for (j = 5; j >= 1; j--) {
+					tgt = order[j]
+					if (j >= i) { continue }
 					key = src SUBSEP tgt
-					if (!(key in tgtsBySrc)) { continue }
-					printf "%s-%s:%.2f%%\n", src, tgt, (100.0 * acc[key] / N)
+					if (!(key in hasAccUp)) { continue }
+					part = tgt " " fmt_pct(accUp[key] + 0, N)
+					if (upStr == "") upStr = part
+					else upStr = upStr ", " part
+				}
+				if (upStr != "") {
+					print "  upstream: " upStr
+				}
+
+				# downstream: forward order
+				downStr = ""
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					if (j <= i) { continue }
+					key = src SUBSEP tgt
+					if (!(key in hasAccDown)) { continue }
+					part = tgt " " fmt_pct(accDown[key] + 0, N)
+					if (downStr == "") downStr = part
+					else downStr = downStr ", " part
+				}
+				if (downStr != "") {
+					print "  downstream: " downStr
 				}
 			}
 		}

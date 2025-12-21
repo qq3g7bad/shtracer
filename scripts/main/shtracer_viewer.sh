@@ -302,58 +302,145 @@ function renderSummary(data) {
     const nodes = Array.isArray(data.nodes) ? data.nodes : [];
     const links = Array.isArray(data.direct_links) ? data.direct_links : (Array.isArray(data.links) ? data.links : []);
 
-    const nodeType = new Map();
-    const typeItemCount = new Map();
-    nodes.forEach(n => {
-        const t = traceTypeFromTraceTarget(n.trace_target);
-        nodeType.set(n.id, t);
-        if (t !== 'pad') typeItemCount.set(t, (typeItemCount.get(t) || 0) + 1);
-    });
-
-    const totalFrom = new Map();
-    const pairFrom = new Map();
-
-    links.forEach(l => {
-        const fromId = l.source;
-        const toId = l.target;
-        const fromType = nodeType.get(fromId);
-        const toType = nodeType.get(toId);
-        if (!fromType || !toType) return;
-        if (fromType === 'pad' || toType === 'pad') return;
-
-        if (!totalFrom.has(fromType)) totalFrom.set(fromType, new Set());
-        totalFrom.get(fromType).add(fromId);
-
-        const key = fromType + '->' + toType;
-        if (!pairFrom.has(key)) pairFrom.set(key, new Set());
-        pairFrom.get(key).add(fromId);
-    });
-
-    function pct(num, den) {
-        if (!den) return '0.00%';
-        return (Math.round((num / den) * 10000) / 100).toFixed(2) + '%';
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
-    const fromTypes = Array.from(typeItemCount.keys()).sort();
-    let html = '<table class="summary-table">' +
-        '<thead><tr><th>From</th><th>To</th><th>Coverage</th></tr></thead><tbody>';
+    function typeBadge(type) {
+        const c = traceTypeColor(type);
+        return `<span class="summary-type-badge" style="background-color:${c};border-color:${c};">${escapeHtml(type)}</span>`;
+    }
 
-    fromTypes.forEach(ft => {
-        const den = typeItemCount.get(ft) || 0;
-        const total = totalFrom.has(ft) ? totalFrom.get(ft).size : 0;
-        html += `<tr class="summary-total-row"><td>${ft}</td><td>Total</td><td>${pct(total, den)}</td></tr>`;
+    function nodeIdFromLinkEnd(end) {
+        if (typeof end === 'string') return end;
+        if (typeof end === 'number') {
+            const n = nodes[end];
+            return n && typeof n.id === 'string' ? n.id : null;
+        }
+        if (end && typeof end === 'object') {
+            if (typeof end.id === 'string') return end.id;
+            if (typeof end.name === 'string') return end.name;
+        }
+        return null;
+    }
 
-        const pairs = Array.from(pairFrom.keys())
-            .filter(k => k.startsWith(ft + '->'))
-            .sort();
-        pairs.forEach(k => {
-            const to = k.split('->')[1];
-            const num = pairFrom.get(k).size;
-            html += `<tr><td>${ft}</td><td>${to}</td><td>${pct(num, den)}</td></tr>`;
+    // Match the Type diagram's link label definition/rounding:
+    // - Build undirected adjacency from direct links
+    // - Compute upstream/downstream projections independently
+    // - Split node mass equally across distinct target layers on each side
+    // - Format like the diagram: >=10% as integer, else 1 decimal; <0.5% as <1%
+    const dims = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+    const dimOrder = new Map(dims.map((d, i) => [d, i]));
+    const isDim = (d) => dimOrder.has(d);
+
+    function formatPct(value, total) {
+        if (!total) return '';
+        const p = (value / total) * 100;
+        if (p > 0 && p < 0.5) return '<1%';
+        const s = (p >= 10 ? p.toFixed(0) : p.toFixed(1));
+        return s.replace(/\.0$/, '') + '%';
+    }
+
+    const idxById = new Map();
+    nodes.forEach((n, i) => {
+        if (n && typeof n.id === 'string') idxById.set(n.id, i);
+    });
+
+    const typeOf = nodes.map(n => traceTypeFromTraceTarget(n && n.trace_target));
+    const idxByDim = {};
+    dims.forEach(d => { idxByDim[d] = []; });
+    typeOf.forEach((t, i) => {
+        if (isDim(t)) idxByDim[t].push(i);
+    });
+
+    const adj = Array.from({ length: nodes.length }, () => []);
+    links.forEach(l => {
+        const aId = nodeIdFromLinkEnd(l.source);
+        const bId = nodeIdFromLinkEnd(l.target);
+        if (!aId || !bId) return;
+        const a = idxById.get(aId);
+        const b = idxById.get(bId);
+        if (typeof a !== 'number' || typeof b !== 'number') return;
+        adj[a].push(b);
+        adj[b].push(a);
+    });
+
+    const N = {};
+    const accUp = {};   // accUp[src][tgt]
+    const accDown = {}; // accDown[src][tgt]
+    dims.forEach(src => {
+        N[src] = idxByDim[src].length;
+        accUp[src] = {};
+        accDown[src] = {};
+        dims.forEach(tgt => {
+            if (tgt === src) return;
+            accUp[src][tgt] = 0;
+            accDown[src][tgt] = 0;
         });
     });
 
-    html += '</tbody></table>';
+    dims.forEach(src => {
+        const srcOrder = dimOrder.get(src);
+        idxByDim[src].forEach(i => {
+            const upSet = new Set();
+            const downSet = new Set();
+            (adj[i] || []).forEach(j => {
+                const t = typeOf[j];
+                if (!isDim(t) || t === src) return;
+                const o = dimOrder.get(t);
+                if (o < srcOrder) upSet.add(t);
+                else if (o > srcOrder) downSet.add(t);
+            });
+
+            if (upSet.size) {
+                const w = 1 / upSet.size;
+                upSet.forEach(tgt => { accUp[src][tgt] += w; });
+            }
+            if (downSet.size) {
+                const w = 1 / downSet.size;
+                downSet.forEach(tgt => { accDown[src][tgt] += w; });
+            }
+        });
+    });
+
+    let html = '<ul class="summary-list">';
+    dims.forEach(src => {
+        const den = N[src] || 0;
+        if (!den) return;
+
+        // Collect targets in stable order: upstream then downstream (same as diagram layout).
+        const upstreamParts = [];
+        for (let k = dims.length - 1; k >= 0; k--) {
+            const tgt = dims[k];
+            if (dimOrder.get(tgt) >= dimOrder.get(src)) continue;
+            const v = accUp[src][tgt] || 0;
+            if (v > 0) upstreamParts.push(`${tgt} ${formatPct(v, den)}`);
+        }
+        const downstreamParts = [];
+        for (let k = 0; k < dims.length; k++) {
+            const tgt = dims[k];
+            if (dimOrder.get(tgt) <= dimOrder.get(src)) continue;
+            const v = accDown[src][tgt] || 0;
+            if (v > 0) downstreamParts.push(`${tgt} ${formatPct(v, den)}`);
+        }
+        if (!upstreamParts.length && !downstreamParts.length) return;
+
+        html += `<li class=\"summary-total-item\">${typeBadge(src)}`;
+        html += '<ul class="summary-sublist">';
+        if (upstreamParts.length) {
+            html += `<li><span class=\"summary-dir\">upstream:</span> <span class=\"summary-pct\">${escapeHtml(upstreamParts.join(', '))}</span></li>`;
+        }
+        if (downstreamParts.length) {
+            html += `<li><span class=\"summary-dir\">downstream:</span> <span class=\"summary-pct\">${escapeHtml(downstreamParts.join(', '))}</span></li>`;
+        }
+        html += '</ul></li>';
+    });
+    html += '</ul>';
     el.innerHTML = html;
 }
 

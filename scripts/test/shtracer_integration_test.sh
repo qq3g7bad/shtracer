@@ -323,10 +323,12 @@ test_integration_summary_export() {
 		assertEquals "Shtracer should exit successfully with summary" 0 "${_EXIT_CODE}"
 
 		# Basic format checks
-		echo "${_OUTPUT}" | grep -q "^total "
-		assertEquals "Summary should contain total lines" 0 $?
-		echo "${_OUTPUT}" | grep -q "%$"
-		assertEquals "Summary lines should end with %" 0 $?
+		echo "${_OUTPUT}" | grep -q "^Requirement$\|^Architecture$\|^Implementation$\|^Unit test$\|^Integration test$"
+		assertEquals "Summary should contain layer headers" 0 $?
+		echo "${_OUTPUT}" | grep -q "^  upstream: \|^  downstream: "
+		assertEquals "Summary should contain upstream/downstream lines" 0 $?
+		echo "${_OUTPUT}" | grep -q "%$\|<1%"
+		assertEquals "Summary should contain percentage tokens" 0 $?
 
 		# Extra scripts should be suppressed in summary output
 		echo "${_OUTPUT}" | grep -q "pre-extra-script\|post-extra-script"
