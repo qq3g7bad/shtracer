@@ -316,6 +316,28 @@ function renderSummary(data) {
         return `<span class="summary-type-badge" style="background-color:${c};border-color:${c};">${escapeHtml(type)}</span>`;
     }
 
+    function escapeJsSingle(s) {
+        return String(s)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
+    }
+
+    function baseName(p) {
+        const s = String(p || '');
+        const parts = s.split('/');
+        return parts.length ? parts[parts.length - 1] : s;
+    }
+
+    function fileIdFromRawName(rawName) {
+        return 'Target_' + String(rawName).replace(/\./g, '_');
+    }
+
+    function fileExtFromRawName(rawName) {
+        const s = String(rawName || '');
+        const m = s.match(/\.([^.]+)$/);
+        return m ? m[1] : 'sh';
+    }
+
     function nodeIdFromLinkEnd(end) {
         if (typeof end === 'string') return end;
         if (typeof end === 'number') {
@@ -408,6 +430,37 @@ function renderSummary(data) {
         });
     });
 
+    // Per trace target (file) coverage within each layer
+    const fileCoverageByDim = {};
+    dims.forEach(d => {
+        fileCoverageByDim[d] = new Map();
+    });
+
+    dims.forEach(src => {
+        const srcOrder = dimOrder.get(src);
+        idxByDim[src].forEach(i => {
+            const n = nodes[i] || {};
+            const raw = baseName(n.file);
+            if (!raw || raw === 'config.md') return;
+
+            let hasUp = false;
+            let hasDown = false;
+            (adj[i] || []).forEach(j => {
+                const t = typeOf[j];
+                if (!isDim(t) || t === src) return;
+                const o = dimOrder.get(t);
+                if (o < srcOrder) hasUp = true;
+                else if (o > srcOrder) hasDown = true;
+            });
+
+            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0 };
+            m.total += 1;
+            if (hasUp) m.up += 1;
+            if (hasDown) m.down += 1;
+            fileCoverageByDim[src].set(raw, m);
+        });
+    });
+
     let html = '<ul class="summary-list">';
     dims.forEach(src => {
         const den = N[src] || 0;
@@ -437,6 +490,25 @@ function renderSummary(data) {
         }
         if (downstreamParts.length) {
             html += `<li><span class=\"summary-dir\">downstream:</span> <span class=\"summary-pct\">${escapeHtml(downstreamParts.join(', '))}</span></li>`;
+        }
+
+        const fileEntries = Array.from(fileCoverageByDim[src].entries())
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+        if (fileEntries.length) {
+            html += `<li><span class=\"summary-dir\">targets:</span>`;
+            html += '<ul class="summary-target-list">';
+            fileEntries.forEach(([rawName, stats]) => {
+                const up = formatPct(stats.up, stats.total);
+                const down = formatPct(stats.down, stats.total);
+                const id = fileIdFromRawName(rawName);
+                const ext = fileExtFromRawName(rawName);
+                html += `<li class=\"summary-target-item\">`;
+                html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
+                html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
+                html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
+                html += `</li>`;
+            });
+            html += '</ul></li>';
         }
         html += '</ul></li>';
     });
@@ -1325,15 +1397,15 @@ EOF
 # @param   $1 : TAG_TABLE_FILENAME
 # @return  HTML <thead> element with sort buttons (literal \n for sed processing)
 _html_add_table_header() {
-    # Fixed layer columns for the matrix.
-    # Note: Returns literal \n strings (not newlines) for later sed substitution
-    printf '%s' '<thead>\n  <tr>\n'
-    printf '%s' '    <th>Requirement <a href="#" onclick="sortTable(0)">sort</a></th>\n'
-    printf '%s' '    <th>Architecture <a href="#" onclick="sortTable(1)">sort</a></th>\n'
-    printf '%s' '    <th>Implementation <a href="#" onclick="sortTable(2)">sort</a></th>\n'
-    printf '%s' '    <th>Unit test <a href="#" onclick="sortTable(3)">sort</a></th>\n'
-    printf '%s' '    <th>Integration test <a href="#" onclick="sortTable(4)">sort</a></th>\n'
-    printf '%s' '  </tr>\n</thead>\n'
+	# Fixed layer columns for the matrix.
+	# Note: Returns literal \n strings (not newlines) for later sed substitution
+	printf '%s' '<thead>\n  <tr>\n'
+	printf '%s' '    <th>Requirement <a href="#" onclick="sortTable(0)">sort</a></th>\n'
+	printf '%s' '    <th>Architecture <a href="#" onclick="sortTable(1)">sort</a></th>\n'
+	printf '%s' '    <th>Implementation <a href="#" onclick="sortTable(2)">sort</a></th>\n'
+	printf '%s' '    <th>Unit test <a href="#" onclick="sortTable(3)">sort</a></th>\n'
+	printf '%s' '    <th>Integration test <a href="#" onclick="sortTable(4)">sort</a></th>\n'
+	printf '%s' '  </tr>\n</thead>\n'
 }
 
 ##
@@ -1341,24 +1413,24 @@ _html_add_table_header() {
 # @param   $1 : TAG_TABLE_FILENAME
 # @return  HTML <tbody> element with table data (literal \n for sed processing)
 _html_convert_tag_table() {
-    # Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
-    # $1: TAG_TABLE_FILENAME (space-separated tags per line)
-    # $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
-    # Note: Returns literal \n strings (not newlines) for later sed substitution
-    _TAG_TABLE_FILENAME="$1"
-    _TAG_INFO_TABLE="$2"
-    _sep="$SHTRACER_SEPARATOR"
-    _nodata="$NODATA_STRING"
+	# Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
+	# $1: TAG_TABLE_FILENAME (space-separated tags per line)
+	# $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
+	# Note: Returns literal \n strings (not newlines) for later sed substitution
+	_TAG_TABLE_FILENAME="$1"
+	_TAG_INFO_TABLE="$2"
+	_sep="$SHTRACER_SEPARATOR"
+	_nodata="$NODATA_STRING"
 
-    printf '%s' "<tbody>$({
-                if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+	printf '%s' "<tbody>$({
+		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
 			cat "$_TAG_INFO_TABLE"
 		else
 			printf '%s\n' "$_TAG_INFO_TABLE"
 		fi
-        printf '%s\n' '__SHTRACER_TAG_INFO_END__'
-        cat "$_TAG_TABLE_FILENAME"
-    } | awk -v sep="$_sep" -v nodata="$_nodata" '
+		printf '%s\n' '__SHTRACER_TAG_INFO_END__'
+		cat "$_TAG_TABLE_FILENAME"
+	} | awk -v sep="$_sep" -v nodata="$_nodata" '
         BEGIN {
             ndims = split("Requirement|Architecture|Implementation|Unit test|Integration test", dims, "|")
             for (i = 1; i <= ndims; i++) dimIndex[dims[i]] = i
@@ -1552,7 +1624,7 @@ convert_template_html() {
 
 		profile_start "convert_template_html_build_table"
 		_TABLE_HTML="$(_html_add_table_header "$_TAG_TABLE_FILENAME")"
-        _TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
+		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
 		profile_start "convert_template_html_insert_tag_table"
@@ -1685,7 +1757,7 @@ tag_info_table_from_json_file() {
 		| sort -k1,1n \
 			>"$_tmp_sort"
 
-    awk -F '\t' -v sep="$_sep" -v OFS="" '
+	awk -F '\t' -v sep="$_sep" -v OFS="" '
 		!seen[$2]++ {
             print $2, sep, $3, sep, $4, sep, $5
 		}
@@ -1693,7 +1765,7 @@ tag_info_table_from_json_file() {
 
 	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
 	if [ -n "$_config_path" ]; then
-        printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
+		printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
 	fi
 
 	cat "$_tmp_file"
@@ -1930,8 +2002,8 @@ shtracer_viewer_main() {
 	SHTRACER_SEPARATOR="${SHTRACER_SEPARATOR:=<shtracer_separator>}"
 	export SHTRACER_SEPARATOR
 
-    NODATA_STRING="${NODATA_STRING:=NONE}"
-    export NODATA_STRING
+	NODATA_STRING="${NODATA_STRING:=NONE}"
+	export NODATA_STRING
 
 	_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 	_TEMPLATE_ASSETS_DIR="${_TEMPLATE_DIR%/}/assets"
