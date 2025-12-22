@@ -262,10 +262,21 @@ Install the following tools for local development (optional but recommended):
 sudo apt-get install shellcheck  # Debian/Ubuntu
 brew install shellcheck          # macOS
 
-# Install shfmt
-go install mvdan.cc/sh/v3/cmd/shfmt@latest
-# or download from https://github.com/mvdan/sh/releases
+# Install shfmt v3.8.0 (CI uses this version)
+# Option 1: Install to local tools/ directory (recommended)
+mkdir -p tools
+# Linux:
+wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64
+# macOS:
+# wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_amd64
+chmod +x tools/shfmt
+
+# Option 2: Install system-wide
+# go install mvdan.cc/sh/v3/cmd/shfmt@v3.8.0
+# or download from https://github.com/mvdan/sh/releases/tag/v3.8.0
 ```
+
+**Note**: Use shfmt v3.8.0 to match CI formatting checks and avoid false formatting issues.
 
 ### Git Hooks
 

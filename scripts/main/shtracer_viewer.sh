@@ -1638,8 +1638,18 @@ _html_generate_file_list() {
 # @param   $2 : INFORMATION (file list HTML)
 # @return  Modified HTML with inserted content and fixed indentation
 _html_insert_content_with_indentation() {
-	echo "$1" \
-		| awk -v information="$2" '
+	_html_insert_info_file=$(mktemp)
+	printf '%s' "$2" >"$_html_insert_info_file"
+
+	_html_insert_result=$(echo "$1" \
+		| awk -v info_file="$_html_insert_info_file" '
+			BEGIN {
+				while ((getline line < info_file) > 0) {
+					if (information != "") information = information "\n"
+					information = information line
+				}
+				close(info_file)
+			}
 			{
 				gsub(/ *<!-- INSERT INFORMATION -->/,
 					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
@@ -1673,7 +1683,10 @@ _html_insert_content_with_indentation() {
 				}
 			}
 		' \
-		| sed '/<!-- SHTRACER INSERTED -->/d'
+		| sed '/<!-- SHTRACER INSERTED -->/d')
+
+	rm -f "$_html_insert_info_file"
+	echo "$_html_insert_result"
 }
 
 ##
@@ -1941,10 +1954,17 @@ convert_template_js() {
 			EOF
 		)
 
+		_convert_template_js_file=$(mktemp)
+		printf '%s' "$_JS_TEMPLATE" >"$_convert_template_js_file"
+
 		_JS_CONTENTS="$(
 			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u \
-				| awk -v js_template="$_JS_TEMPLATE" 'BEGIN{
-						init_js_template = js_template
+				| awk -v template_file="$_convert_template_js_file" 'BEGIN{
+						while ((getline line < template_file) > 0) {
+							if (init_js_template != "") init_js_template = init_js_template "\n"
+							init_js_template = init_js_template line
+						}
+						close(template_file)
 					}
 					{
 						js_template = init_js_template
@@ -1974,6 +1994,7 @@ convert_template_js() {
 						print js_template
 					}'
 		)"
+		rm -f "$_convert_template_js_file"
 		_viewer_emit_show_text_js_template | while read -r s; do
 			case "$s" in
 				*//\ js_contents*)

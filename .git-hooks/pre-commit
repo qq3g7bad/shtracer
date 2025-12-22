@@ -39,18 +39,27 @@ else
   echo "Shellcheck passed!"
 fi
 
-# Check if shfmt is installed
-if ! command -v shfmt >/dev/null 2>&1; then
-  echo "Warning: shfmt is not installed. Skipping formatting check."
-  echo "Install shfmt: https://github.com/mvdan/sh#shfmt"
+# Check if shfmt is installed (prefer local tools/shfmt 3.8.0)
+SHFMT_CMD=""
+if [ -x "./tools/shfmt" ]; then
+  SHFMT_CMD="./tools/shfmt"
+  echo "Using local shfmt: $(./tools/shfmt --version)"
+elif command -v shfmt >/dev/null 2>&1; then
+  SHFMT_CMD="shfmt"
+  echo "Using system shfmt: $(shfmt --version)"
 else
+  echo "Warning: shfmt is not installed. Skipping formatting check."
+  echo "Install shfmt v3.8.0 to tools/: wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 && chmod +x tools/shfmt"
+fi
+
+if [ -n "$SHFMT_CMD" ]; then
   echo "Checking formatting with shfmt..."
   for file in $STAGED_SH_FILES; do
     if [ -f "$file" ]; then
       echo "  Checking $file"
-      if ! shfmt -d -ci -bn "$file" >/dev/null 2>&1; then
+      if ! $SHFMT_CMD -d -ci -bn "$file" >/dev/null 2>&1; then
         echo "Formatting issues found in $file"
-        echo "Run 'shfmt -w -ci -bn $file' to fix."
+        echo "Run '$SHFMT_CMD -w -ci -bn $file' to fix."
         echo "Or use 'git commit --no-verify' to bypass."
         exit 1
       fi
