@@ -1697,7 +1697,7 @@ convert_template_html() {
 		profile_end "convert_template_html_build_table"
 
 		profile_start "convert_template_html_insert_tag_table"
-		_tmp_table_html_file="$(mktemp)"
+		_tmp_table_html_file="$(mktemp 2>/dev/null || mktemp -t shtracer_table)"
 		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
