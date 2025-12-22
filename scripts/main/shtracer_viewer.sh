@@ -36,98 +36,144 @@ function showText(event, fileName, highlightLine, language) {
 	const bytes = new Uint8Array(binaryString.length);
 	for (let i = 0; i < binaryString.length; i++) {
 		bytes[i] = binaryString.charCodeAt(i);
-	}
-	const content = new TextDecoder('utf-8').decode(bytes);
+            # Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
+            # $1: TAG_TABLE_FILENAME (space-separated tags per line)
+            # $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
+            # Note: Returns literal \n strings (not newlines) for later sed substitution
+            _TAG_TABLE_FILENAME="$1"
+            _TAG_INFO_TABLE="$2"
+            _sep="$SHTRACER_SEPARATOR"
+            _nodata="$NODATA_STRING"
 
-	// Skip syntax highlighting for markdown files
-	let highlightedContent;
-	if (language === 'md' || language === 'markdown' || language === 'txt') {
-		// For markdown and text files, escape HTML and add basic formatting
-		highlightedContent = content
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;')
-			// Add color to markdown headings
-			.replace(/^(#{1,6})\s+(.+)$/gm, '<span style="color: #0969da; font-weight: bold;">$1 $2</span>');
-	} else {
-		// For code files, use syntax highlighting
-		if (hljs.getLanguage(language)) {
-			highlightedContent = hljs.highlight(content, { language }).value;
-		} else {
-			highlightedContent = hljs.highlightAuto(content).value;
-		}
-	}
+            printf '%s' "<tbody>$({
+                if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+                    cat "$_TAG_INFO_TABLE"
+                else
+                    printf '%s\n' "$_TAG_INFO_TABLE"
+                fi
+                printf '%s\n' '__SHTRACER_TAG_INFO_END__'
+                cat "$_TAG_TABLE_FILENAME"
+            } | awk -v sep="$_sep" -v nodata="$_nodata" '
+                BEGIN {
+                    ndims = split("Requirement|Architecture|Implementation|Unit test|Integration test", dims, "|")
+                    for (i = 1; i <= ndims; i++) dimIndex[dims[i]] = i
+                    mode = 0
+                }
+                function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+                function field1(s, delim,   p1) {
+                    p1 = index(s, delim)
+                    if (p1 <= 0) return s
+                    return substr(s, 1, p1 - 1)
+                }
+                function field2(s, delim,   rest, p1, p2) {
+                    p1 = index(s, delim)
+                    if (p1 <= 0) return ""
+                    rest = substr(s, p1 + length(delim))
+                    p2 = index(rest, delim)
+                    if (p2 <= 0) return rest
+                    return substr(rest, 1, p2 - 1)
+                }
+                function field3(s, delim,   rest, p1, p2, p3) {
+                    p1 = index(s, delim)
+                    if (p1 <= 0) return ""
+                    rest = substr(s, p1 + length(delim))
+                    p2 = index(rest, delim)
+                    if (p2 <= 0) return ""
+                    rest = substr(rest, p2 + length(delim))
+                    p3 = index(rest, delim)
+                    if (p3 <= 0) return rest
+                    return substr(rest, 1, p3 - 1)
+                }
+                function field4(s, delim,   rest, p1, p2, p3) {
+                    p1 = index(s, delim)
+                    if (p1 <= 0) return ""
+                    rest = substr(s, p1 + length(delim))
+                    p2 = index(rest, delim)
+                    if (p2 <= 0) return ""
+                    rest = substr(rest, p2 + length(delim))
+                    p3 = index(rest, delim)
+                    if (p3 <= 0) return ""
+                    return substr(rest, p3 + length(delim))
+                }
+                function type_from_trace_target(tt,   n, p, t) {
+                    if (tt == "") return "Unknown"
+                    n = split(tt, p, ":")
+                    t = trim(p[n])
+                    return t == "" ? "Unknown" : t
+                }
+                function escape_attr(s,   t) {
+                    t = s
+                    gsub(/&/, "&amp;", t)
+                    gsub(/</, "&lt;", t)
+                    gsub(/>/, "&gt;", t)
+                    gsub(/"/, "&quot;", t)
+                    return t
+                }
+                function escape_js_sq(s,   t) {
+                    t = s
+                    gsub(/\\/, "\\\\", t)
+                    gsub(/\047/, "\\\\\047", t)
+                    return t
+                }
+                function badge(tag, typ, line, fileId, ext,   safeTyp, safeId, safeExt) {
+                    safeTyp = escape_attr(typ)
+                    safeId = escape_js_sq(fileId)
+                    safeExt = escape_js_sq(ext)
+                    return "<span class=\\\"matrix-tag-badge\\\" data-type=\\\"" safeTyp "\\\">" \
+                        "<a href=\\\"#\\\" onclick=\\\"showText(event, \047" safeId "\047, " line ", \047" safeExt "\047)\\\" " \
+                        "onmouseover=\\\"showTooltip(event, \047" safeId "\047)\\\" onmouseout=\\\"hideTooltip()\\\">" tag "</a>" \
+                        "</span>"
+                }
+                $0 == "__SHTRACER_TAG_INFO_END__" { mode = 1; next }
+                mode == 0 {
+                    if ($0 == "") next
+                    tag = trim(field1($0, sep))
+                    trace_target = trim(field4($0, sep))
+                    tagType[tag] = type_from_trace_target(trace_target)
 
-	// Split the highlighted HTML into lines and add highlight-line class to the target line
-	// Note: highlightLine is 1-based (human-readable line number), but array index is 0-based
-	const lines = highlightedContent.split('\n');
-	const finalText = lines.map((line, index) => {
-		const lineClass = (index === highlightLine - 1) ? ' class="highlight-line"' : '';
-		return `<div${lineClass}>${line || '&#8203;'}</div>`;
-	}).join('');
+                    line = trim(field2($0, sep))
+                    path = trim(field3($0, sep))
+                    tagLine[tag] = (line == "" ? 1 : line)
 
-	textContainer.innerHTML = `<pre><code class="hljs">${finalText}</code></pre>`;
+                    raw = path
+                    gsub(/.*\//, "", raw)
+                    ext = "sh"
+                    if (match(raw, /\.[^\.]+$/)) ext = substr(raw, RSTART + 1)
+                    tagExt[tag] = ext
 
-	const highlightedElement = textContainer.querySelector('.highlight-line');
-	if (highlightedElement) {
-		highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-	}
-
-	outputElement.textContent = file.path;
-}
-
-/**
- * @brief Hide display if it is the same tag as the tag one line above
- */
-function hideSameText() {
-	const table = document.getElementById("tag-table");
-
-	/* reset hidden text */
-	const rows = table.rows;
-	const tags = table.querySelectorAll('a');
-		tags.forEach(tag => {
-		tag.classList.remove("hidden-text");
-	});
-
-	/* check each row */
-	for (let i = 1; i < rows.length; i++) {
-		const cells = rows[i].cells;
-		for (let j = 0; j < cells.length; j++) {
-			const currentCellText = cells[j].innerText.trim();
-			const previousCellText = rows[i - 1].cells[j].innerText.trim();
-			if (currentCellText === previousCellText) {
-				const tag = cells[j].querySelector('a');
-				if (tag) {
-					tag.classList.add("hidden-text");
-				}
-			}
-		}
-	}
-}
-
-/**
- * @brief Sort the table based by a clicked column
- * @param columnIndex : [int] selected column
- */
-function sortTable(columnIndex) {
-	const table = document.getElementById("tag-table");
-
-	if (!table.sortStates) {
-		table.sortStates = Array.from(table.querySelectorAll('th')).map(() => false);
-	}
-
-	const ascending = !table.sortStates[columnIndex];
-	table.sortStates = table.sortStates.map((_, index) => index === columnIndex ? ascending : false);
-
-	const rows = Array.from(table.rows).slice(1);
-
-	rows.sort((a, b) => {
-		const cellA = a.cells[columnIndex].innerText.trim();
-		const cellB = b.cells[columnIndex].innerText.trim();
-
-		// "REQ" や "@" を除去し、数値部分だけを取り出す
+                    fid = raw
+                    gsub(/\./, "_", fid)
+                    fid = "Target_" fid
+                    tagFileId[tag] = fid
+                    next
+                }
+                {
+                    for (i = 1; i <= ndims; i++) { cell[i] = nodata; html[i] = "" }
+                    nextSlot = 1
+                    nt = split($0, tags, /[[:space:]]+/)
+                    for (k = 1; k <= nt; k++) {
+                        t = trim(tags[k])
+                        if (t == "" || t == nodata) continue
+                        typ = tagType[t]
+                        if (typ == "") typ = "Unknown"
+                        if (typ in dimIndex) {
+                            col = dimIndex[typ]
+                        } else {
+                            while (nextSlot <= ndims && cell[nextSlot] != nodata) nextSlot++
+                            col = (nextSlot <= ndims) ? nextSlot : ndims
+                        }
+                        frag = badge(t, typ, tagLine[t], tagFileId[t], tagExt[t])
+                        if (cell[col] == nodata) { cell[col] = t; html[col] = frag }
+                        else { cell[col] = cell[col] " " t; html[col] = html[col] "<br>" frag }
+                    }
+                    printf "\\n  <tr>\\n"
+                    for (i = 1; i <= ndims; i++) {
+                        if (cell[i] == nodata) printf "    <td>%s</td>\\n", nodata
+                        else printf "    <td>%s</td>\\n", html[i]
+                    }
+                    printf "  </tr>"
+                }
+            ')\n</tbody>"
 		const extractNumbers = (str) => str
 			.replace(/[^\d.]/g, '') // 数字とピリオド以外を削除
 			.split('.')             // ピリオドで分割
@@ -1436,10 +1482,30 @@ _html_convert_tag_table() {
             for (i = 1; i <= ndims; i++) dimIndex[dims[i]] = i
             mode = 0
         }
+        function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
         function field1(s, delim,   p1) {
             p1 = index(s, delim)
             if (p1 <= 0) return s
             return substr(s, 1, p1 - 1)
+        }
+        function field2(s, delim,   rest, p1, p2) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return ""
+            rest = substr(s, p1 + length(delim))
+            p2 = index(rest, delim)
+            if (p2 <= 0) return rest
+            return substr(rest, 1, p2 - 1)
+        }
+        function field3(s, delim,   rest, p1, p2, p3) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return ""
+            rest = substr(s, p1 + length(delim))
+            p2 = index(rest, delim)
+            if (p2 <= 0) return ""
+            rest = substr(rest, p2 + length(delim))
+            p3 = index(rest, delim)
+            if (p3 <= 0) return rest
+            return substr(rest, 1, p3 - 1)
         }
         function field4(s, delim,   rest, p1, p2, p3) {
             p1 = index(s, delim)
@@ -1452,14 +1518,13 @@ _html_convert_tag_table() {
             if (p3 <= 0) return ""
             return substr(rest, p3 + length(delim))
         }
-        function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
         function type_from_trace_target(tt,   n, p, t) {
             if (tt == "") return "Unknown"
             n = split(tt, p, ":")
             t = trim(p[n])
             return t == "" ? "Unknown" : t
         }
-        function escape_attr(s,   t) {
+        function escape_html(s,   t) {
             t = s
             gsub(/&/, "&amp;", t)
             gsub(/</, "&lt;", t)
@@ -1467,9 +1532,28 @@ _html_convert_tag_table() {
             gsub(/"/, "&quot;", t)
             return t
         }
-        function badge(tag, typ,   safeTyp) {
-            safeTyp = escape_attr(typ)
-            return "<span class=\\\"matrix-tag-badge\\\" data-type=\\\"" safeTyp "\\\">" tag "</span>"
+        function basename(path,   t) {
+            t = path
+            gsub(/.*\//, "", t)
+            return t
+        }
+        function ext_from_basename(base) {
+            if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
+            return "sh"
+        }
+        function fileid_from_basename(base,   t) {
+            t = base
+            gsub(/\./, "_", t)
+            return "Target_" t
+        }
+        function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
+            safeTyp = escape_html(typ)
+            safeTag = escape_html(tag)
+            safeId = escape_html(fileId)
+            safeExt = escape_html(ext)
+            return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
+                "<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
+                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
         }
         $0 == "__SHTRACER_TAG_INFO_END__" {
             mode = 1
@@ -1478,8 +1562,16 @@ _html_convert_tag_table() {
         mode == 0 {
             if ($0 == "") next
             tag = trim(field1($0, sep))
+            if (tag == "") next
+            line = trim(field2($0, sep))
+            path = trim(field3($0, sep))
             trace_target = trim(field4($0, sep))
+            if (line == "" || line + 0 < 1) line = 1
             tagType[tag] = type_from_trace_target(trace_target)
+            tagLine[tag] = line
+            base = basename(path)
+            tagExt[tag] = ext_from_basename(base)
+            tagFileId[tag] = fileid_from_basename(base)
             next
         }
         {
@@ -1497,7 +1589,7 @@ _html_convert_tag_table() {
                     while (nextSlot <= ndims && cell[nextSlot] != nodata) nextSlot++
                     col = (nextSlot <= ndims) ? nextSlot : ndims
                 }
-                frag = badge(t, typ)
+                frag = badge(t, typ, tagLine[t], tagFileId[t], tagExt[t])
                 if (cell[col] == nodata) { cell[col] = t; html[col] = frag }
                 else { cell[col] = cell[col] " " t; html[col] = html[col] "<br>" frag }
             }
@@ -1509,29 +1601,6 @@ _html_convert_tag_table() {
             printf "  </tr>"
         }
     ')\n</tbody>"
-}
-
-##
-# @brief   Generate sed script to convert tags to clickable links
-# @param   $1 : TAG_INFO_TABLE (tag information with file paths)
-# @return  sed commands to replace plain tags with <a> elements
-_html_generate_tag_links() {
-	echo "$1" \
-		| awk -F"$SHTRACER_SEPARATOR" '{
-			n = split($3, parts, "/");
-			filename = parts[n];
-			raw_filename = filename;
-			extension_pos = match(raw_filename, /\.[^\.]+$/);
-			gsub(/\./, "_", filename);
-			gsub(/^/, "Target_", filename);
-
-			if (extension_pos) {
-				extension = substr(raw_filename, extension_pos + 1);
-			} else {
-				extension = "sh";
-			}
-			print "s|" $1 "|<a href=\"#\" onclick=\"showText(event, '\''" filename "'\'', " $2 ", '\''" extension "'\'')\" onmouseover=\"showTooltip(event, '\''" filename "'\'')\" onmouseout=\"hideTooltip()\">" $1 "</a>|g";
-		}'
 }
 
 ##
@@ -1634,10 +1703,6 @@ convert_template_html() {
 				<"${_TEMPLATE_HTML_DIR%/}/template.html"
 		)"
 		profile_end "convert_template_html_insert_tag_table"
-
-		profile_start "convert_template_html_insert_tag_table_link"
-		_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "$(_html_generate_tag_links "$_TAG_INFO_TABLE")")"
-		profile_end "convert_template_html_insert_tag_table_link"
 
 		profile_start "convert_template_html_insert_information"
 		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
