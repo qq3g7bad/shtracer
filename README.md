@@ -220,16 +220,33 @@ Note:
 
 ## 🗂️ Features
 
-* Create traceability markdown files from following input files.
-  * Markdown files which include contents to trace.
-  * These contents are indexed by their own IDs.
-  * Connections between files are specified by IDs.
-  * These IDs are written in each markdown file as comment blocks.
-* (Optional) Use markdown files as intermediate products.
-  * Create intermediate markdown files from other file format by using some scripts.
-  * Create non-markdown output files by using some scripts.
+### Core Traceability
 
-For details, see documents in `./docs/` directory.
+* **Tag-Based Linking**: Connect requirements, architecture, implementation, and tests using simple `@TAG@` syntax in markdown comments
+* **Multi-File Tracing**: Trace across multiple markdown files and source code files
+* **Verification Mode**: Validate that all tags are properly linked (no orphaned or broken references)
+* **Change Mode**: Safely rename/swap tags across your entire project
+
+### Rich Visualization (NEW in v0.2.0)
+
+* **🎨 Interactive Sankey Diagrams**: Modern D3.js-powered flow diagrams showing traceability relationships
+  * Proportional link widths based on connection density
+  * Color-coded node types (Requirements, Architecture, Implementation, Tests)
+  * Hover interactions and smooth animations
+* **📊 Coverage Statistics**: Per-file and per-layer coverage metrics
+  * Identify gaps in your traceability matrix at a glance
+  * Unified coverage calculations across CLI and viewer
+* **🎯 Self-Contained HTML**: Single-file output with embedded assets
+  * No external dependencies - share HTML files anywhere
+  * Works offline, in restricted environments, or on internal networks
+
+### Developer-Friendly
+
+* **JSON-First Output**: Structured JSON output via `--json` for integration with other tools
+* **Cross-Platform**: POSIX-compliant shell scripts work on Linux, macOS, and Windows (via Git Bash/WSL)
+* **Security-Focused**: Removed arbitrary script execution (PRE/POST-EXTRA-SCRIPT) in v0.2.0
+
+For detailed usage and examples, see documents in `./docs/` directory.
 
 ## 🌏 Requirements
 

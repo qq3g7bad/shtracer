@@ -1639,6 +1639,8 @@ _html_generate_file_list() {
 # @return  Modified HTML with inserted content and fixed indentation
 _html_insert_content_with_indentation() {
 	_html_insert_info_file=$(mktemp)
+	trap 'rm -f "$_html_insert_info_file" 2>/dev/null || true' EXIT INT TERM
+
 	printf '%s' "$2" >"$_html_insert_info_file"
 
 	_html_insert_result=$(echo "$1" \
@@ -1685,7 +1687,8 @@ _html_insert_content_with_indentation() {
 		' \
 		| sed '/<!-- SHTRACER INSERTED -->/d')
 
-	rm -f "$_html_insert_info_file"
+	rm -f "$_html_insert_info_file" 2>/dev/null || true
+	trap - EXIT INT TERM
 	echo "$_html_insert_result"
 }
 
@@ -1955,6 +1958,8 @@ convert_template_js() {
 		)
 
 		_convert_template_js_file=$(mktemp)
+		trap 'rm -f "$_convert_template_js_file" 2>/dev/null || true' EXIT INT TERM
+
 		printf '%s' "$_JS_TEMPLATE" >"$_convert_template_js_file"
 
 		_JS_CONTENTS="$(
@@ -1994,7 +1999,8 @@ convert_template_js() {
 						print js_template
 					}'
 		)"
-		rm -f "$_convert_template_js_file"
+		rm -f "$_convert_template_js_file" 2>/dev/null || true
+		trap - EXIT INT TERM
 		_viewer_emit_show_text_js_template | while read -r s; do
 			case "$s" in
 				*//\ js_contents*)
