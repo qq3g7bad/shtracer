@@ -1697,11 +1697,24 @@ convert_template_html() {
 		profile_end "convert_template_html_build_table"
 
 		profile_start "convert_template_html_insert_tag_table"
+		_tmp_table_html_file="$(mktemp)"
+		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
 		_HTML_CONTENT="$(
-			sed -e "s/'\\n'/'\\\\n'/g" \
-				-e "s|^[ \t]*<!-- INSERT TABLE -->.*|<!-- SHTRACER INSERTED -->\n${_TABLE_HTML}\n<!-- SHTRACER INSERTED -->|" \
-				<"${_TEMPLATE_HTML_DIR%/}/template.html"
+			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
+				| awk -v table_html_file="$_tmp_table_html_file" '
+                    /^[ \t]*<!-- INSERT TABLE -->/ {
+                        print "<!-- SHTRACER INSERTED -->"
+                        while ((getline line < table_html_file) > 0) {
+                            print line
+                        }
+                        close(table_html_file)
+                        print "<!-- SHTRACER INSERTED -->"
+                        next
+                    }
+                    { print }
+                '
 		)"
+		rm -f "$_tmp_table_html_file"
 		profile_end "convert_template_html_insert_tag_table"
 
 		profile_start "convert_template_html_insert_information"
