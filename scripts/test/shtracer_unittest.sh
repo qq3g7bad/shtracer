@@ -9,7 +9,6 @@ cd "${TEST_DIR}" || exit 1
 
 # Ensure shunit2 can find this script after we cd
 SELF_PATH="${TEST_DIR%/}/$(basename -- "$0")"
-export SHUNIT_PARENT="$SELF_PATH"
 
 # Let ../../shtracer resolve its own SCRIPT_DIR even when sourced
 SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_DIR%/}/../.." 2>/dev/null && pwd -P)
@@ -462,5 +461,7 @@ test_main_routine_invalid_config_paths() {
 	)
 }
 
+# shellcheck disable=SC2034
+SHUNIT_PARENT="$SELF_PATH"
 # shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"
