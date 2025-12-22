@@ -1,15 +1,23 @@
 #!/bin/sh
 
 # Ensure paths resolve regardless of caller CWD
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
-if [ -z "$SCRIPT_DIR" ]; then
-	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$TEST_DIR" ]; then
+	TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
 fi
-cd "${SCRIPT_DIR}" || exit 1
+cd "${TEST_DIR}" || exit 1
+
+# Ensure shunit2 can find this script after we cd
+SELF_PATH="${TEST_DIR%/}/$(basename -- "$0")"
+export SHUNIT_PARENT="$SELF_PATH"
+
+# Let ../../shtracer resolve its own SCRIPT_DIR even when sourced
+SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_DIR%/}/../.." 2>/dev/null && pwd -P)
+SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 
 # Source test targets
-# shellcheck source=../../shtracer
-. "../../shtracer"
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR%/}/shtracer"
 # shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
@@ -31,7 +39,7 @@ oneTimeSetUp() {
 #
 setUp() {
 	set +u
-	export SCRIPT_DIR="../../"
+	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 }
 
@@ -278,7 +286,7 @@ test_parse_arguments_normal_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0"
+		parse_arguments "$SELF_PATH"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 	)
@@ -292,7 +300,7 @@ test_parse_arguments_verify_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0" "-v"
+		parse_arguments "$SELF_PATH" "-v"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -306,7 +314,7 @@ test_parse_arguments_summary_mode() {
 		load_functions
 		EXPORT_SUMMARY='false'
 		# Act -------------
-		parse_arguments "$0" "--summary"
+		parse_arguments "$SELF_PATH" "--summary"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 		assertEquals "$EXPORT_SUMMARY" "true"
@@ -321,7 +329,7 @@ test_parse_arguments_change_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0" "-c" "old_tag" "new_tag"
+		parse_arguments "$SELF_PATH" "-c" "old_tag" "new_tag"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "CHANGE"
 	)
@@ -350,11 +358,11 @@ test_parse_arguments_with_config_file() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0"
+		parse_arguments "$SELF_PATH"
 		# Assert ----------
-		_DIRNAME=$(cd "$(dirname "$0")" && pwd)
-		assertEquals "${_DIRNAME%/}/${0##*/}" "$CONFIG_PATH"
-		assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
+		_DIRNAME=$(cd "$(dirname "$SELF_PATH")" && pwd)
+		assertEquals "$SELF_PATH" "$CONFIG_PATH"
+		assertEquals "${_DIRNAME%/}" "$CONFIG_DIR"
 		assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"
 	)
