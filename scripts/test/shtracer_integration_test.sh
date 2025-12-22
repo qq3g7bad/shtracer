@@ -345,18 +345,18 @@ test_integration_json_export_flexible_order() {
 		# Assert ----------
 		assertEquals "Shtracer should exit successfully with --json before config" 0 "${_EXIT_CODE}"
 
-		# Verify JSON structure
+		# Verify JSON structure (same as test_integration_json_export)
 		echo "${_OUTPUT}" | grep -q '"metadata"'
 		assertEquals "JSON should contain metadata" 0 $?
 
-		echo "${_OUTPUT}" | grep -q '"tags"'
-		assertEquals "JSON should contain tags" 0 $?
+		echo "${_OUTPUT}" | grep -q '"nodes"'
+		assertEquals "JSON should contain nodes" 0 $?
 
-		# Verify JSON is valid (can be parsed)
-		echo "${_OUTPUT}" | grep -q "^{"
-		assertEquals "JSON should start with {" 0 $?
-		echo "${_OUTPUT}" | tail -1 | grep -q "}$"
-		assertEquals "JSON should end with }" 0 $?
+		echo "${_OUTPUT}" | grep -q '"links"'
+		assertEquals "JSON should contain links" 0 $?
+
+		echo "${_OUTPUT}" | grep -q '"chains"'
+		assertEquals "JSON should contain chains" 0 $?
 	)
 }
 
