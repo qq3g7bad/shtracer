@@ -864,6 +864,36 @@ make_json() {
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
+	_escape_sed_pattern() {
+		# Escape BRE/ERE-ish metacharacters for sed pattern (treated as regex)
+		# Note: we avoid choosing sed delimiter as '/' to reduce escaping needs later.
+		printf '%s' "$1" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
+	}
+	_escape_sed_replacement() {
+		# Escape sed replacement metacharacters (& and \\) and our delimiter '|'
+		printf '%s' "$1" | sed 's/\\/\\\\/g; s/&/\\&/g; s/|/\\|/g'
+	}
+	_list_target_files() {
+		# $1: PATH (file or directory)
+		# $2: extension regex (grep -E style), optional
+		_target_path="$1"
+		_ext_re="$2"
+		if [ -f "$_target_path" ]; then
+			printf '%s\n' "$_target_path"
+			return 0
+		fi
+		if [ ! -d "$_target_path" ]; then
+			return 0
+		fi
+		_ext_re=${_ext_re:-.*}
+		find "$_target_path" -maxdepth 1 -type f -print 2>/dev/null \
+			| while IFS= read -r _f; do
+				_base=${_f##*/}
+				printf '%s\n' "$_base" | grep -Eq "$_ext_re" || continue
+				printf '%s\n' "$_f"
+			done
+	}
+
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
 		_ABSOLUTE_TAG_DIRNAME="$(
@@ -882,36 +912,42 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		_FILE_LIST="$(echo "$_TARGET_DATA" \
-			| while read -r _DATA; do
-				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
-				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
-				cd "$CONFIG_DIR" || error_exit 1 "swat_tags" "Cannot change directory to config path"
-
-				# Check if TARGET_PATH is file or direcrory
-				if [ -f "$_PATH" ]; then # File
-					_FILE="$_PATH"
-				else # Directory (Check extension: Multiple extensions can be set by grep argument way)
-					_EXTENSION=${_EXTENSION:-*}
-					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null \
-						| grep -E "$_EXTENSION" \
-						| sed "s@^@$_PATH@")"
-
-					if [ "$(echo "$_FILE" | sed '/^$/d' | wc -l)" -eq 0 ]; then
-						return # There are no files to match specified extension.
-					fi
-				fi
-				echo "$_FILE"
-			done)"
+		_FILE_LIST="$(
+			echo "$_TARGET_DATA" \
+				| while read -r _DATA; do
+					_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
+					_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
+					cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
+					_list_target_files "$_PATH" "$_EXTENSION"
+				done
+		)"
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
+			_before_pat="$(_escape_sed_pattern "$2")"
+			_after_pat="$(_escape_sed_pattern "$3")"
+			_tmp_pat="$(_escape_sed_pattern "$_TEMP_TAG")"
+			_before_rep="$(_escape_sed_replacement "$2")"
+			_after_rep="$(_escape_sed_replacement "$3")"
+			_tmp_rep="$(_escape_sed_replacement "$_TEMP_TAG")"
 			echo "$_FILE_LIST" \
 				| sort -u \
-				| while read -r t; do
-					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
-					sed -i "s/${3}/${2}/g" "$t"
-					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
+				| while IFS= read -r t; do
+					[ -n "$t" ] || continue
+					_tmp_file="$(mktemp 2>/dev/null || mktemp -t shtracer_swap_tags)" || exit 1
+					sed \
+						-e "s|${_before_pat}|${_tmp_rep}|g" \
+						-e "s|${_after_pat}|${_before_rep}|g" \
+						-e "s|${_tmp_pat}|${_after_rep}|g" \
+						"$t" >"$_tmp_file" || {
+						rm -f "$_tmp_file"
+						exit 1
+					}
+					cat "$_tmp_file" >"$t" || {
+						rm -f "$_tmp_file"
+						exit 1
+					}
+					rm -f "$_tmp_file"
 				done
 		)
 	)
