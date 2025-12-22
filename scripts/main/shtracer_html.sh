@@ -17,233 +17,6 @@ case "$0" in
 esac
 
 ##
-# @brief   Parse config and generate flowchart indices
-# @param   $1 : CONFIG_OUTPUT_DATA path
-# @param   $2 : FORK_STRING_BRE
-# @param   $3 : UML_OUTPUT_CONFIG output path
-# @return  None (writes to $3)
-_make_flowchart_parse_config() {
-	_CONFIG_OUTPUT_DATA="$1"
-	_FORK_STRING_BRE="$2"
-	_UML_OUTPUT_CONFIG="$3"
-
-	# Parse config output data
-	awk <"$_CONFIG_OUTPUT_DATA" \
-		-F "$SHTRACER_SEPARATOR" \
-		'{ if(previous != $1){print $1}; previous=$1 }' \
-		| awk -F":" -v fork_string_bre="$_FORK_STRING_BRE" \
-			'BEGIN{}
-			{
-				# Fork counter
-				fork_count       = gsub(fork_string_bre, "&")
-				fork_count_index = 2*fork_count
-				increment_index  = 2*fork_count + 1
-
-				idx[increment_index]++
-
-				# If fork detected
-				if(previous_fork_count+1 == fork_count) {
-					idx[fork_count_index] = 0
-					idx[increment_index]  = 1
-					idx[increment_index-2]++
-				}
-				previous_fork_count=fork_count
-
-
-				# In fork situation, concatenation from $1 to $(NF-1)
-				if(fork_count_index > 0) {
-					fork_section = ""
-					for (i = 2; i < NF; i++) {
-						fork_section = fork_section"-"$i
-					}
-					if (fork_section != previous_fork_section) {
-						idx[fork_count_index]++
-						idx[increment_index]=1
-					}
-					previous_fork_section = fork_section
-				}
-
-				flowchart_idx = ""
-				for (i = 1; i <= increment_index; i++) {
-					flowchart_idx = flowchart_idx"_"idx[i]
-				}
-
-				print flowchart_idx, $0
-			}' \
-		| sed 's/^[^_]*_//; s/ :/:/' >"$_UML_OUTPUT_CONFIG"
-}
-
-##
-# @brief   Prepare UML declarations from config
-# @param   $1 : UML_OUTPUT_CONFIG path
-# @param   $2 : UML_OUTPUT_DECLARATION output path
-# @return  None (writes to $2)
-_make_flowchart_prepare_declarations() {
-	_UML_OUTPUT_CONFIG="$1"
-	_UML_OUTPUT_DECLARATION="$2"
-
-	# Prepare declaration for UML
-	awk <"$_UML_OUTPUT_CONFIG" \
-		-F ":" \
-		'{print "id"$1"(["$NF"])"}' >"$_UML_OUTPUT_DECLARATION"
-}
-
-##
-# @brief   Prepare UML relationships from config
-# @param   $1 : UML_OUTPUT_CONFIG path
-# @param   $2 : FORK_STRING_BRE
-# @param   $3 : UML_OUTPUT_RELATIONSHIPS output path
-# @return  None (writes to $3)
-#
-# This AWK state machine generates Mermaid flowchart relationships (edges and subgraphs).
-# It handles complex fork structures where execution paths split and merge:
-#   - Case 1: Fork increment (entering nested structure) - creates new subgraph block
-#   - Case 2: Fork decrement (exiting nested structure) - closes subgraphs, merges branches
-#   - Case 3: Same fork level - handles parallel branches and sequential flow within forks
-#   - Case 4: Simple sequential flow - normal node-to-node connections
-# The script tracks fork depth, manages subgraph nesting, and ensures all branches
-# properly connect when merging.
-_make_flowchart_prepare_relationships() {
-	_UML_OUTPUT_CONFIG="$1"
-	_FORK_STRING_BRE="$2"
-	_UML_OUTPUT_RELATIONSHIPS="$3"
-
-	# Generate Mermaid flowchart relationships
-	awk <"$_UML_OUTPUT_CONFIG" \
-		-F ":" -v fork_string_bre="$_FORK_STRING_BRE" \
-		'BEGIN{previous="start"}
-		{
-			# Fork counter
-			fork_count = gsub(fork_string_bre, "&")
-
-			split($1, section, "_")
-			split(previous, previous_section, "_")
-
-			# If fork detected
-
-			# 1) fork counter incremented
-			if(previous_fork_count+1 == fork_count) {
-				fork_base=previous
-				previous="id"$1
-				print fork_base" --> id"$1
-				fork_counter[fork_count]++
-				print "subgraph \""$(NF-1) "\""
-				fork_last[fork_counter[fork_count]] = $1
-			}
-
-			# 2) fork counter decremented
-			else if(previous_fork_count >= fork_count+1) {
-				while(previous_fork_count >= fork_count+1) {
-					print "end"
-					for (i=1; i<=fork_counter[previous_fork_count]; i++) {
-						print "id"fork_last[i]" --> id"$1
-					}
-					previous_fork_count--;
-				}
-			}
-
-			else{
-				if (length(section) > 2 && length(previous_section) > 2) {
-
-					# 3-1) fork again
-					if(section[length(section)-1] > previous_section[length(previous_section)-1]) {
-						print "end"
-						print fork_base" --> id"$1
-						previous="id"$1
-						fork_counter[fork_count]++
-						print "subgraph \""$(NF-1) "\""
-						fork_last[fork_counter[fork_count]] = $1
-					}
-
-					# 3-2) fork end
-					else if(section[length(section)-1] < previous_section[length(previous_section)-1]) {
-						print previous" --> id"$1
-						previous="id"$1
-					}
-
-					# 3-3) In the same fork
-					else {
-						print previous" --> id"$1
-						fork_last[fork_counter[fork_count]] = $1
-						previous="id"$1
-					}
-				}
-				# 4-1)
-				else {
-					print previous" --> id"$1
-					previous="id"$1
-				}
-			}
-			previous_fork_count=fork_count
-		}
-		END {
-			# When the fork block is not closed at the last line
-			if (fork_count >= 1) {
-				while(fork_count >=1) {
-					print "end"
-					fork_count--;
-				}
-			}
-			else {
-				print stop[End]
-				print "id"$1" --> stop"
-			}
-		}' \
-		|
-		# delete subgraphs without data
-		sed '/^subgraph ".*"$/{N;/^\(subgraph ".*"\)\nend$/d;}' >"$_UML_OUTPUT_RELATIONSHIPS"
-}
-
-##
-# @brief  Generate Mermaid flowchart diagram from config data
-# @param $1 : CONFIG_OUTPUT_DATA
-# @return UML_OUTPUT_FILENAME
-# @tag @IMP3.1@ (FROM: @ARC3.1@)
-make_target_flowchart() {
-	(
-		profile_start "make_target_flowchart"
-
-		_CONFIG_OUTPUT_DATA="$1"
-		_FORK_STRING_BRE="\\\\(fork\\\\)"
-
-		_UML_OUTPUT_DIR="${OUTPUT_DIR%/}/uml/"
-		_UML_OUTPUT_CONFIG="${_UML_OUTPUT_DIR%/}/01_config"
-		_UML_OUTPUT_DECLARATION="${_UML_OUTPUT_DIR%/}/10_declaration"
-		_UML_OUTPUT_RELATIONSHIPS="${_UML_OUTPUT_DIR%/}/11_relationships"
-		_UML_OUTPUT_FILENAME="${_UML_OUTPUT_DIR%/}/20_uml"
-
-		mkdir -p "$_UML_OUTPUT_DIR"
-
-		# Parse config and generate flowchart indices
-		_make_flowchart_parse_config "$_CONFIG_OUTPUT_DATA" "$_FORK_STRING_BRE" "$_UML_OUTPUT_CONFIG"
-
-		# Prepare declarations for UML
-		_make_flowchart_prepare_declarations "$_UML_OUTPUT_CONFIG" "$_UML_OUTPUT_DECLARATION"
-
-		# Prepare relationships for UML
-		_make_flowchart_prepare_relationships "$_UML_OUTPUT_CONFIG" "$_FORK_STRING_BRE" "$_UML_OUTPUT_RELATIONSHIPS"
-
-		# Generate flowchart from template
-		_TEMPLATE_FLOWCHART='flowchart TB
-
-			start[Start]
-			@state_declaration@
-			@state_relationships@
-			'
-
-		echo "$_TEMPLATE_FLOWCHART" \
-			| sed "/@state_declaration@/r $_UML_OUTPUT_DECLARATION" \
-			| sed '/@state_declaration@/d' \
-			| sed "/@state_relationships@/r $_UML_OUTPUT_RELATIONSHIPS" \
-			| sed '/@state_relationships@/d' \
-			| sed 's/^[[:space:]]*//' >"$_UML_OUTPUT_FILENAME"
-
-		echo "$_UML_OUTPUT_FILENAME"
-		profile_end "make_target_flowchart"
-	)
-}
-
-##
 # @brief   Generate HTML table header with sortable columns
 # @param   $1 : TAG_TABLE_FILENAME
 # @return  HTML <thead> element with sort buttons (literal \n for sed processing)
@@ -353,12 +126,10 @@ _html_insert_content_with_indentation() {
 	#   - Apply consistent spacing (2 or 4 spaces depending on nesting)
 	#   - Remove marker comments after processing
 	echo "$1" \
-		| awk -v information="$2" -v mermaid_script="$3" '
+		| awk -v information="$2" '
 			{
 				gsub(/ *<!-- INSERT INFORMATION -->/,
 					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
-				gsub(/ *<!-- INSERT MERMAID -->/,
-					"<!-- SHTRACER INSERTED -->\n" mermaid_script "\n<!-- SHTRACER INSERTED -->");
 				print
 			}' \
 		| awk '
@@ -406,8 +177,7 @@ convert_template_html() {
 
 		_TAG_TABLE_FILENAME="$1"
 		_TAG_INFO_TABLE="$2"
-		_UML_FILENAME="$3"
-		_TEMPLATE_HTML_DIR="$4"
+		_TEMPLATE_HTML_DIR="$3"
 
 		# Build HTML table (header + body)
 		profile_start "convert_template_html_build_table"
@@ -436,8 +206,7 @@ convert_template_html() {
 
 		# Insert file information and Mermaid UML with proper indentation
 		profile_start "convert_template_html_insert_mermaid"
-		_MERMAID_SCRIPT="$(cat "$_UML_FILENAME")"
-		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION" "$_MERMAID_SCRIPT")"
+		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
 		profile_end "convert_template_html_insert_mermaid"
 
 		echo "$_HTML_CONTENT"
@@ -543,11 +312,11 @@ make_html() {
 			END {
 				print "@CONFIG@", "1", config_path
 			}')"
-		_UML_FILENAME="$3"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
-		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_UML_FILENAME" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
+		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
 		convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
+		cat "${_TEMPLTE_ASSETS_DIR%/}/sankey.js" >"${_OUTPUT_ASSETS_DIR%/}/sankey.js"
 	)
 }

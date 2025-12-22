@@ -579,6 +579,107 @@ print_verification_result() {
 }
 
 ##
+# @brief  Generate JSON output for traceability data
+# @param  $1 : TAG_OUTPUT_DATA (01_tags file path)
+# @param  $2 : TAG_PAIRS (02_tag_pairs file path)
+# @param  $3 : TAG_PAIRS_DOWNSTREAM (03_tag_pairs_downstream file path)
+# @param  $4 : TAG_TABLE (04_tag_table file path)
+# @param  $5 : CONFIG_TABLE (01_config_table file path)
+# @param  $6 : CONFIG_PATH (config file path)
+# @return JSON_OUTPUT_FILENAME
+# @tag    @IMP2.7@ (FROM: @ARC2.6@)
+make_json() {
+	_TAG_OUTPUT_DATA="$1"
+	_TAG_PAIRS="$2"
+	_TAG_PAIRS_DOWNSTREAM="$3"
+	_TAG_TABLE="$4"
+	_CONFIG_TABLE="$5"
+	_CONFIG_PATH="$6"
+
+	_JSON_OUTPUT_FILENAME="${OUTPUT_DIR%/}/output.json"
+
+	# Generate timestamp
+	_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+	# Start JSON structure
+	{
+		printf '{\n'
+		printf '  "metadata": {\n'
+		printf '    "version": "0.1.1",\n'
+		printf '    "generated": "%s",\n' "$_TIMESTAMP"
+		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
+		printf '  },\n'
+
+		# Generate nodes array from 01_tags
+		printf '  "nodes": [\n'
+		awk -F"$SHTRACER_SEPARATOR" '
+		BEGIN { first=1 }
+		NF >= 6 {
+			if (!first) printf ",\n"
+			first=0
+			# Escape quotes and backslashes in description
+			desc = $4
+			gsub(/"/, "\\\"", desc)
+			gsub(/\\/, "\\\\", desc)
+			gsub(/\n/, "\\n", desc)
+			gsub(/\r/, "\\r", desc)
+			gsub(/\t/, "\\t", desc)
+			printf "    {\n"
+			printf "      \"id\": \"%s\",\n", $2
+			printf "      \"label\": \"%s\",\n", $2
+			printf "      \"description\": \"%s\",\n", desc
+			printf "      \"file\": \"%s\",\n", $5
+			printf "      \"line\": %d,\n", $6
+			printf "      \"trace_target\": \"%s\"\n", $1
+			printf "    }"
+		}
+		END { printf "\n" }
+		' "$_TAG_OUTPUT_DATA"
+		printf '  ],\n'
+
+		# Generate links array from tag pairs (exclude NONE)
+		printf '  "links": [\n'
+		awk '
+		BEGIN { first=1 }
+		$1 != "NONE" && $2 != "NONE" {
+			key = $1 "," $2
+			if (!seen[key]++) {
+				if (!first) printf ",\n"
+				first=0
+				printf "    {\n"
+				printf "      \"source\": \"%s\",\n", $1
+				printf "      \"target\": \"%s\",\n", $2
+				printf "      \"value\": 1\n"
+				printf "    }"
+			}
+		}
+		' "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
+		printf '\n  ],\n'
+
+		# Generate chains array from tag table
+		printf '  "chains": [\n'
+		awk '
+		BEGIN { first=1 }
+		{
+			if (!first) printf ",\n"
+			first=0
+			printf "    ["
+			for (i=1; i<=NF; i++) {
+				if (i > 1) printf ", "
+				printf "\"%s\"", $i
+			}
+			printf "]"
+		}
+		' "$_TAG_TABLE"
+		printf '\n  ]\n'
+
+		printf '}\n'
+	} >"$_JSON_OUTPUT_FILENAME"
+
+	echo "$_JSON_OUTPUT_FILENAME"
+}
+
+##
 # @brief  Swap or rename tags across all trace target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG

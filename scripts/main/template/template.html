@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./assets/template.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -14,14 +16,8 @@
       <h1>shtracer output</h1>
       <h2>Trace targets</h2>
         <!-- INSERT INFORMATION -->
-      <h2>UML</h2>
-      <pre class="mermaid">
-        <!-- INSERT MERMAID -->
-      </pre>
-      <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: true });
-      </script>
+      <h2>Traceability Flow</h2>
+      <div id="sankey-diagram" style="width: 100%; height: 600px;"></div>
       <h2>Requirement traceability matrix</h2>
       <table id="tag-table">
         <!-- INSERT TABLE -->
@@ -35,5 +31,6 @@
     </div>
   </div>
   <script src="./assets/show_text.js"></script>
+  <script src="./assets/sankey.js"></script>
 </body>
 </html>

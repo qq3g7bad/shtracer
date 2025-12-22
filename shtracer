@@ -8,6 +8,7 @@ CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
+EXPORT_JSON='false'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -45,6 +46,7 @@ print_usage() {
 		  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
 		  -v                               Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
+		  --json                           Export traceability data in JSON format
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -94,6 +96,10 @@ parse_arguments() {
 		2*-v) # Verify mode
 			SHTRACER_MODE='VERIFY'
 			;;
+		2*--json) # Normal mode with JSON export
+			SHTRACER_MODE='NORMAL'
+			EXPORT_JSON='true'
+			;;
 		4*-c*) # Change mode
 			SHTRACER_MODE='CHANGE'
 			BEFORE_TAG="$3"
@@ -127,6 +133,7 @@ main_routine() {
 
 	# Export mode for use in sub-functions
 	export SHTRACER_MODE
+	export EXPORT_JSON
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
@@ -152,11 +159,20 @@ main_routine() {
 
 	if [ "$SHTRACER_MODE" = 'NORMAL' ]; then
 
-		if ! _UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"; then
-			error_exit 1 "main_routine" "Error in make_target_flowchart"
+		# Generate JSON (now mandatory for visualization)
+		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
+		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+		if ! make_json \
+			"$_TAGS" \
+			"${_TAG_OUTPUT_DIR%/}/02_tag_pairs" \
+			"${_TAG_OUTPUT_DIR%/}/03_tag_pairs_downstream" \
+			"$_TAG_TABLE_FILENAME" \
+			"${_CONFIG_OUTPUT_DIR%/}/01_config_table" \
+			"$CONFIG_PATH"; then
+			error_exit 1 "main_routine" "Error in make_json"
 		fi
 
-		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"; then
+		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS"; then
 			error_exit 1 "main_routine" "Error in make_html"
 		fi
 	fi

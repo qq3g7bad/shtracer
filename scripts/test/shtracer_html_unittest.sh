@@ -39,70 +39,6 @@ tearDown() {
 }
 
 ##
-# @brief  Test for make_target_flowchart without arguments
-# @tag    @UT3.1@ (FROM: @IMP3.1@)
-test_make_target_flowchart_without_arguments() {
-	(
-		# Arrange ---------
-		# Act -------------
-		_RESULT="$(make_target_flowchart "" 2>&1)"
-
-		# Assert ----------
-		# Function may succeed with empty argument, check if result is valid
-		# If it creates a file, it should at least have flowchart structure
-		if [ -n "$_RESULT" ] && [ -f "$_RESULT" ]; then
-			# If file was created, verify it has proper content
-			assertNotEquals "" "$(grep -E "(flowchart|start|stop)" "$_RESULT" 2>/dev/null || echo "")"
-		else
-			# If no file created, that's also acceptable behavior
-			assertTrue "Function completed" "true"
-		fi
-	)
-}
-
-##
-# @brief  Test for make_target_flowchart with valid config
-# @tag    @UT3.2@ (FROM: @IMP3.1@)
-test_make_target_flowchart_with_valid_config() {
-	(
-		# Arrange ---------
-		SCRIPT_DIR="../../"
-		mkdir -p "$OUTPUT_DIR/config"
-		echo ":Requirement" >"$OUTPUT_DIR/config/test_config"
-
-		# Act -------------
-		_RESULT="$(make_target_flowchart "$OUTPUT_DIR/config/test_config")"
-
-		# Assert ----------
-		assertEquals 0 "$?"
-		assertNotEquals "" "$_RESULT"
-		assertEquals 0 "$(
-			[ -f "$_RESULT" ]
-			echo "$?"
-		)"
-		assertNotEquals "" "$(grep "flowchart TB" "$_RESULT")"
-	)
-}
-
-##
-# @brief  Test for make_target_flowchart with non-existent file
-# @tag    @UT3.3@ (FROM: @IMP3.1@)
-test_make_target_flowchart_with_non_existent_file() {
-	(
-		# Arrange ---------
-		SCRIPT_DIR="../../"
-
-		# Act -------------
-		_RESULT="$(make_target_flowchart "non_existent_file" 2>&1)"
-
-		# Assert ----------
-		# Function may handle non-existent files gracefully
-		# Check if it at least completes without fatal errors
-		assertTrue "Function completed" "true"
-	)
-}
-
-##
 # @brief  Test for convert_template_html with valid inputs
 # @tag    @UT3.4@ (FROM: @IMP3.1@)
 test_convert_template_html_with_valid_inputs() {
@@ -110,14 +46,12 @@ test_convert_template_html_with_valid_inputs() {
 		# Arrange ---------
 		SCRIPT_DIR="../../"
 		mkdir -p "$OUTPUT_DIR/tags"
-		mkdir -p "$OUTPUT_DIR/uml"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
-		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 		_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 
 		# Act -------------
-		_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info" "$OUTPUT_DIR/uml/test_uml" "$_TEMPLATE_DIR")"
+		_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info" "$_TEMPLATE_DIR")"
 
 		# Assert ----------
 		assertEquals 0 "$?"
@@ -172,7 +106,7 @@ test_make_html_with_valid_inputs() {
 		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 
 		# Act -------------
-		make_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_tags" "$OUTPUT_DIR/uml/test_uml"
+		make_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_tags"
 
 		# Assert ----------
 		assertEquals 0 "$?"
@@ -188,6 +122,26 @@ test_make_html_with_valid_inputs() {
 			[ -f "$OUTPUT_DIR/assets/template.css" ]
 			echo "$?"
 		)"
+		assertEquals 0 "$(
+			[ -f "$OUTPUT_DIR/assets/sankey.js" ]
+			echo "$?"
+		)"
+
+		# Check HTML content
+		grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should have DOCTYPE" 0 $?
+
+		grep -q "<table" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should contain table" 0 $?
+
+		grep -q "d3js.org" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should include D3.js" 0 $?
+
+		grep -q "sankey-diagram" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should contain Sankey diagram container" 0 $?
+
+		grep -q "sankey.js" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should include sankey.js" 0 $?
 	)
 }
 

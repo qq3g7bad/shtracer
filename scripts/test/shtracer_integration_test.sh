@@ -55,6 +55,7 @@ test_integration_normal_mode() {
 		assertTrue "Tags file should exist" "[ -f output/tags/01_tags ]"
 		assertTrue "Tag table should exist" "[ -f output/tags/04_tag_table ]"
 		assertTrue "HTML output should exist" "[ -f output/output.html ]"
+		assertTrue "JSON output should exist" "[ -f output/output.json ]"
 
 		# Verify tag table content
 		_TAG_TABLE=$(cat output/tags/04_tag_table)
@@ -68,6 +69,20 @@ test_integration_normal_mode() {
 
 		grep -q "<table" output/output.html
 		assertEquals "HTML should contain table" 0 $?
+
+		# Check D3.js and Sankey elements
+		grep -q "d3js.org" output/output.html
+		assertEquals "HTML should include D3.js" 0 $?
+
+		grep -q "sankey-diagram" output/output.html
+		assertEquals "HTML should contain Sankey diagram container" 0 $?
+
+		grep -q "sankey.js" output/output.html
+		assertEquals "HTML should include sankey.js" 0 $?
+
+		# Check JSON is valid
+		python3 -m json.tool output/output.json >/dev/null 2>&1
+		assertEquals "JSON should be valid" 0 $?
 	)
 }
 
@@ -211,6 +226,43 @@ EOF
 
 		# Clean up
 		rm -f config_error.md
+	)
+}
+
+##
+# @brief  Integration test for JSON export
+# @tag    @IT1.4@ (FROM: @UT1.18@)
+test_integration_json_export() {
+	(
+		# Arrange ---------
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		# Act -------------
+		_OUTPUT=$("${SHTRACER_BIN}" ./config_integration.md --json 2>&1)
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Shtracer should exit successfully with JSON export" 0 "${_EXIT_CODE}"
+
+		# Check JSON output exists
+		assertTrue "JSON output should exist" "[ -f output/output.json ]"
+
+		# Verify JSON is valid (basic structure check)
+		_JSON_CONTENT=$(cat output/output.json)
+		echo "${_JSON_CONTENT}" | grep -q '"metadata"'
+		assertEquals "JSON should contain metadata" 0 $?
+
+		echo "${_JSON_CONTENT}" | grep -q '"nodes"'
+		assertEquals "JSON should contain nodes" 0 $?
+
+		echo "${_JSON_CONTENT}" | grep -q '"links"'
+		assertEquals "JSON should contain links" 0 $?
+
+		echo "${_JSON_CONTENT}" | grep -q '"chains"'
+		assertEquals "JSON should contain chains" 0 $?
+
+		# HTML should still be generated
+		assertTrue "HTML should still be generated with --json" "[ -f output/output.html ]"
 	)
 }
 
