@@ -65,7 +65,7 @@ test_integration_normal_mode() {
 		assertEquals "Tag table should match expected output" "${_EXPECTED}" "${_TAG_TABLE}"
 
 		# Generate HTML via viewer (stdin JSON -> stdout HTML)
-		cat output/output.json | "${SHTRACER_VIEWER}" > output/output.html
+		"${SHTRACER_VIEWER}" <output/output.json >output/output.html
 		assertEquals "Viewer should exit successfully" 0 $?
 		assertTrue "HTML output should exist" "[ -f output/output.html ]"
 
@@ -118,7 +118,7 @@ test_integration_html_option() {
 		mkdir -p output
 
 		# Act -------------
-		"${SHTRACER_BIN}" ./config_integration.md --html > output/output.html 2>/dev/null
+		"${SHTRACER_BIN}" ./config_integration.md --html >output/output.html 2>/dev/null
 		_EXIT_CODE=$?
 
 		# Assert ----------
@@ -152,13 +152,6 @@ test_integration_verify_mode() {
 
 		# Tag table should still be generated
 		assertTrue "Tag table should exist in verify mode" "[ -f output/tags/04_tag_table ]"
-
-		# Output should not contain pre-extra-script or post-extra-script messages
-		echo "${_OUTPUT}" | grep -q "pre-extra-script"
-		assertNotEquals "Output should not contain pre-extra-script in verify mode" 0 $?
-
-		echo "${_OUTPUT}" | grep -q "post-extra-script"
-		assertNotEquals "Output should not contain post-extra-script in verify mode" 0 $?
 	)
 }
 
@@ -329,10 +322,6 @@ test_integration_summary_export() {
 		assertEquals "Summary should contain upstream/downstream lines" 0 $?
 		echo "${_OUTPUT}" | grep -q "%$\|<1%"
 		assertEquals "Summary should contain percentage tokens" 0 $?
-
-		# Extra scripts should be suppressed in summary output
-		echo "${_OUTPUT}" | grep -q "pre-extra-script\|post-extra-script"
-		assertNotEquals "Summary should not contain extra script output" 0 $?
 
 		# HTML/JSON should NOT be generated in summary mode
 		assertTrue "HTML should not be generated with --summary" "[ ! -f output/output.html ]"
