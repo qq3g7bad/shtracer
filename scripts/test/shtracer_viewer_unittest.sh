@@ -1,13 +1,20 @@
 #!/bin/sh
 
 # Ensure paths resolve regardless of caller CWD
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+SCRIPT_DIR=$(
+	unset CDPATH
+	cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P
+)
 if [ -z "$SCRIPT_DIR" ]; then
-	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+	SCRIPT_DIR=$(
+		unset CDPATH
+		cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P
+	)
 fi
 
 # shunit2 needs a readable path to this test file (it uses $SHUNIT_PARENT/$0)
-export SHUNIT_PARENT="${SCRIPT_DIR%/}/$(basename -- "$0")"
+SHUNIT_PARENT="${SCRIPT_DIR%/}/$(basename -- "$0")"
+export SHUNIT_PARENT
 
 cd "${SCRIPT_DIR}" || exit 1
 

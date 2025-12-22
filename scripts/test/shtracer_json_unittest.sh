@@ -5,9 +5,15 @@
 # @brief   Unit tests for JSON export functionality
 #
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+SCRIPT_DIR=$(
+	unset CDPATH
+	cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P
+)
 if [ -z "$SCRIPT_DIR" ]; then
-	SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+	SCRIPT_DIR=$(
+		unset CDPATH
+		cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P
+	)
 fi
 cd "${SCRIPT_DIR}" || exit 1
 
