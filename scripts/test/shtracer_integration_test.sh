@@ -329,5 +329,90 @@ test_integration_summary_export() {
 	)
 }
 
+##
+# @brief  Integration test for --json before config (flexible order)
+# @tag    @IT1.9@ (FROM: @UT1.24@)
+test_integration_json_export_flexible_order() {
+	(
+		# Arrange ---------
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		# Act -------------
+		# New order: --json first
+		_OUTPUT=$("${SHTRACER_BIN}" --json ./config_integration.md 2>&1)
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Shtracer should exit successfully with --json before config" 0 "${_EXIT_CODE}"
+
+		# Verify JSON structure
+		echo "${_OUTPUT}" | grep -q '"metadata"'
+		assertEquals "JSON should contain metadata" 0 $?
+
+		echo "${_OUTPUT}" | grep -q '"tags"'
+		assertEquals "JSON should contain tags" 0 $?
+
+		# Verify JSON is valid (can be parsed)
+		echo "${_OUTPUT}" | grep -q "^{"
+		assertEquals "JSON should start with {" 0 $?
+		echo "${_OUTPUT}" | tail -1 | grep -q "}$"
+		assertEquals "JSON should end with }" 0 $?
+	)
+}
+
+##
+# @brief  Integration test for --html before config (flexible order)
+# @tag    @IT1.10@ (FROM: @UT1.25@)
+test_integration_html_flexible_order() {
+	(
+		# Arrange ---------
+		cd "${TEST_DATA_DIR}" || exit 1
+		rm -rf output
+		mkdir -p output
+
+		# Act -------------
+		# New order: --html first
+		"${SHTRACER_BIN}" --html ./config_integration.md >output/output.html 2>/dev/null
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "HTML export with --html before config should succeed" 0 "${_EXIT_CODE}"
+
+		assertTrue "HTML output should exist" "[ -f output/output.html ]"
+
+		# Check HTML is valid
+		grep -q "<!DOCTYPE html>" output/output.html
+		assertEquals "HTML should have DOCTYPE" 0 $?
+
+		grep -q "<table" output/output.html
+		assertEquals "HTML should contain table" 0 $?
+
+		grep -q "d3js.org" output/output.html
+		assertEquals "HTML should include D3.js" 0 $?
+	)
+}
+
+##
+# @brief  Integration test for -v before config (flexible order)
+# @tag    @IT1.11@ (FROM: @UT1.26@)
+test_integration_verify_flexible_order() {
+	(
+		# Arrange ---------
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		# Act -------------
+		# New order: -v first
+		_OUTPUT=$("${SHTRACER_BIN}" -v ./config_integration.md 2>&1)
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Verify mode with -v before config should succeed" 0 "${_EXIT_CODE}"
+
+		# Output should be empty on success (no duplicates/isolated tags)
+		# or should contain verification messages if issues found
+		# For this test data, we expect success with minimal output
+	)
+}
+
 # shellcheck source=shunit2/shunit2
 . "${SCRIPT_DIR}/shunit2/shunit2"

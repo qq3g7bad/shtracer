@@ -156,22 +156,27 @@ Examples:
      $ ./shtracer ./sample/config.md
 
   2. Generate HTML via viewer (recommended)
-    $ ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+     $ ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+     $ ./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
 
   3. Generate HTML directly
-    $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
+     $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
+     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
 
-  3. Change mode (swap or rename tags).
-     $ ./shtracer ./sample/config.md -c old_tag new_tag.
+  4. Change mode (swap or rename tags)
+     $ ./shtracer ./sample/config.md -c old_tag new_tag
+     $ ./shtracer -c old_tag new_tag ./sample/config.md
 
-  4. Verify mode (check for duplicate or isolated tags).
+  5. Verify mode (check for duplicate or isolated tags)
      $ ./shtracer ./sample/config.md -v
+     $ ./shtracer -v ./sample/config.md
 
-  5. Test mode
+  6. Test mode
      $ ./shtracer -t
 
 Note:
-  - The <configfile> argument must always be specified before options.
+  - Arguments can be specified in any order.
+  - Only one option can be used at a time.
 
 ```
 

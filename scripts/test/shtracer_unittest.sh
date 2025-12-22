@@ -368,6 +368,152 @@ test_parse_arguments_with_config_file() {
 }
 
 ##
+# @brief  Test for parse_arguments with --json before config (flexible order)
+# @tag    @UT1.24@ (FROM: @IMP1.3@)
+test_parse_arguments_json_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_JSON='false'
+		# Act -------------
+		parse_arguments "--json" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_JSON" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --html before config (flexible order)
+# @tag    @UT1.25@ (FROM: @IMP1.3@)
+test_parse_arguments_html_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_HTML='false'
+		# Act -------------
+		parse_arguments "--html" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_HTML" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -v before config (flexible order)
+# @tag    @UT1.26@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "-v" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --summary before config (flexible order)
+# @tag    @UT1.27@ (FROM: @IMP1.3@)
+test_parse_arguments_summary_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_SUMMARY='false'
+		# Act -------------
+		parse_arguments "--summary" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_SUMMARY" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -c before config (flexible order)
+# @tag    @UT1.28@ (FROM: @IMP1.3@)
+test_parse_arguments_change_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "-c" "old_tag" "new_tag" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "CHANGE"
+		assertEquals "$BEFORE_TAG" "old_tag"
+		assertEquals "$AFTER_TAG" "new_tag"
+	)
+}
+
+##
+# @brief  Test for parse_arguments rejecting multiple options
+# @tag    @UT1.29@ (FROM: @IMP1.3@)
+test_parse_arguments_multiple_options() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "--json" "--html" "$SELF_PATH" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Multiple options"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments rejecting mode with export flag
+# @tag    @UT1.30@ (FROM: @IMP1.3@)
+test_parse_arguments_mode_with_export() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "-v" "--json" "$SELF_PATH" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Multiple options"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --json but no config file
+# @tag    @UT1.31@ (FROM: @IMP1.3@)
+test_parse_arguments_json_without_config() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "--json" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Config file required"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -c missing second tag argument
+# @tag    @UT1.32@ (FROM: @IMP1.3@)
+test_parse_arguments_change_missing_args() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "-c" "old_tag" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "requires"
+		assertEquals 0 "$?"
+	)
+}
+
+##
 # @brief  Test for main_routine
 # @tag    @UT1.18@ (FROM: @IMP4.1@)
 test_main_routine() {

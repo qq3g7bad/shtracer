@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `shtracer_json_unittest.sh` with 20+ test cases
   - Validates JSON output structure and content
   - Ensures parser correctness
+- **Flexible Argument Order** (current commit)
+  - Options can now be specified before or after the config file
+  - Examples: `shtracer --json config.md` and `shtracer config.md --json` both work
+  - Full backward compatibility maintained
+  - Clearer error messages for invalid option combinations
 
 ### Changed
 
@@ -63,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated Documentation** ([054fba5](https://github.com/qq3g7bad/shtracer/commit/054fba5))
   - Removed "(fork)" annotations from config examples
   - Clarified that configs are project-specific, not fork-specific
+- **Argument Parsing** (current commit)
+  - Switched from case pattern matching to two-pass while-loop parsing
+  - Enables flexible argument ordering
+  - Single-option-only constraint enforced more explicitly
+  - Better error messages for invalid combinations
 
 ### Fixed
 
