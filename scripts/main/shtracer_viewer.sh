@@ -1149,7 +1149,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
                     tooltip.style('visibility', 'hidden');
                 });
 
-                
+
     } else {
         // For type diagram, use sankey links
         g.append('g')
@@ -1353,14 +1353,14 @@ function renderSankey(data) {
 		// Prepare nodes and links for full diagram
 		const sankeyNodes = data.nodes.map((d, i) => ({ ...d, index: i }));
 		const nodeIndexMap = new Map(sankeyNodes.map((node, i) => [node.id, i]));
-    
+
 
 		const sankeyLinks = data.links.map(d => ({
 				...d,
 				source: nodeIndexMap.get(d.source),
 				target: nodeIndexMap.get(d.target)
 		}));
-    
+
 		sankeyLinks.forEach((link, i) => {
 				if (link.source === undefined || link.target === undefined) {
 						console.error(`Link ${i} has undefined source/target:`, link);
@@ -1590,35 +1590,6 @@ _html_convert_tag_table() {
 }
 
 ##
-# @brief   Generate HTML file information list for sidebar
-# @param   $1 : TAG_INFO_TABLE (tag information with file paths)
-# @return  HTML <ul> element with clickable file links
-_html_generate_file_list() {
-	printf '%s\n' '<div id="trace-targets">'
-	printf '%s\n' '<ul>'
-	echo "$1" \
-		| awk -F"$SHTRACER_SEPARATOR" '$1 != "@CONFIG@" {print $3}' \
-		| sort -u \
-		| awk '{
-            n = split($0, parts, "/");
-            filename = parts[n];
-            raw_filename = filename;
-            extension_pos = match(raw_filename, /\.[^\.]+$/);
-            gsub(/\./, "_", filename);
-            gsub(/^/, "Target_", filename);
-
-            if (extension_pos) {
-                extension = substr(raw_filename, extension_pos + 1);
-            } else {
-                extension = "sh";
-            }
-            print "<li><a href=\"#\" onclick=\"showText(event, '\''"filename"'\'', 1, '\''"extension"'\'')\" onmouseover=\"showTooltip(event, '\''"filename"'\'')\" onmouseout=\"hideTooltip()\">"raw_filename"</a></li>"
-        }'
-	printf '%s\n' '</ul>'
-	printf '%s\n' '</div>'
-}
-
-##
 # @brief   Insert file information into HTML with proper indentation
 # @param   $1 : HTML_CONTENT (template HTML to modify)
 # @param   $2 : INFORMATION (file list HTML)
@@ -1748,13 +1719,9 @@ convert_template_html() {
 		rm -f "$_tmp_table_html_file"
 		profile_end "convert_template_html_insert_tag_table"
 
-		profile_start "convert_template_html_insert_information"
-		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
-		profile_end "convert_template_html_insert_information"
-
-		profile_start "convert_template_html_insert_mermaid"
+		profile_start "_html_insert_content_with_indentation"
 		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
-		profile_end "convert_template_html_insert_mermaid"
+		profile_end "_html_insert_content_with_indentation"
 
 		echo "$_HTML_CONTENT"
 
@@ -1983,8 +1950,8 @@ convert_template_js() {
 
                         contents = file_to_js_string(path)
                         print "\t\"" js_escape(filename) "\": {"
-                        print "\t\tpath:\"" js_escape(path) "\"," 
-                        print "\t\tcontent:\"" contents "\"," 
+                        print "\t\tpath:\"" js_escape(path) "\","
+                        print "\t\tcontent:\"" contents "\","
                         print "\t\textension:\"" js_escape(extension) "\""
                         print "\t},"
                     }'
