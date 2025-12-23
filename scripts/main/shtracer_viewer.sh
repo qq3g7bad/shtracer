@@ -1393,36 +1393,64 @@ EOF
 }
 
 ##
-# @brief   Generate HTML table header with sortable columns
-# @param   $1 : TAG_TABLE_FILENAME
-# @return  HTML <thead> element with sort buttons (literal \n for sed processing)
+# @brief   Generate HTML table header with sortable columns dynamically from TAG_INFO_TABLE
+# @param   $1 : TAG_INFO_TABLE (tag information with trace_target)
+# @return  HTML <thead> element with sort buttons
 _html_add_table_header() {
-	# Fixed layer columns for the matrix.
-	# Note: Returns literal \n strings (not newlines) for later sed substitution
-	printf '%s' '<thead>\n  <tr>\n'
-	printf '%s' '    <th>Requirement <a href="#" onclick="sortTable(0)">sort</a></th>\n'
-	printf '%s' '    <th>Architecture <a href="#" onclick="sortTable(1)">sort</a></th>\n'
-	printf '%s' '    <th>Implementation <a href="#" onclick="sortTable(2)">sort</a></th>\n'
-	printf '%s' '    <th>Unit test <a href="#" onclick="sortTable(3)">sort</a></th>\n'
-	printf '%s' '    <th>Integration test <a href="#" onclick="sortTable(4)">sort</a></th>\n'
-	printf '%s' '  </tr>\n</thead>\n'
+	_TAG_INFO_TABLE="$1"
+	_sep="$SHTRACER_SEPARATOR"
+
+	printf '%s\n' '<thead>'
+	printf '%s\n' '  <tr>'
+
+	# Extract unique trace_target types and generate header columns
+	{
+		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+			cat "$_TAG_INFO_TABLE"
+		else
+			printf '%s\n' "$_TAG_INFO_TABLE"
+		fi
+	} | awk -F"$_sep" -v col_idx=0 '
+		function get_last_segment(s,   n, parts) {
+			n = split(s, parts, ":")
+			return n > 0 ? parts[n] : s
+		}
+		{
+			if (NF >= 4 && $4 != "") {
+				trace_target = $4
+				col_name = get_last_segment(trace_target)
+				if (!(col_name in seen)) {
+					seen[col_name] = 1
+					cols[col_idx++] = col_name
+				}
+			}
+		}
+		END {
+			for (i = 0; i < col_idx; i++) {
+				printf "    <th>%s <a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\n", cols[i], i
+			}
+		}
+	'
+
+	printf '%s\n' '  </tr>'
+	printf '%s\n' '</thead>'
 }
 
 ##
 # @brief   Convert tag table rows to HTML table body
 # @param   $1 : TAG_TABLE_FILENAME
-# @return  HTML <tbody> element with table data (literal \n for sed processing)
+# @return  HTML <tbody> element with table data
 _html_convert_tag_table() {
 	# Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
 	# $1: TAG_TABLE_FILENAME (space-separated tags per line)
 	# $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
-	# Note: Returns literal \n strings (not newlines) for later sed substitution
 	_TAG_TABLE_FILENAME="$1"
 	_TAG_INFO_TABLE="$2"
 	_sep="$SHTRACER_SEPARATOR"
 	_nodata="$NODATA_STRING"
 
-	printf '%s' "<tbody>$({
+	printf '%s\n' '<tbody>'
+	{
 		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
 			cat "$_TAG_INFO_TABLE"
 		else
@@ -1432,9 +1460,12 @@ _html_convert_tag_table() {
 		cat "$_TAG_TABLE_FILENAME"
 	} | awk -v sep="$_sep" -v nodata="$_nodata" '
         BEGIN {
-            ndims = split("Requirement|Architecture|Implementation|Unit test|Integration test", dims, "|")
-            for (i = 1; i <= ndims; i++) dimIndex[dims[i]] = i
+            ndims = 0
             mode = 0
+        }
+        function get_last_segment(s,   n, parts) {
+            n = split(s, parts, ":")
+            return n > 0 ? parts[n] : s
         }
         function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
         function field1(s, delim,   p1) {
@@ -1521,11 +1552,17 @@ _html_convert_tag_table() {
             path = trim(field3($0, sep))
             trace_target = trim(field4($0, sep))
             if (line == "" || line + 0 < 1) line = 1
-            tagType[tag] = type_from_trace_target(trace_target)
+            typ = type_from_trace_target(trace_target)
+            tagType[tag] = typ
             tagLine[tag] = line
             base = basename(path)
             tagExt[tag] = ext_from_basename(base)
             tagFileId[tag] = fileid_from_basename(base)
+            # Build dims array dynamically
+            if (typ != "" && typ != "Unknown" && !(typ in dimIndex)) {
+                dims[++ndims] = typ
+                dimIndex[typ] = ndims
+            }
             next
         }
         {
@@ -1547,14 +1584,15 @@ _html_convert_tag_table() {
                 if (cell[col] == nodata) { cell[col] = t; html[col] = frag }
                 else { cell[col] = cell[col] " " t; html[col] = html[col] "<br>" frag }
             }
-            printf "\\n  <tr>\\n"
+            printf "\n  <tr>\n"
             for (i = 1; i <= ndims; i++) {
-                if (cell[i] == nodata) printf "    <td>%s</td>\\n", nodata
-                else printf "    <td>%s</td>\\n", html[i]
+                if (cell[i] == nodata) printf "    <td>%s</td>\n", nodata
+                else printf "    <td>%s</td>\n", html[i]
             }
             printf "  </tr>"
         }
-    ')\n</tbody>"
+    '
+	printf '%s\n' '</tbody>'
 }
 
 ##
@@ -1669,7 +1707,7 @@ convert_template_html() {
 		_JSON_FILE="${4:-}"
 
 		profile_start "convert_template_html_build_table"
-		_TABLE_HTML="$(_html_add_table_header "$_TAG_TABLE_FILENAME")"
+		_TABLE_HTML="$(_html_add_table_header "$_TAG_INFO_TABLE")"
 		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
