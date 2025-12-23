@@ -15,13 +15,16 @@ if [ -z "$SCRIPT_DIR" ]; then
 		cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P
 	)
 fi
-cd "${SCRIPT_DIR}" || exit 1
+TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
+SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
 
-# shellcheck source=../main/shtracer_util.sh
-. "../main/shtracer_util.sh"
+cd "${TEST_ROOT}" || exit 1
 
-# shellcheck source=../main/shtracer_func.sh
-. "../main/shtracer_func.sh"
+# shellcheck source=../../main/shtracer_util.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+
+# shellcheck source=../../main/shtracer_func.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
 
 ##
 # @brief
@@ -42,8 +45,8 @@ setUp() {
 	export NODATA_STRING="NONE"
 	export OUTPUT_DIR="${SHUNIT_TMPDIR}/output/"
 	mkdir -p "$OUTPUT_DIR"
-	export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
-	cd "${SCRIPT_DIR}" || exit 1
+	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	cd "${TEST_ROOT}" || exit 1
 }
 
 ##
@@ -274,4 +277,4 @@ test_cli_json_flag() {
 
 # Load and run shUnit2
 # shellcheck source=shunit2/shunit2
-. "./shunit2/shunit2"
+. "${TEST_ROOT%/}/shunit2/shunit2"

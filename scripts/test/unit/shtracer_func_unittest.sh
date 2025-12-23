@@ -13,12 +13,15 @@ if [ -z "$SCRIPT_DIR" ]; then
 fi
 
 # Ensure relative sources resolve regardless of caller CWD
-cd "${SCRIPT_DIR}" || exit 1
+TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
+SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
 
-# shellcheck source=../main/shtracer_func.sh
-. "../main/shtracer_func.sh"
-# shellcheck source=../main/shtracer_util.sh
-. "../main/shtracer_util.sh"
+cd "${TEST_ROOT}" || exit 1
+
+# shellcheck source=../../main/shtracer_func.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
+# shellcheck source=../../main/shtracer_util.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 
 ##
 # @brief
@@ -37,9 +40,9 @@ setUp() {
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	export NODATA_STRING="NONE"
-	export OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
-	export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/"
-	cd "${SCRIPT_DIR}" || exit 1
+	export OUTPUT_DIR="${TEST_ROOT%/}/output/"
+	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	cd "${TEST_ROOT}" || exit 1
 }
 
 ##
@@ -109,7 +112,7 @@ test_extract_tags() {
 	(
 		# Arrange ---------
 		# shellcheck disable=SC2030  # Intentional subshell modification for test isolation
-		export CONFIG_DIR="${SCRIPT_DIR%/}/testdata/unit_test/"
+		export CONFIG_DIR="${TEST_ROOT%/}/testdata/unit_test/"
 
 		# Act -------------
 
@@ -403,4 +406,4 @@ test_print_verification_result_with_duplicated() {
 }
 
 # shellcheck source=shunit2/shunit2
-. "./shunit2/shunit2"
+. "${TEST_ROOT%/}/shunit2/shunit2"

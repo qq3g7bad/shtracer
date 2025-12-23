@@ -118,7 +118,7 @@ jobs:
           echo "Running shellcheck on main scripts..."
           shellcheck ./shtracer
           shellcheck ./scripts/main/*.sh
-          shellcheck ./scripts/test/*.sh
+          find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*" -print0 | xargs -0 shellcheck
           echo "Shellcheck passed!"
 
       # Check shell script formatting with shfmt
@@ -130,7 +130,7 @@ jobs:
           shfmt -d -ci -bn \
             ./shtracer \
             $(find ./scripts/main -name "*.sh") \
-            $(find ./scripts/test -maxdepth 1 -name "*.sh")
+            $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
   # Job 3: Run verification checks

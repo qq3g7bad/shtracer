@@ -18,10 +18,13 @@ export SHUNIT_PARENT
 
 cd "${SCRIPT_DIR}" || exit 1
 
-# shellcheck source=../main/shtracer_viewer.sh
-. "../main/shtracer_viewer.sh"
-# shellcheck source=../main/shtracer_util.sh
-. "../main/shtracer_util.sh"
+TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
+SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
+
+# shellcheck source=../../main/shtracer_viewer.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_viewer.sh"
+# shellcheck source=../../main/shtracer_util.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 
 ##
 # @brief
@@ -39,10 +42,11 @@ setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	export NODATA_STRING="NONE"
-	export OUTPUT_DIR="./output/"
-	export CONFIG_DIR="./testdata/"
+	export OUTPUT_DIR="${TEST_ROOT%/}/output/"
+	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
+	cd "${TEST_ROOT}" || exit 1
 }
 
 ##
@@ -58,7 +62,7 @@ tearDown() {
 test_convert_template_html_with_valid_inputs() {
 	(
 		# Arrange ---------
-		SCRIPT_DIR="../../"
+		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
 		mkdir -p "$OUTPUT_DIR/tags"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
@@ -80,12 +84,12 @@ test_convert_template_html_with_valid_inputs() {
 test_convert_template_js_with_valid_inputs() {
 	(
 		# Arrange ---------
-		SCRIPT_DIR="../../"
+		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
 		mkdir -p "$OUTPUT_DIR/test_dir"
 		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 
 		# Use absolute path for test file
-		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
+		_TEST_FILE="$(unset CDPATH; cd "$OUTPUT_DIR/test_dir" && pwd -P)/test_file.md"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
 		_TEMPLATE_ASSETS_DIR="${SCRIPT_DIR%/}/scripts/main/template/assets"
 
@@ -111,7 +115,7 @@ test_convert_template_js_with_valid_inputs() {
 test_make_html_with_valid_inputs() {
 	(
 		# Arrange ---------
-		SCRIPT_DIR="../../"
+		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
 		export CONFIG_PATH="./testdata/unit_test/test_config1.md"
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
@@ -211,4 +215,4 @@ EOF
 }
 
 # shellcheck source=shunit2/shunit2
-. "./shunit2/shunit2"
+. "${TEST_ROOT%/}/shunit2/shunit2"

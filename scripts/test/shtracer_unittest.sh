@@ -14,15 +14,20 @@ SELF_PATH="${TEST_DIR%/}/$(basename -- "$0")"
 SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_DIR%/}/../.." 2>/dev/null && pwd -P)
 SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 
+TEST_ROOT="$TEST_DIR"
+export TEST_ROOT
+export SHTRACER_ROOT_DIR
+
 # Source test targets
 # shellcheck source=/dev/null
 . "${SCRIPT_DIR%/}/shtracer"
 # shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
-sh -c "./shtracer_func_unittest.sh"
-sh -c "./shtracer_viewer_unittest.sh"
-sh -c "./shtracer_integration_test.sh"
+sh -c "./unit/shtracer_func_unittest.sh"
+sh -c "./unit/shtracer_viewer_unittest.sh"
+sh -c "./unit/shtracer_json_unittest.sh"
+sh -c "./integration/shtracer_integration_test.sh"
 
 ##
 # @brief

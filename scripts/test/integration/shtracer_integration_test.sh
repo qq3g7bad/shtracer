@@ -3,11 +3,14 @@
 # Integration tests for shtracer
 # Tests end-to-end functionality with real configuration and data
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-SHTRACER_BIN="${SCRIPT_DIR}/../../shtracer"
-SHTRACER_VIEWER="${SCRIPT_DIR}/../main/shtracer_viewer.sh"
-TEST_DATA_DIR="${SCRIPT_DIR}/testdata/integration"
-ANSWER_DIR="${SCRIPT_DIR}/testdata/answer/integration"
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
+SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
+
+SHTRACER_BIN="${SHTRACER_ROOT_DIR%/}/shtracer"
+SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_viewer.sh"
+TEST_DATA_DIR="${TEST_ROOT%/}/testdata/integration"
+ANSWER_DIR="${TEST_ROOT%/}/testdata/answer/integration"
 
 ##
 # @brief
@@ -409,4 +412,4 @@ test_integration_verify_flexible_order() {
 }
 
 # shellcheck source=shunit2/shunit2
-. "${SCRIPT_DIR}/shunit2/shunit2"
+. "${TEST_ROOT%/}/shunit2/shunit2"
