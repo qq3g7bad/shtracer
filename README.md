@@ -17,9 +17,7 @@ ShellTracer (**shtracer**) is a project for creating a [requirements traceabilit
 
 ### HTML output
 
-![](./docs/img/matrix.svg)
-
-![](./docs/img/flow.svg)
+![](./docs/img/flow.png)
 
 ### Text output
 
