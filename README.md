@@ -141,7 +141,7 @@ chmod +x ./scripts/main/shtracer_viewer.sh
 Usage: shtracer <configfile> [options]
 
 Options:
-  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
+  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
   -v                               Verify mode: detect duplicate or isolated tags
   -t                               Test mode: execute unit tests
   --json                           Export traceability data in JSON format (stdout)
