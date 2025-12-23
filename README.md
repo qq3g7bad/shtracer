@@ -152,7 +152,6 @@ Note:
 
 * **JSON-First Output**: Structured JSON output via `--json` for integration with other tools
 * **Cross-Platform**: POSIX-compliant shell scripts work on Linux, macOS, and Windows (via Git Bash/WSL)
-* **Security-Focused**: Removed arbitrary script execution (PRE/POST-EXTRA-SCRIPT) in v0.2.0
 
 For detailed usage and examples, see documents in `./docs/` directory.
 
