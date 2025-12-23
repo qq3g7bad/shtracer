@@ -12,7 +12,6 @@ if [ -z "$SCRIPT_DIR" ]; then
 	)
 fi
 
-# Ensure relative sources resolve regardless of caller CWD
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
 
@@ -61,7 +60,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/unit_test/test_config1.md")"
+		_RETURN_VALUE="$(check_configfile "./testdata/unit_test/config_minimal_single_file.md")"
 
 		# Assert ----------
 

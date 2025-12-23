@@ -119,11 +119,11 @@ test_make_html_with_valid_inputs() {
 	(
 		# Arrange ---------
 		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		export CONFIG_PATH="./testdata/unit_test/test_config1.md"
+		export CONFIG_PATH="./testdata/unit_test/config_minimal_single_file.md"
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
-		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./testdata/unit_test/testdata1.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
+		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./testdata/unit_test/requirements_minimal.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
 		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 
 		# Act -------------

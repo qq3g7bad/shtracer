@@ -527,7 +527,7 @@ test_main_routine() {
 		set -u
 
 		# Act -------------
-		main_routine "./testdata/unit_test/test_config4.md" >/dev/null 2>&1
+		main_routine "./testdata/unit_test/config_minimal_single_file.md" >/dev/null 2>&1
 		IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 		IFS=' '
 
@@ -561,7 +561,7 @@ test_main_routine_multiple_directories() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -579,7 +579,7 @@ test_main_routine_output_isolated() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -597,7 +597,7 @@ test_main_routine_invalid_config_paths() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/wrong_config.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_paths.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
