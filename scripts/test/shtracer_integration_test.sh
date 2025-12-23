@@ -89,21 +89,15 @@ test_integration_normal_mode() {
 		grep -q "traceabilityData" output/output.html
 		assertEquals "HTML should include embedded JSON" 0 $?
 
-		# Check JSON is valid
-		if command -v python3 >/dev/null 2>&1; then
-			python3 -m json.tool output/output.json >/dev/null 2>&1
-			assertEquals "JSON should be valid" 0 $?
-		else
-			# Fallback: basic structure checks (not a full JSON validation)
-			grep -q '"metadata"' output/output.json
-			assertEquals "JSON should contain metadata" 0 $?
-			grep -q '"nodes"' output/output.json
-			assertEquals "JSON should contain nodes" 0 $?
-			grep -q '"links"' output/output.json
-			assertEquals "JSON should contain links" 0 $?
-			grep -q '"chains"' output/output.json
-			assertEquals "JSON should contain chains" 0 $?
-		fi
+		# Check JSON structure (POSIX-compliant, no python dependency)
+		grep -q '"metadata"' output/output.json
+		assertEquals "JSON should contain metadata" 0 $?
+		grep -q '"nodes"' output/output.json
+		assertEquals "JSON should contain nodes" 0 $?
+		grep -q '"links"' output/output.json
+		assertEquals "JSON should contain links" 0 $?
+		grep -q '"chains"' output/output.json
+		assertEquals "JSON should contain chains" 0 $?
 	)
 }
 
