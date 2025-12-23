@@ -21,5 +21,3 @@ Thumbs.db
 # Test artifacts
 *.log
 
-# Local development tools
-tools/
