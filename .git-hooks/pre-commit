@@ -39,17 +39,14 @@ else
   echo "Shellcheck passed!"
 fi
 
-# Check if shfmt is installed (prefer local tools/shfmt 3.8.0)
+# Check if shfmt is installed
 SHFMT_CMD=""
-if [ -x "./tools/shfmt" ]; then
-  SHFMT_CMD="./tools/shfmt"
-  echo "Using local shfmt: $(./tools/shfmt --version)"
-elif command -v shfmt >/dev/null 2>&1; then
+if command -v shfmt >/dev/null 2>&1; then
   SHFMT_CMD="shfmt"
-  echo "Using system shfmt: $(shfmt --version)"
+  echo "Using shfmt: $(shfmt --version)"
 else
   echo "Warning: shfmt is not installed. Skipping formatting check."
-  echo "Install shfmt v3.8.0 to tools/: wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 && chmod +x tools/shfmt"
+  echo "Install shfmt v3.8.0 (CI uses v3.8.0): https://github.com/mvdan/sh/releases/tag/v3.8.0"
 fi
 
 if [ -n "$SHFMT_CMD" ]; then

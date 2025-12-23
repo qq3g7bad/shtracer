@@ -266,15 +266,7 @@ sudo apt-get install shellcheck  # Debian/Ubuntu
 brew install shellcheck          # macOS
 
 # Install shfmt v3.8.0 (CI uses this version)
-# Option 1: Install to local tools/ directory (recommended)
-mkdir -p tools
-# Linux:
-wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64
-# macOS:
-# wget -qO tools/shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_amd64
-chmod +x tools/shfmt
-
-# Option 2: Install system-wide
+# Install system-wide (recommended)
 # go install mvdan.cc/sh/v3/cmd/shfmt@v3.8.0
 # or download from https://github.com/mvdan/sh/releases/tag/v3.8.0
 ```

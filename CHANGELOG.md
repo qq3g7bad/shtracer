@@ -58,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Better separation of concerns: core logic vs. visualization
 - **Standardized Development Tools** ([242aa1f](https://github.com/qq3g7bad/shtracer/commit/242aa1f))
   - Locked shfmt version to 3.8.0 (matches CI)
-  - Added local `tools/shfmt` support
-  - Updated pre-commit hooks to use local shfmt
+  - Use shfmt v3.8.0 (matches CI)
+  - Updated pre-commit hooks to use shfmt from PATH when available
   - Prevents formatting conflicts between environments
 - **Improved Test Organization** ([4607b51](https://github.com/qq3g7bad/shtracer/commit/4607b51), [297a33d](https://github.com/qq3g7bad/shtracer/commit/297a33d))
   - Made test runner CWD-agnostic (can run from any directory)
