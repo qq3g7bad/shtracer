@@ -194,7 +194,7 @@ _extract_tags_discover_files() {
 			tag_format = extract_from_backtick($6)
 			tag_line_format = extract_from_backtick($7)
 			tag_title_offset = $8 == "" ? 1 : $8
-			if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
+			if (tag_title_offset + 0 < 0) { tag_title_offset = 0 }
 
 			if (tag_format == "") { next }
 
@@ -258,7 +258,7 @@ _extract_tags_process_files() {
 				tag_format = $6
 				tag_line_format = $7
 				tag_title_offset = ($8 == "" ? 1 : $8)
-				if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
+				if (tag_title_offset + 0 < 0) { tag_title_offset = 0 }
 
 				# Calculate absolute path once per file (optimization for Windows/Git Bash)
 				filename = path; gsub(".*/", "", filename);
