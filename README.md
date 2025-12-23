@@ -114,7 +114,7 @@ id4 --> stop
 
 ## ⚽ Getting started
 
-1. Open bash.
+1. Open shell.
 1. Set the current directory at this repository.
 1. Enter the following commands.
 
@@ -129,12 +129,10 @@ chmod +x ./scripts/main/shtracer_viewer.sh
 ./shtracer ./sample/config.md
 
 # Create a single self-contained HTML report (stdin JSON -> stdout HTML)
-./shtracer ./sample/config.md --json \
-  | ./scripts/main/shtracer_viewer.sh \
-  > ./sample/output/output.html
+./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
 
 # Or, generate HTML directly (JSON -> viewer internally)
-./shtracer ./sample/config.md --html > ./sample/output/output.html
+./shtracer --html ./sample/config.md > ./sample/output/output.html
 ```
 
 ## 🚀 Usage
@@ -156,19 +154,15 @@ Examples:
      $ ./shtracer ./sample/config.md
 
   2. Generate HTML via viewer (recommended)
-     $ ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
      $ ./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
 
   3. Generate HTML directly
-     $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
      $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
 
   4. Change mode (swap or rename tags)
-     $ ./shtracer ./sample/config.md -c old_tag new_tag
      $ ./shtracer -c old_tag new_tag ./sample/config.md
 
   5. Verify mode (check for duplicate or isolated tags)
-     $ ./shtracer ./sample/config.md -v
      $ ./shtracer -v ./sample/config.md
 
   6. Test mode
@@ -232,19 +226,6 @@ Note:
 * **Verification Mode**: Validate that all tags are properly linked (no orphaned or broken references)
 * **Change Mode**: Safely rename/swap tags across your entire project
 
-### Rich Visualization (NEW in v0.2.0)
-
-* **🎨 Interactive Sankey Diagrams**: Modern D3.js-powered flow diagrams showing traceability relationships
-  * Proportional link widths based on connection density
-  * Color-coded node types (Requirements, Architecture, Implementation, Tests)
-  * Hover interactions and smooth animations
-* **📊 Coverage Statistics**: Per-file and per-layer coverage metrics
-  * Identify gaps in your traceability matrix at a glance
-  * Unified coverage calculations across CLI and viewer
-* **🎯 Self-Contained HTML**: Single-file output with embedded assets
-  * No external dependencies - share HTML files anywhere
-  * Works offline, in restricted environments, or on internal networks
-
 ### Developer-Friendly
 
 * **JSON-First Output**: Structured JSON output via `--json` for integration with other tools
@@ -269,7 +250,7 @@ For detailed usage and examples, see documents in `./docs/` directory.
 
 * [shUnit2](https://github.com/kward/shunit2) (for unit testing)
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
-* [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
+* [d3.js](https://d3js.org/) (for showing diagrams)
 
 ## 🔧 Development Setup
 
@@ -315,8 +296,6 @@ For installation and usage, see [.git-hooks/README.md](.git-hooks/README.md).
 
 ### High Priority
 
-* Support json export formats
-* Change images from Mermaid.js to D3.js and use a Sankey diagram to express the complex trace flow
 * Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
 * Make a cross-reference table for easy reference
 * Export all trace data in Markdown format.

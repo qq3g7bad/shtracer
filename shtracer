@@ -56,22 +56,18 @@ print_usage() {
 		     $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
-		     $ ./shtracer ./sample/config.md -c old_tag new_tag
 		     $ ./shtracer -c old_tag new_tag ./sample/config.md
 
 		  3. Verify mode (check for duplicate or isolated tags).
-		     $ ./shtracer ./sample/config.md -v
 		     $ ./shtracer -v ./sample/config.md
 
 		  4. Test mode
 		     $ ./shtracer -t
 
 		  5. Summary mode
-		     $ ./shtracer ./sample/config.md --summary
 		     $ ./shtracer --summary ./sample/config.md
 
 		  6. HTML mode
-		     $ ./shtracer ./sample/config.md --html > ./sample/output/output.html
 		     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
 
 		Note:
