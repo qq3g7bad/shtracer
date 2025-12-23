@@ -137,7 +137,7 @@ EOF
 	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/test/config.md")"
 
 	# Verify metadata
-	assertTrue "Should contain version" "grep -q '\"version\": \"0.1.1\"' '$_JSON_OUTPUT'"
+	assertTrue "Should contain version" "grep -q '\"version\": \"0.1.2\"' '$_JSON_OUTPUT'"
 	assertTrue "Should contain generated timestamp" "grep -q '\"generated\":' '$_JSON_OUTPUT'"
 	assertTrue "Should contain config path" "grep -q '\"config_path\": \"/test/config.md\"' '$_JSON_OUTPUT'"
 }

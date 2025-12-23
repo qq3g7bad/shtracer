@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-12-23
+
+### Added
+- **GitHub-Style UI Theme**
+  - Light/dark mode toggle with familiar GitHub color scheme
+  - Smooth theme transitions with CSS variables
+  - Theme preference saved to localStorage
+  - GitHub-inspired fonts: `ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas`
+- **GitHub-Style Syntax Highlighting**
+  - Light theme: Official GitHub light color scheme
+  - Dark theme: Official GitHub dark color scheme
+  - Proper color coding for keywords, strings, comments, functions, etc.
+  - Applied to all code elements (code, pre, kbd, samp, tt)
+
+### Changed
+- **Improved Traceability Matrix Column Order**
+  - Matrix columns now match config.md definition order (Requirement → Architecture → Implementation → Unit test → Integration test)
+  - Order dynamically extracted from config.md headings
+  - No hardcoded type ordering
+  - Consistent with Traceability Flow (Type) diagram
+- **Enhanced README**
+  - Removed outdated Mermaid diagrams
+  - Added detailed HTML viewer feature descriptions
+  - Updated TODO section to reflect completed styling improvements
+
+### Fixed
+- Removed external highlight.js CSS dependency (now uses embedded GitHub-style CSS)
+
 ## [0.2.0] - TBD
 
 ### ⚠️ Breaking Changes
@@ -251,7 +279,8 @@ echo "Trace complete!"
 - Tag verification mode
 - Tag swap/rename functionality
 
-[Unreleased]: https://github.com/qq3g7bad/shtracer/compare/V0.2.0...HEAD
+[Unreleased]: https://github.com/qq3g7bad/shtracer/compare/V0.1.2...HEAD
+[0.1.2]: https://github.com/qq3g7bad/shtracer/compare/V0.1.1...V0.1.2
 [0.2.0]: https://github.com/qq3g7bad/shtracer/compare/V0.1.1...V0.2.0
 [0.1.1]: https://github.com/qq3g7bad/shtracer/compare/V0.1.0...V0.1.1
 [0.1.0]: https://github.com/qq3g7bad/shtracer/compare/V0.0.2...V0.1.0

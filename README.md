@@ -13,57 +13,13 @@ ShellTracer (**shtracer**) is a project for creating a [requirements traceabilit
 * For maximum extensibility and easy version control, simplify the input/output files as text files.
 * For portability, use only shell scripts to create RTMs.
 
-```mermaid
-stateDiagram
-
-input:Input
-opt_input:Optional input files
-
-state input {
-  targetfiles:Trace target files
-  config:config.md
-}
-state opt_input {
-  wordinput:Word files
-  excelinput:Excel files
-}
-note left of input
-  Text files
-end note
-
-[*] --> input
-[*] --> opt_input
-
-opt_input --> targetfiles
-opt_output:Optional output files
-
-state output {
-  txt_output: Text files
-  html_output:HTML file
-}
-
-state txt_output {
-  rtm:Requirements traceability matrix (RTM)
-  uml:UML
-}
-
-state opt_output {
-  excel_output:Excel file
-}
-
-
-input --> output : shtracer
-rtm --> opt_output
-rtm --> html_output
-uml --> html_output
-
-```
-
 ## 📷 Screenshots
 
 ### HTML output
 
-![sample](./docs/img/sample.png)
+![](./docs/img/matrix.svg)
+
+![](./docs/img/flow.svg)
 
 ### Text output
 
@@ -73,38 +29,6 @@ uml --> html_output
 @REQ1.2@ @ARC2.1@ @IMP2.1@ @UT1.1@ @IT1.1@
 @REQ1.2@ @ARC3.1@ @IMP3.1@ @UT1.2@ @IT1.1@
 @REQ1.4@ @ARC2.1@ @IMP2.1@ @UT2.1@ @IT1.1@
-```
-
-### UML
-
-* Drawn by Mermaid.
-
-```mermaid
-flowchart TB
-
-start[Start]
-id1([Requirement])
-id2([Architecture])
-id3_1_1([Implementation])
-id3_1_2([Unit test])
-id3_2_1([Implementation])
-id3_2_2([Unit test])
-id4([Integration test])
-stop[End]
-
-start --> id1
-id1 --> id2
-id2 --> id3_1_1
-subgraph "Main scripts"
-id3_1_1 --> id3_1_2
-end
-id2 --> id3_2_1
-subgraph "Optional scripts"
-id3_2_1 --> id3_2_2
-end
-id3_1_2 --> id4
-id3_2_2 --> id4
-id4 --> stop
 ```
 
 ## 🥅 Goal
@@ -288,11 +212,11 @@ For installation and usage, see [.git-hooks/README.md](.git-hooks/README.md).
 
 ### High Priority
 
-* Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
 * Make a cross-reference table for easy reference
-* Export all trace data in Markdown format.
+* Export all trace data in Markdown format
 
 ### Future Enhancements
 
 * Use OR condition in the extension filter
 * Support Excel/CSV export formats
+* Add colorblind-friendly color palette option

@@ -763,7 +763,7 @@ make_json() {
 	{
 		printf '{\n'
 		printf '  "metadata": {\n'
-		printf '    "version": "0.1.1",\n'
+		printf '    "version": "0.1.2",\n'
 		printf '    "generated": "%s",\n' "$_TIMESTAMP"
 		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
 		printf '  },\n'

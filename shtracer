@@ -75,7 +75,7 @@ print_usage() {
 		  - Only one option can be used at a time.
 
 		Version:
-		  - 0.2.0
+		  - 0.1.2
 
 	USAGE
 	exit 1

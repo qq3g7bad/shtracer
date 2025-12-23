@@ -1398,6 +1398,7 @@ _html_add_table_header() {
 	printf '%s\n' '  <tr>'
 
 	# Extract unique trace_target types and generate header columns
+	# Order follows appearance in TAG_INFO_TABLE (config.md trace target definition order)
 	{
 		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
 			cat "$_TAG_INFO_TABLE"
@@ -1741,7 +1742,24 @@ tag_info_table_from_json_file() {
 	_sep="${SHTRACER_SEPARATOR}"
 	_tmp_file="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
 	_tmp_sort="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	trap 'rm -f "$_tmp_file" "$_tmp_sort" 2>/dev/null || true' EXIT INT TERM
+	_tmp_config_order="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
+	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
+
+	# Extract trace target order from config.md (both ## and ### headings)
+	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
+		awk '
+			/^##+ / {
+				heading = $0
+				sub(/^##+ /, "", heading)
+				sub(/[[:space:]]*$/, "", heading)
+				if (heading !~ /^[[:space:]]*$/ && !(heading in seen)) {
+					print ++order_idx, heading
+					seen[heading] = 1
+				}
+			}
+		' <"$_config_path" >"$_tmp_config_order"
+	fi
 
 	awk '
 		BEGIN {
@@ -1821,19 +1839,56 @@ tag_info_table_from_json_file() {
 		| sort -k1,1n \
 			>"$_tmp_sort"
 
-	awk -F '\t' -v sep="$_sep" -v OFS="" '
-		!seen[$2]++ {
-            print $2, sep, $3, sep, $4, sep, $5
+	# Assign trace target order based on config.md heading order
+	awk -F '\t' -v sep="$_sep" -v config_order_file="$_tmp_config_order" '
+		BEGIN {
+			# Load config.md heading order
+			old_fs = FS
+			FS = " "
+			while ((getline line < config_order_file) > 0) {
+				split(line, parts, " ")
+				order_num = parts[1]
+				heading = parts[2]
+				for (i = 3; i in parts; i++) heading = heading " " parts[i]
+				config_order[heading] = order_num
+			}
+			close(config_order_file)
+			FS = old_fs
 		}
-	' <"$_tmp_sort" >"$_tmp_file"
+		function get_last_segment(s,   n, parts) {
+			n = split(s, parts, ":")
+			return n > 0 ? parts[n] : s
+		}
+		{
+			tag = $2
+			line = $3
+			file = $4
+			trace_target = $5
 
-	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+			# Extract type from trace_target (last segment)
+			type = get_last_segment(trace_target)
+
+			# Get order from config.md
+			order = config_order[type]
+			if (order == "") order = 999
+
+			# Output with order prefix for sorting
+			print order "\t" tag "\t" line "\t" file "\t" trace_target
+		}
+	' <"$_tmp_sort" \
+		| sort -k1,1n \
+		| awk -F '\t' -v sep="$_sep" -v OFS="" '
+			!seen[$2]++ {
+				print $2, sep, $3, sep, $4, sep, $5
+			}
+		' >"$_tmp_file"
+
 	if [ -n "$_config_path" ]; then
 		printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
 	fi
 
 	cat "$_tmp_file"
-	rm -f "$_tmp_file" "$_tmp_sort" 2>/dev/null || true
+	rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true
 	trap - EXIT INT TERM
 }
 
