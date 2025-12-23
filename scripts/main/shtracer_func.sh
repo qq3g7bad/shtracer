@@ -934,7 +934,7 @@ swap_tags() {
 				| sort -u \
 				| while IFS= read -r t; do
 					[ -n "$t" ] || continue
-					_tmp_file="$(mktemp 2>/dev/null || mktemp -t shtracer_swap_tags)" || exit 1
+					_tmp_file="$(shtracer_tmpfile)" || exit 1
 					sed \
 						-e "s|${_before_pat}|${_tmp_rep}|g" \
 						-e "s|${_after_pat}|${_before_rep}|g" \

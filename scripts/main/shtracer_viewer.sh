@@ -31,13 +31,7 @@ function showText(event, fileName, highlightLine, language) {
 	const textContainer = document.getElementById('text-container');
 	const outputElement = document.getElementById("file-information");
 
-	// Decode Base64 content (UTF-8 compatible)
-	const binaryString = atob(file.contentBase64);
-	const bytes = new Uint8Array(binaryString.length);
-	for (let i = 0; i < binaryString.length; i++) {
-		bytes[i] = binaryString.charCodeAt(i);
-	}
-	const content = new TextDecoder('utf-8').decode(bytes);
+    const content = file.content;
 
 	// Skip syntax highlighting for markdown files
 	let highlightedContent;
@@ -1630,7 +1624,9 @@ _html_generate_file_list() {
 # @param   $2 : INFORMATION (file list HTML)
 # @return  Modified HTML with inserted content and fixed indentation
 _html_insert_content_with_indentation() {
-	_html_insert_info_file=$(mktemp)
+	_html_insert_info_file="$(shtracer_tmpfile)" || {
+		error_exit 1 "_html_insert_content_with_indentation" "Failed to create temporary file"
+	}
 	trap 'rm -f "$_html_insert_info_file" 2>/dev/null || true' EXIT INT TERM
 
 	printf '%s' "$2" >"$_html_insert_info_file"
@@ -1706,17 +1702,25 @@ convert_template_html() {
 		_TEMPLATE_HTML_DIR="$3"
 		_JSON_FILE="${4:-}"
 
+		profile_start "convert_template_html_read_json"
+		if [ -z "$_JSON_FILE" ]; then
+			_JSON_FILE="${OUTPUT_DIR%/}/output.json"
+		fi
+		profile_end "convert_template_html_read_json"
+
 		profile_start "convert_template_html_build_table"
 		_TABLE_HTML="$(_html_add_table_header "$_TAG_INFO_TABLE")"
 		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
 		profile_start "convert_template_html_insert_tag_table"
-		_tmp_table_html_file="$(mktemp 2>/dev/null || mktemp -t shtracer_table)"
+		_tmp_table_html_file="$(shtracer_tmpfile)" || {
+			error_exit 1 "convert_template_html" "Failed to create temporary file"
+		}
 		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
-				| awk -v table_html_file="$_tmp_table_html_file" '
+				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" '
                     /^[ \t]*<!-- INSERT TABLE -->/ {
                         print "<!-- SHTRACER INSERTED -->"
                         while ((getline line < table_html_file) > 0) {
@@ -1725,6 +1729,17 @@ convert_template_html() {
                         }
                         close(table_html_file)
                         print "<!-- SHTRACER INSERTED -->"
+                        next
+                    }
+                    /^[ \t]*<!-- INSERT JSON DATA -->/ {
+                        print "const traceabilityData = "
+                        while ((getline j < json_file) > 0) {
+                            gsub(/\r$/, "", j)
+                            gsub(/<\/script>/, "<\\/script>", j)
+                            print j
+                        }
+                        close(json_file)
+                        print ";"
                         next
                     }
                     { print }
@@ -1736,18 +1751,6 @@ convert_template_html() {
 		profile_start "convert_template_html_insert_information"
 		_INFORMATION="$(_html_generate_file_list "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_insert_information"
-
-		profile_start "convert_template_html_read_json"
-		if [ -z "$_JSON_FILE" ]; then
-			_JSON_FILE="${OUTPUT_DIR%/}/output.json"
-		fi
-		_JSON_DATA_B64="$(base64 -w 0 "$_JSON_FILE" 2>/dev/null || base64 "$_JSON_FILE" 2>/dev/null | tr -d '\n')"
-		_JSON_SCRIPT="const traceabilityData = JSON.parse(atob('${_JSON_DATA_B64}'));"
-		profile_end "convert_template_html_read_json"
-
-		profile_start "convert_template_html_insert_json"
-		_HTML_CONTENT="$(echo "$_HTML_CONTENT" | sed "s|<!-- INSERT JSON DATA -->|${_JSON_SCRIPT}|")"
-		profile_end "convert_template_html_insert_json"
 
 		profile_start "convert_template_html_insert_mermaid"
 		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
@@ -1769,8 +1772,8 @@ tag_info_table_from_json_file() {
 		error_exit 1 "tag_info_table_from_json_file" "JSON file not readable"
 	fi
 	_sep="${SHTRACER_SEPARATOR}"
-	_tmp_file="$(mktemp 2>/dev/null || mktemp -t shtracer_taginfo)"
-	_tmp_sort="$(mktemp 2>/dev/null || mktemp -t shtracer_taginfo_sort)"
+	_tmp_file="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
+	_tmp_sort="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
 	trap 'rm -f "$_tmp_file" "$_tmp_sort" 2>/dev/null || true' EXIT INT TERM
 
 	awk '
@@ -1938,7 +1941,7 @@ tag_table_from_json_file() {
 }
 
 ##
-# @brief Convert template js file for tracing targets (using Base64 encoding)
+# @brief Convert template js file for tracing targets
 # @param $1 : TAG_INFO_TABLE
 # @param $2 : TEMPLATE_ASSETS_DIR
 convert_template_js() {
@@ -1947,61 +1950,45 @@ convert_template_js() {
 		_TAG_INFO_TABLE="$1"
 		_TEMPLATE_ASSETS_DIR="$2"
 
-		_JS_TEMPLATE=$(
-			cat <<-'EOF'
-				@TRACE_TARGET_FILENAME@: {
-				      path:"@TRACE_TARGET_PATH@",
-				      contentBase64:"@TRACE_TARGET_CONTENTS_BASE64@",
-				      extension:"@TRACE_TARGET_EXTENSION@"
-				},
-			EOF
-		)
-
-		_convert_template_js_file=$(mktemp)
-		trap 'rm -f "$_convert_template_js_file" 2>/dev/null || true' EXIT INT TERM
-
-		printf '%s' "$_JS_TEMPLATE" >"$_convert_template_js_file"
-
 		_JS_CONTENTS="$(
 			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u \
-				| awk -v template_file="$_convert_template_js_file" 'BEGIN{
-						while ((getline line < template_file) > 0) {
-							gsub(/\r$/, "", line)
-							if (init_js_template != "") init_js_template = init_js_template "\n"
-							init_js_template = init_js_template line
-						}
-						close(template_file)
-					}
-					{
-						js_template = init_js_template
-						path = $0
-						n = split($0, parts, "/");
-						filename = parts[n];
-						raw_filename = filename;
+				| awk '
+                    function js_escape(s) {
+                        gsub(/\\/, "\\\\", s)
+                        gsub(/"/, "\\\"", s)
+                        gsub(/\t/, "\\t", s)
+                        gsub(/\r/, "\\r", s)
+                        return s
+                    }
+                    function file_to_js_string(path,   line, out) {
+                        out = ""
+                        while ((getline line < path) > 0) {
+                            gsub(/\r$/, "", line)
+                            out = out js_escape(line) "\\n"
+                        }
+                        close(path)
+                        return out
+                    }
+                    {
+                        path = $0
+                        n = split($0, parts, "/")
+                        raw_filename = parts[n]
+                        filename = raw_filename
+                        extension_pos = match(raw_filename, /\.[^\.]+$/)
+                        if (extension_pos) extension = substr(raw_filename, extension_pos + 1)
+                        else extension = "txt"
 
-						extension_pos = match(raw_filename, /\.[^\.]+$/);
-						if (extension_pos) {
-							extension = substr(raw_filename, extension_pos + 1);
-						} else {
-							extension = "txt";
-						}
+                        gsub(/\./, "_", filename)
+                        gsub(/^/, "Target_", filename)
 
-						gsub(/\./, "_", filename);
-						gsub(/^/, "Target_", filename);
-
-						cmd = "base64 -w 0 \"" path "\" 2>/dev/null || base64 \"" path "\""
-						cmd | getline base64_content
-						close(cmd)
-
-						gsub(/@TRACE_TARGET_PATH@/, path, js_template);
-						gsub(/@TRACE_TARGET_FILENAME@/, filename, js_template);
-						gsub(/@TRACE_TARGET_CONTENTS_BASE64@/, base64_content, js_template);
-						gsub(/@TRACE_TARGET_EXTENSION@/, extension, js_template);
-						print js_template
-					}'
+                        contents = file_to_js_string(path)
+                        print "\t\"" js_escape(filename) "\": {"
+                        print "\t\tpath:\"" js_escape(path) "\"," 
+                        print "\t\tcontent:\"" contents "\"," 
+                        print "\t\textension:\"" js_escape(extension) "\""
+                        print "\t},"
+                    }'
 		)"
-		rm -f "$_convert_template_js_file" 2>/dev/null || true
-		trap - EXIT INT TERM
 		_viewer_emit_show_text_js_template | while read -r s; do
 			case "$s" in
 				*//\ js_contents*)
@@ -2097,7 +2084,10 @@ shtracer_viewer_main() {
 	done
 
 	# Determine repo root (SCRIPT_DIR in shtracer terminology)
-	_REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+	_REPO_DIR="$(
+		unset CDPATH
+		cd "$(dirname "$0")/../.." && pwd -P
+	)"
 	SCRIPT_DIR="$_REPO_DIR"
 	export SCRIPT_DIR
 
@@ -2114,7 +2104,10 @@ shtracer_viewer_main() {
 	_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 	_TEMPLATE_ASSETS_DIR="${_TEMPLATE_DIR%/}/assets"
 
-	_tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t shtracer_viewer)"
+	_tmp_dir="$(shtracer_tmpdir)" || {
+		echo "[shtracer_viewer.sh][error]: failed to create temporary directory" 1>&2
+		exit 1
+	}
 	_json_tmp="${_tmp_dir%/}/input.json"
 	_html_tmp="${_tmp_dir%/}/base.html"
 	_tag_table_tmp="${_tmp_dir%/}/tag_table"

@@ -10,6 +10,49 @@ SHTRACER_FALSE="${SHTRACER_FALSE:=0}"
 # When SHTRACER_IS_PROFILE_ENABLE is set to SHTRACER_TRUE, the time taken by each function during execution is output to stderr.
 SHTRACER_IS_PROFILE_ENABLE="${SHTRACER_IS_PROFILE_ENABLE:=$SHTRACER_FALSE}"
 
+_shtracer_tmp_base_dir() {
+	if [ -n "${TMPDIR:-}" ]; then
+		printf '%s' "${TMPDIR%/}"
+		return 0
+	fi
+	printf '%s' "/tmp"
+}
+
+shtracer_tmpfile() {
+	_tmp_dir="$(_shtracer_tmp_base_dir)"
+	_i=0
+	while [ "$_i" -lt 1000 ]; do
+		_path="${_tmp_dir%/}/shtracer.${$}.${_i}"
+		(
+			umask 0077
+			set -C
+			: >"$_path"
+		) 2>/dev/null && {
+			printf '%s\n' "$_path"
+			return 0
+		}
+		_i=$((_i + 1))
+	done
+	return 1
+}
+
+shtracer_tmpdir() {
+	_tmp_dir="$(_shtracer_tmp_base_dir)"
+	_i=0
+	while [ "$_i" -lt 1000 ]; do
+		_path="${_tmp_dir%/}/shtracer.${$}.${_i}.d"
+		(
+			umask 0077
+			mkdir "$_path"
+		) 2>/dev/null && {
+			printf '%s\n' "$_path"
+			return 0
+		}
+		_i=$((_i + 1))
+	done
+	return 1
+}
+
 ##
 # @brief  Initialize environment
 # @tag    @IMP4.1@ (FROM: @ARC1.2@)
