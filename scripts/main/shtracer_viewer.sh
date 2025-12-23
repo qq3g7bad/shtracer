@@ -279,7 +279,7 @@ function annotateTraceTargets(data) {
 }
 
 function annotateMatrixBadges() {
-    const badges = document.querySelectorAll('.matrix-tag-badge');
+    const badges = document.querySelectorAll('.matrix-tag-badge[data-type]');
     badges.forEach(span => {
         if (!span) return;
         const t = span.getAttribute('data-type') || 'Unknown';
@@ -1580,7 +1580,7 @@ _html_convert_tag_table() {
             }
             printf "\n  <tr>\n"
             for (i = 1; i <= ndims; i++) {
-                if (cell[i] == nodata) printf "    <td>%s</td>\n", nodata
+                if (cell[i] == nodata) printf "    <td><span class=\"matrix-tag-badge matrix-tag-badge-nodata\">%s</span></td>\n", nodata
                 else printf "    <td>%s</td>\n", html[i]
             }
             printf "  </tr>"
