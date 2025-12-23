@@ -8,9 +8,12 @@ CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
+EXPORT_JSON='false'
+EXPORT_SUMMARY='false'
+EXPORT_HTML='false'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+SCRIPT_DIR=${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}
 
 # Export variables used in external scripts
 export NODATA_STRING="NONE"
@@ -29,8 +32,6 @@ load_functions() {
 	. "./scripts/main/shtracer_util.sh"
 	# shellcheck source=scripts/main/shtracer_func.sh
 	. "./scripts/main/shtracer_func.sh"
-	# shellcheck source=scripts/main/shtracer_html.sh
-	. "./scripts/main/shtracer_html.sh"
 	cd "${_PREVIOUS_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
 }
 
@@ -42,9 +43,12 @@ print_usage() {
 		Usage: shtracer <configfile> [options]
 
 		Options:
-		  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
+		  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
 		  -v                               Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
+		  --json                           Export traceability data in JSON format
+		  --html                           Export a single HTML document to stdout (JSON -> viewer)
+		  --summary                        Print traceability summary to stdout (direct links only)
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -52,68 +56,180 @@ print_usage() {
 		     $ ./shtracer ./sample/config.md
 
 		  2. Change mode (swap or rename tags).
-		     $ ./shtracer ./sample/config.md -c old_tag new_tag.
+		     $ ./shtracer -c old_tag new_tag ./sample/config.md
 
 		  3. Verify mode (check for duplicate or isolated tags).
-		     $ ./shtracer ./sample/config.md -v
+		     $ ./shtracer -v ./sample/config.md
 
 		  4. Test mode
 		     $ ./shtracer -t
 
+		  5. Summary mode
+		     $ ./shtracer --summary ./sample/config.md
+
+		  6. HTML mode
+		     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
+
 		Note:
-		  - The <configfile> argument must always be specified before options.
+		  - Arguments can be specified in any order.
+		  - Only one option can be used at a time.
 
 		Version:
-		  - 0.1.1
+		  - 0.1.2
 
 	USAGE
 	exit 1
 }
 
 ##
-# @brief  Parse arguments
+# @brief  Parse arguments with flexible ordering (two-pass algorithm)
 # @tag    @IMP1.3@ (FROM: @ARC1.2@)
 parse_arguments() {
-	case "$#${1:-}${2:-}${3:-}${4:-}" in
-		1-h | 1-v | 1--help | 1--version) # Print usage
-			print_usage
-			;;
-		1-t) # Test mode
-			SHTRACER_MODE='TEST'
-			return
-			;;
-		1-*) # Undefined option
-			error_exit 1 "parse_arguments" "Invalid argument"
-			;;
-		1*) # Normal mode
-			SHTRACER_MODE='NORMAL'
-			;;
-		2*-C) # Normal mode with color
-			SHTRACER_MODE='NORMAL'
-			;;
-		2*-v) # Verify mode
-			SHTRACER_MODE='VERIFY'
-			;;
-		4*-c*) # Change mode
-			SHTRACER_MODE='CHANGE'
-			BEFORE_TAG="$3"
-			AFTER_TAG="$4"
-			;;
-		*)
-			error_exit 1 "parse_arguments" "Invalid argument"
-			;;
-	esac
+	# Special case: single argument (help, version, test, or config only)
+	if [ "$#" -eq 1 ]; then
+		case "$1" in
+			-h | -v | --help | --version)
+				# Note: -v alone prints usage (backward compatibility)
+				# -v with config file activates verify mode
+				print_usage
+				;;
+			-t)
+				SHTRACER_MODE='TEST'
+				return
+				;;
+			--json | --html | --summary)
+				# These options require a config file
+				error_exit 1 "parse_arguments" "Config file required"
+				;;
+			-*)
+				error_exit 1 "parse_arguments" "Invalid argument"
+				;;
+			*)
+				# Single argument: treat as config file
+				_config_file="$1"
+				SHTRACER_MODE='NORMAL'
+				;;
+		esac
+	else
+		# Multi-argument parsing: extract options and config file
+		_opt_mode=""
+		_opt_flag=""
+		_export_flag=""
+		_config_file=""
+		_change_before=""
+		_change_after=""
+		_found_option=0
 
-	# Check if config file exists
-	if [ ! -r "$1" ]; then
-		error_exit 1 "parse_arguments" "$1 does not exist"
+		while [ $# -gt 0 ]; do
+			case "$1" in
+				-v)
+					_found_option=$((_found_option + 1))
+					_opt_mode="VERIFY"
+					_opt_flag="-v"
+					shift
+					;;
+				-c)
+					_found_option=$((_found_option + 1))
+					_opt_mode="CHANGE"
+					_opt_flag="-c"
+					if [ $# -lt 3 ]; then
+						error_exit 1 "parse_arguments" "-c requires <before_tag> <after_tag>"
+					fi
+					shift
+					_change_before="$1"
+					shift
+					_change_after="$1"
+					shift
+					;;
+				--json)
+					_found_option=$((_found_option + 1))
+					_export_flag="--json"
+					shift
+					;;
+				--html)
+					_found_option=$((_found_option + 1))
+					_export_flag="--html"
+					shift
+					;;
+				--summary)
+					_found_option=$((_found_option + 1))
+					_export_flag="--summary"
+					shift
+					;;
+				-C)
+					# Legacy color mode (deprecated, silently ignore)
+					shift
+					;;
+				-*)
+					error_exit 1 "parse_arguments" "Invalid option: $1"
+					;;
+				*)
+					# Non-option argument: assume config file
+					if [ -z "$_config_file" ]; then
+						_config_file="$1"
+					else
+						error_exit 1 "parse_arguments" "Multiple config files specified"
+					fi
+					shift
+					;;
+			esac
+		done
+
+		# Validation: reject multiple simultaneous options
+		if [ "$_found_option" -gt 1 ]; then
+			error_exit 1 "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --json, --html, --summary)"
+		fi
+
+		# Validation: mode flags and export flags are mutually exclusive
+		if [ -n "$_opt_flag" ] && [ -n "$_export_flag" ]; then
+			error_exit 1 "parse_arguments" "Cannot combine $_opt_flag with $_export_flag"
+		fi
+
+		# Set mode
+		if [ -n "$_opt_mode" ]; then
+			SHTRACER_MODE="$_opt_mode"
+		else
+			SHTRACER_MODE="NORMAL"
+		fi
+
+		# Set export flags
+		case "$_export_flag" in
+			--json)
+				EXPORT_JSON='true'
+				;;
+			--html)
+				EXPORT_HTML='true'
+				;;
+			--summary)
+				EXPORT_SUMMARY='true'
+				;;
+		esac
+
+		# Set change mode tags
+		if [ "$SHTRACER_MODE" = "CHANGE" ]; then
+			BEFORE_TAG="$_change_before"
+			AFTER_TAG="$_change_after"
+		fi
 	fi
 
-	cd "$CURRENT_DIR" || error_exit 1 "parse_arguments" "Cannot change current directory"
-	CONFIG_DIR="$(cd "$(dirname "$1")" && pwd)"
-	OUTPUT_DIR="${CONFIG_DIR%/}/output/"
-	CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$1")"
-	CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+	# Validation: config file required for non-TEST modes
+	if [ "$SHTRACER_MODE" != "TEST" ]; then
+		if [ -z "$_config_file" ]; then
+			error_exit 1 "parse_arguments" "Config file required"
+		fi
+
+		# Check if config file exists
+		if [ ! -r "$_config_file" ]; then
+			error_exit 1 "parse_arguments" "$_config_file does not exist"
+		fi
+
+		# Resolve to absolute path
+		cd "$CURRENT_DIR" || error_exit 1 "parse_arguments" "Cannot change current directory"
+		CONFIG_DIR="$(cd "$(dirname "$_config_file")" && pwd)"
+		OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+		CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$_config_file")"
+		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+	fi
 }
 
 ##
@@ -127,6 +243,9 @@ main_routine() {
 
 	# Export mode for use in sub-functions
 	export SHTRACER_MODE
+	export EXPORT_JSON
+	export EXPORT_SUMMARY
+	export EXPORT_HTML
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
@@ -151,13 +270,39 @@ main_routine() {
 	_VERIFICATION_FILENAME=${_TAG_TABLE_FILENAMES#*"$SHTRACER_SEPARATOR"}
 
 	if [ "$SHTRACER_MODE" = 'NORMAL' ]; then
-
-		if ! _UML_OUTPUT_FILENAME="$(make_target_flowchart "$CONFIG_OUTPUT")"; then
-			error_exit 1 "main_routine" "Error in make_target_flowchart"
+		# If --summary flag is specified, print summary to stdout and exit
+		if [ "$EXPORT_SUMMARY" = 'true' ]; then
+			_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
+			print_summary_direct_links "$_TAGS" "${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
+			return 0
 		fi
 
-		if ! make_html "$_TAG_TABLE_FILENAME" "$_TAGS" "$_UML_OUTPUT_FILENAME"; then
-			error_exit 1 "main_routine" "Error in make_html"
+		# Generate JSON (now mandatory for visualization)
+		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
+		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+		if ! _JSON_OUTPUT_FILE=$(make_json \
+			"$_TAGS" \
+			"${_TAG_OUTPUT_DIR%/}/02_tag_pairs" \
+			"${_TAG_OUTPUT_DIR%/}/03_tag_pairs_downstream" \
+			"$_TAG_TABLE_FILENAME" \
+			"${_CONFIG_OUTPUT_DIR%/}/01_config_table" \
+			"$CONFIG_PATH"); then
+			error_exit 1 "main_routine" "Error in make_json"
+		fi
+
+		# If --json flag is specified, output JSON to stdout and exit
+		if [ "$EXPORT_JSON" = 'true' ]; then
+			cat "$_JSON_OUTPUT_FILE"
+			return 0
+		fi
+
+		# If --html flag is specified, generate HTML to stdout via viewer and exit
+		if [ "$EXPORT_HTML" = 'true' ]; then
+			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" ]; then
+				error_exit 1 "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
+			fi
+			sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"
+			return $?
 		fi
 	fi
 

@@ -35,7 +35,7 @@ end note
 [*] --> input
 [*] --> opt_input
 
-opt_input --> targetfiles : pre-extra-scripts
+opt_input --> targetfiles
 opt_output:Optional output files
 
 state output {
@@ -54,7 +54,7 @@ state opt_output {
 
 
 input --> output : shtracer
-rtm --> opt_output : post-extra-scripts
+rtm --> opt_output
 rtm --> html_output
 uml --> html_output
 
@@ -122,8 +122,6 @@ column | optional  | content                                                    
 6      | mandatory | tag format (for searching tags written in BRE)                       | `
 7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
-9      | optional  | pre-extra-script                                                     | `
-10     | optional  | post-extra-script                                                    | `
 
 <!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.1.1@) -->
 #### Make tag table
@@ -192,57 +190,11 @@ The following cases are invalid.
 * [ ] Duplicated tags.
 
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2.2@) -->
-### 📄 `shtracer_html.sh`
+### 📄 `shtracer_viewer.sh`
 
-* Output text-formatted UML data (e.g., PlantUML, Mermaid) and HTML visualization.
+* Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
 
-Implementation is divided into three helper functions for flowchart generation:
-
-#### Parse config and generate flowchart indices
-
-* Parse the config output data to extract unique trace target titles.
-* Detect fork patterns in the configuration (marked with `(fork)` keyword).
-* Generate hierarchical flowchart indices for each node.
-* Handle nested fork structures with proper index incrementation.
-* Output indexed configuration for flowchart generation.
-
-#### Prepare UML declarations
-
-* Read the indexed config and generate Mermaid node declarations.
-* Create flowchart node syntax: `id<index>([<title>])`.
-* Output declarations for all nodes in the flowchart.
-
-#### Prepare UML relationships
-
-* Parse the indexed config to determine node relationships.
-* Detect fork increments, decrements, and nested fork structures.
-* Generate Mermaid edge syntax: `node1 --> node2`.
-* Create subgraph blocks for fork sections with appropriate labels.
-* Handle closing of fork blocks at the end of the flowchart.
-* Remove empty subgraphs from the output.
-
-The generated flowchart uses Mermaid syntax as shown below:
-
-```mermaid
-flowchart TB
-
-start[Start]
-id1([Requirement])
-id2([Architecture])
-id3_1_1([Implementation])
-id3_1_2([Unit test])
-id3_2_1([Implementation])
-id3_2_2([Unit test])
-id4([Integration test])
-stop[End]
-
-start --> id1
-id1 --> id2
-id2 --> id3_1_1
-subgraph "Main scripts"
-id3_1_1 --> id3_1_2
-end
-id2 --> id3_2_1
+The viewer renders the diagrams and summary directly from the JSON payload (nodes/links/chains).
 subgraph "Optional scripts"
 id3_2_1 --> id3_2_2
 end
@@ -250,4 +202,3 @@ id3_1_2 --> id4
 id3_2_2 --> id4
 id4 --> stop
 ```
-

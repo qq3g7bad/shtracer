@@ -74,9 +74,7 @@ _check_config_convert_to_table() {
 					a["BRIEF"],
 					a["TAG FORMAT"],
 					a["TAG LINE FORMAT"],
-					a["TAG-TITLE OFFSET"],
-					a["PRE-EXTRA-SCRIPT"],
-					a["POST-EXTRA-SCRIPT"];
+					a["TAG-TITLE OFFSET"];
 			}
 
 			BEGIN {
@@ -196,14 +194,13 @@ _extract_tags_discover_files() {
 			tag_format = extract_from_backtick($6)
 			tag_line_format = extract_from_backtick($7)
 			tag_title_offset = $8 == "" ? 1 : $8
-			pre_extra_script = extract_from_backtick($9)
-			post_extra_script = extract_from_backtick($10)
+			if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
 
 			if (tag_format == "") { next }
 
 			cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 			if (is_file_exist == 0) {
-				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""
+				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset
 			}
 			else {
 				# for multiple extension filter
@@ -230,7 +227,7 @@ _extract_tags_discover_files() {
 				else {
 					cmd = "find \"" path "\" -type f " ext_expr ""
 				}
-				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset, pre_extra_script, post_extra_script, ""; } close(cmd);
+				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset; } close(cmd);
 			}
 		}' | sort -u
 }
@@ -248,12 +245,10 @@ _extract_tags_process_files() {
 	# AWK: Parse config line by line, read each target file, extract tags with context
 	# Process:
 	#   1. Parse config fields (title, path, tag format, offset)
-	#   2. Execute pre-extra-script if specified
 	#   3. Scan file line by line:
 	#      - When tag pattern matches: extract tag ID and FROM tags
 	#      - Count down from TAG_TITLE_OFFSET to find associated title
 	#      - Capture file path and line number for reference
-	#   4. Execute post-extra-script if specified
 	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
 	echo "$1" \
 		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
@@ -262,19 +257,8 @@ _extract_tags_process_files() {
 				path = $2
 				tag_format = $6
 				tag_line_format = $7
-				tag_title_offset = $8 ? $8 > 0 : 0
-				pre_extra_script = $9
-				post_extra_script = $10
-
-				# Execute pre_extra_script
-				# Suppress output in verify mode
-				if (pre_extra_script != "") {
-					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
-						system(pre_extra_script " >/dev/null 2>&1")
-					} else {
-						system(pre_extra_script)
-					}
-				}
+				tag_title_offset = ($8 == "" ? 1 : $8)
+				if (tag_title_offset + 0 < 1) { tag_title_offset = 1 }
 
 				# Calculate absolute path once per file (optimization for Windows/Git Bash)
 				filename = path; gsub(".*/", "", filename);
@@ -330,15 +314,7 @@ _extract_tags_process_files() {
 					}
 
 				}
-				# Execute post_extra_script
-				# Suppress output in verify mode
-				if (post_extra_script != "") {
-					if (ENVIRON["SHTRACER_MODE"] == "VERIFY") {
-						system(post_extra_script " >/dev/null 2>&1")
-					} else {
-						system(post_extra_script)
-					}
-				}
+				close(path)
 			}
 			' >"$2"
 }
@@ -556,6 +532,189 @@ join_tag_pairs() {
 }
 
 ##
+# @brief  Print traceability summary based on direct links only (02_tag_pairs)
+# @param  $1 : TAG_OUTPUT_DATA path (01_tags)
+# @param  $2 : TAG_PAIRS path (02_tag_pairs)
+# @return  Prints summary lines to stdout
+print_summary_direct_links() {
+	if [ $# -ne 2 ] || [ ! -r "$1" ] || [ ! -r "$2" ]; then
+		error_exit 1 "print_summary_direct_links" "incorrect argument."
+	fi
+
+	_TAGS_FILE="$1"
+	_TAG_PAIRS_FILE="$2"
+
+	# Output format:
+	#   <layer>
+	#     upstream: <target layer> <pct>, ...
+	#     downstream: <target layer> <pct>, ...
+	# Notes:
+	# - Uses direct links only.
+	# - Treats links as undirected.
+	# - Computes upstream/downstream projections independently (relative to layer order).
+	# - For nodes connected to multiple target layers on a side, split 1 equally across distinct target layers.
+	# - Percent formatting matches the Type diagram labels.
+	awk \
+		-v SEP="$SHTRACER_SEPARATOR" \
+		-v TAGS_FILE="$_TAGS_FILE" \
+		'
+		function trim(s) {
+			gsub(/^[[:space:]]+/, "", s)
+			gsub(/[[:space:]]+$/, "", s)
+			return s
+		}
+		function layer_suffix(s,   n, a, t) {
+			n = split(s, a, ":")
+			t = a[n]
+			return trim(t)
+		}
+		function fmt_pct(value, total,   p, s) {
+			if (total <= 0) { return "" }
+			p = (value / total) * 100
+			if (p > 0 && p < 0.5) { return "<1%" }
+			if (p >= 10) { s = sprintf("%.0f", p) }
+			else { s = sprintf("%.1f", p) }
+			sub(/\.0$/, "", s)
+			return s "%"
+		}
+		BEGIN {
+			# First pass: load tag->layer from 01_tags
+			while ((getline line < TAGS_FILE) > 0) {
+				n = split(line, f, SEP)
+				if (n < 2) { continue }
+				tag = trim(f[2])
+				if (tag == "" || tag == "NONE") { continue }
+				layer = layer_suffix(f[1])
+				if (layer == "") { continue }
+				if (!(tag in tag2layer)) {
+					tag2layer[tag] = layer
+					layerN[layer]++
+					layers[layer] = 1
+				}
+			}
+			close(TAGS_FILE)
+
+			# Preferred stable order
+			order[1] = "Requirement"
+			order[2] = "Architecture"
+			order[3] = "Implementation"
+			order[4] = "Unit test"
+			order[5] = "Integration test"
+			for (i = 1; i <= 5; i++) {
+				ord[order[i]] = i
+			}
+		}
+		{
+			# Second pass (main input): 02_tag_pairs (space separated)
+			tagA = $1
+			tagB = $2
+			if (tagA == "" || tagB == "") { next }
+			if (tagA == "NONE" || tagB == "NONE") { next }
+			if (!(tagA in tag2layer) || !(tagB in tag2layer)) { next }
+			la = tag2layer[tagA]
+			lb = tag2layer[tagB]
+			if (la == "" || lb == "") { next }
+			if (la == lb) { next }
+			if (!(la in ord) || !(lb in ord)) { next }
+
+			# Undirected, but categorize per endpoint as upstream/downstream by layer order.
+			# Endpoint A
+			if (ord[lb] < ord[la]) {
+				k = tagA SUBSEP lb
+				if (!(k in hasUp)) { hasUp[k] = 1; upcnt[tagA]++ }
+			} else if (ord[lb] > ord[la]) {
+				k = tagA SUBSEP lb
+				if (!(k in hasDown)) { hasDown[k] = 1; downcnt[tagA]++ }
+			}
+			# Endpoint B
+			if (ord[la] < ord[lb]) {
+				k = tagB SUBSEP la
+				if (!(k in hasUp)) { hasUp[k] = 1; upcnt[tagB]++ }
+			} else if (ord[la] > ord[lb]) {
+				k = tagB SUBSEP la
+				if (!(k in hasDown)) { hasDown[k] = 1; downcnt[tagB]++ }
+			}
+		}
+		END {
+			# Accumulate split-mass per layer side (up/down) and target layer
+			for (k in hasUp) {
+				split(k, parts, SUBSEP)
+				tag = parts[1]
+				tgt = parts[2]
+				src = tag2layer[tag]
+				if (src == "" || tgt == "") { continue }
+				if (upcnt[tag] <= 0) { continue }
+				accUp[src SUBSEP tgt] += (1.0 / upcnt[tag])
+				hasAccUp[src SUBSEP tgt] = 1
+			}
+			for (k in hasDown) {
+				split(k, parts, SUBSEP)
+				tag = parts[1]
+				tgt = parts[2]
+				src = tag2layer[tag]
+				if (src == "" || tgt == "") { continue }
+				if (downcnt[tag] <= 0) { continue }
+				accDown[src SUBSEP tgt] += (1.0 / downcnt[tag])
+				hasAccDown[src SUBSEP tgt] = 1
+			}
+
+			# Emit summary per layer (no totals). Upstream and downstream in stable order.
+			for (i = 1; i <= 5; i++) {
+				src = order[i]
+				N = layerN[src] + 0
+				if (N <= 0) { continue }
+
+				# Determine if this layer has any upstream/downstream targets
+				hasLine = 0
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					if (j >= i) { continue }
+					if ((src SUBSEP tgt) in hasAccUp) { hasLine = 1 }
+				}
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					if (j <= i) { continue }
+					if ((src SUBSEP tgt) in hasAccDown) { hasLine = 1 }
+				}
+				if (!hasLine) { continue }
+
+				print src
+
+				# upstream: reverse order (closest previous layer first visually)
+				upStr = ""
+				for (j = 5; j >= 1; j--) {
+					tgt = order[j]
+					if (j >= i) { continue }
+					key = src SUBSEP tgt
+					if (!(key in hasAccUp)) { continue }
+					part = tgt " " fmt_pct(accUp[key] + 0, N)
+					if (upStr == "") upStr = part
+					else upStr = upStr ", " part
+				}
+				if (upStr != "") {
+					print "  upstream: " upStr
+				}
+
+				# downstream: forward order
+				downStr = ""
+				for (j = 1; j <= 5; j++) {
+					tgt = order[j]
+					if (j <= i) { continue }
+					key = src SUBSEP tgt
+					if (!(key in hasAccDown)) { continue }
+					part = tgt " " fmt_pct(accDown[key] + 0, N)
+					if (downStr == "") downStr = part
+					else downStr = downStr ", " part
+				}
+				if (downStr != "") {
+					print "  downstream: " downStr
+				}
+			}
+		}
+		' <"$_TAG_PAIRS_FILE"
+}
+
+##
 # @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
@@ -579,12 +738,162 @@ print_verification_result() {
 }
 
 ##
+# @brief  Generate JSON output for traceability data
+# @param  $1 : TAG_OUTPUT_DATA (01_tags file path)
+# @param  $2 : TAG_PAIRS (02_tag_pairs file path)
+# @param  $3 : TAG_PAIRS_DOWNSTREAM (03_tag_pairs_downstream file path)
+# @param  $4 : TAG_TABLE (04_tag_table file path)
+# @param  $5 : CONFIG_TABLE (01_config_table file path)
+# @param  $6 : CONFIG_PATH (config file path)
+# @return JSON_OUTPUT_FILENAME
+make_json() {
+	_TAG_OUTPUT_DATA="$1"
+	_TAG_PAIRS="$2"
+	_TAG_PAIRS_DOWNSTREAM="$3"
+	_TAG_TABLE="$4"
+	_CONFIG_TABLE="$5"
+	_CONFIG_PATH="$6"
+
+	_JSON_OUTPUT_FILENAME="${OUTPUT_DIR%/}/output.json"
+
+	# Generate timestamp
+	_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+	# Start JSON structure
+	{
+		printf '{\n'
+		printf '  "metadata": {\n'
+		printf '    "version": "0.1.2",\n'
+		printf '    "generated": "%s",\n' "$_TIMESTAMP"
+		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
+		printf '  },\n'
+
+		# Generate nodes array from 01_tags
+		printf '  "nodes": [\n'
+		awk -F"$SHTRACER_SEPARATOR" '
+		BEGIN { first=1 }
+		NF >= 6 {
+			if (!first) printf ",\n"
+			first=0
+			# Escape quotes and backslashes in description
+			desc = $4
+			gsub(/"/, "\\\"", desc)
+			gsub(/\\/, "\\\\", desc)
+			gsub(/\n/, "\\n", desc)
+			gsub(/\r/, "\\r", desc)
+			gsub(/\t/, "\\t", desc)
+			printf "    {\n"
+			printf "      \"id\": \"%s\",\n", $2
+			printf "      \"label\": \"%s\",\n", $2
+			printf "      \"description\": \"%s\",\n", desc
+			printf "      \"file\": \"%s\",\n", $5
+			printf "      \"line\": %d,\n", $6
+			printf "      \"trace_target\": \"%s\"\n", $1
+			printf "    }"
+		}
+		END { printf "\n" }
+		' "$_TAG_OUTPUT_DATA"
+		printf '  ],\n'
+
+		# Generate links array from tag pairs (exclude NONE and validate nodes exist)
+		printf '  "links": [\n'
+		# Create temporary file with node list
+		_NODE_TEMP_FILE="${OUTPUT_DIR%/}/nodes.tmp"
+		awk -F'<shtracer_separator>' '
+		NF >= 6 {
+			print $2
+		}
+		' "$_TAG_OUTPUT_DATA" >"$_NODE_TEMP_FILE"
+
+		# Generate links using node validation
+		awk '
+		BEGIN { first=1 }
+		# Read nodes into array
+		ARGIND == 1 {
+			nodes[$1] = 1
+			next
+		}
+		# Process tag pairs
+		ARGIND >= 2 && $1 != "NONE" && $2 != "NONE" {
+			if ($1 in nodes && $2 in nodes) {
+				key = $1 "," $2
+				if (!seen[key]++) {
+					if (!first) printf ",\n"
+					first=0
+					printf "    {\n"
+					printf "      \"source\": \"%s\",\n", $1
+					printf "      \"target\": \"%s\",\n", $2
+					printf "      \"value\": 1\n"
+					printf "    }"
+				}
+			}
+		}
+		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
+
+		# Clean up temp file
+		rm -f "$_NODE_TEMP_FILE"
+		printf '\n  ],\n'
+
+		# Generate chains array from tag table
+		printf '  "chains": [\n'
+		awk '
+		BEGIN { first=1 }
+		{
+			if (!first) printf ",\n"
+			first=0
+			printf "    ["
+			for (i=1; i<=NF; i++) {
+				if (i > 1) printf ", "
+				printf "\"%s\"", $i
+			}
+			printf "]"
+		}
+		' "$_TAG_TABLE"
+		printf '\n  ]\n'
+
+		printf '}\n'
+	} >"$_JSON_OUTPUT_FILENAME"
+
+	echo "$_JSON_OUTPUT_FILENAME"
+}
+
+##
 # @brief  Swap or rename tags across all trace target files
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
+	_escape_sed_pattern() {
+		# Escape BRE/ERE-ish metacharacters for sed pattern (treated as regex)
+		# Note: we avoid choosing sed delimiter as '/' to reduce escaping needs later.
+		printf '%s' "$1" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
+	}
+	_escape_sed_replacement() {
+		# Escape sed replacement metacharacters (& and \\) and our delimiter '|'
+		printf '%s' "$1" | sed 's/\\/\\\\/g; s/&/\\&/g; s/|/\\|/g'
+	}
+	_list_target_files() {
+		# $1: PATH (file or directory)
+		# $2: extension regex (grep -E style), optional
+		_target_path="$1"
+		_ext_re="$2"
+		if [ -f "$_target_path" ]; then
+			printf '%s\n' "$_target_path"
+			return 0
+		fi
+		if [ ! -d "$_target_path" ]; then
+			return 0
+		fi
+		_ext_re=${_ext_re:-.*}
+		find "$_target_path" -maxdepth 1 -type f -print 2>/dev/null \
+			| while IFS= read -r _f; do
+				_base=${_f##*/}
+				printf '%s\n' "$_base" | grep -Eq "$_ext_re" || continue
+				printf '%s\n' "$_f"
+			done
+	}
+
 	if [ -e "$1" ]; then
 		_ABSOLUTE_TAG_BASENAME="$(basename "$1")"
 		_ABSOLUTE_TAG_DIRNAME="$(
@@ -603,36 +912,42 @@ swap_tags() {
 		_TEMP_TAG="@SHTRACER___TEMP___TAG@"
 		_TEMP_TAG="$(echo "$_TEMP_TAG" | sed 's/___/_/g')" # for preventing conversion
 
-		_FILE_LIST="$(echo "$_TARGET_DATA" \
-			| while read -r _DATA; do
-				_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
-				_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
-				cd "$CONFIG_DIR" || error_exit 1 "swat_tags" "Cannot change directory to config path"
-
-				# Check if TARGET_PATH is file or direcrory
-				if [ -f "$_PATH" ]; then # File
-					_FILE="$_PATH"
-				else # Directory (Check extension: Multiple extensions can be set by grep argument way)
-					_EXTENSION=${_EXTENSION:-*}
-					_FILE="$(eval ls "${_PATH%/}/" 2>/dev/null \
-						| grep -E "$_EXTENSION" \
-						| sed "s@^@$_PATH@")"
-
-					if [ "$(echo "$_FILE" | sed '/^$/d' | wc -l)" -eq 0 ]; then
-						return # There are no files to match specified extension.
-					fi
-				fi
-				echo "$_FILE"
-			done)"
+		_FILE_LIST="$(
+			echo "$_TARGET_DATA" \
+				| while read -r _DATA; do
+					_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
+					_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
+					cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
+					_list_target_files "$_PATH" "$_EXTENSION"
+				done
+		)"
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
+			_before_pat="$(_escape_sed_pattern "$2")"
+			_after_pat="$(_escape_sed_pattern "$3")"
+			_tmp_pat="$(_escape_sed_pattern "$_TEMP_TAG")"
+			_before_rep="$(_escape_sed_replacement "$2")"
+			_after_rep="$(_escape_sed_replacement "$3")"
+			_tmp_rep="$(_escape_sed_replacement "$_TEMP_TAG")"
 			echo "$_FILE_LIST" \
 				| sort -u \
-				| while read -r t; do
-					sed -i "s/${2}/${_TEMP_TAG}/g" "$t"
-					sed -i "s/${3}/${2}/g" "$t"
-					sed -i "s/${_TEMP_TAG}/${3}/g" "$t"
+				| while IFS= read -r t; do
+					[ -n "$t" ] || continue
+					_tmp_file="$(shtracer_tmpfile)" || exit 1
+					sed \
+						-e "s|${_before_pat}|${_tmp_rep}|g" \
+						-e "s|${_after_pat}|${_before_rep}|g" \
+						-e "s|${_tmp_pat}|${_after_rep}|g" \
+						"$t" >"$_tmp_file" || {
+						rm -f "$_tmp_file"
+						exit 1
+					}
+					cat "$_tmp_file" >"$t" || {
+						rm -f "$_tmp_file"
+						exit 1
+					}
+					rm -f "$_tmp_file"
 				done
 		)
 	)

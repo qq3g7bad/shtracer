@@ -40,17 +40,23 @@ else
 fi
 
 # Check if shfmt is installed
-if ! command -v shfmt >/dev/null 2>&1; then
-  echo "Warning: shfmt is not installed. Skipping formatting check."
-  echo "Install shfmt: https://github.com/mvdan/sh#shfmt"
+SHFMT_CMD=""
+if command -v shfmt >/dev/null 2>&1; then
+  SHFMT_CMD="shfmt"
+  echo "Using shfmt: $(shfmt --version)"
 else
+  echo "Warning: shfmt is not installed. Skipping formatting check."
+  echo "Install shfmt v3.8.0 (CI uses v3.8.0): https://github.com/mvdan/sh/releases/tag/v3.8.0"
+fi
+
+if [ -n "$SHFMT_CMD" ]; then
   echo "Checking formatting with shfmt..."
   for file in $STAGED_SH_FILES; do
     if [ -f "$file" ]; then
       echo "  Checking $file"
-      if ! shfmt -d -ci -bn "$file" >/dev/null 2>&1; then
+      if ! $SHFMT_CMD -d -ci -bn "$file" >/dev/null 2>&1; then
         echo "Formatting issues found in $file"
-        echo "Run 'shfmt -w -ci -bn $file' to fix."
+        echo "Run '$SHFMT_CMD -w -ci -bn $file' to fix."
         echo "Or use 'git commit --no-verify' to bypass."
         exit 1
       fi

@@ -56,18 +56,29 @@ jobs:
 
       # Step 4: Run sample config (verify normal operation)
       - name: Run sample config
-        run: ./shtracer ./sample/config.md
+        run: |
+          rm -rf ./sample/output
+          ./shtracer ./sample/config.md
 
       # Step 5: Verify that output files were generated
       - name: Verify output files
         run: |
-          # Check if generated files exist
+          # Normal mode should generate tag table + JSON (HTML is generated via viewer)
           test -f ./sample/output/tags/04_tag_table || exit 1
-          test -f ./sample/output/uml/20_uml || exit 1
-          test -f ./sample/output/output.html || exit 1
-          echo "All output files generated successfully!"
+          test -f ./sample/output/output.json || exit 1
+          test ! -f ./sample/output/output.html || exit 1
+          echo "Normal mode outputs verified."
 
-      # Step 6: Upload logs if tests fail
+      # Step 6: Generate single HTML via viewer path
+      - name: Generate HTML via --html
+        run: |
+          ./shtracer ./sample/config.md --html > ./sample/output/output.html
+          test -f ./sample/output/output.html || exit 1
+          grep -q "<!DOCTYPE html>" ./sample/output/output.html || exit 1
+          grep -q "traceabilityData" ./sample/output/output.html || exit 1
+          echo "HTML generation verified."
+
+      # Step 7: Upload logs if tests fail
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -107,7 +118,7 @@ jobs:
           echo "Running shellcheck on main scripts..."
           shellcheck ./shtracer
           shellcheck ./scripts/main/*.sh
-          shellcheck ./scripts/test/*.sh
+          find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*" -print0 | xargs -0 shellcheck
           echo "Shellcheck passed!"
 
       # Check shell script formatting with shfmt
@@ -119,7 +130,7 @@ jobs:
           shfmt -d -ci -bn \
             ./shtracer \
             $(find ./scripts/main -name "*.sh") \
-            $(find ./scripts/test -maxdepth 1 -name "*.sh")
+            $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
   # Job 3: Run verification checks
