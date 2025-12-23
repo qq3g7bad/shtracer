@@ -1600,16 +1600,23 @@ _html_insert_content_with_indentation() {
 	_html_insert_result=$(echo "$1" \
 		| awk -v info_file="$_html_insert_info_file" '
 			BEGIN {
+				idx = 0
 				while ((getline line < info_file) > 0) {
-					if (information != "") information = information "\n"
-					information = information line
+					gsub(/\r$/, "", line)
+					lines[idx++] = line
 				}
 				close(info_file)
 			}
 			{
-				gsub(/ *<!-- INSERT INFORMATION -->/,
-					"<!-- SHTRACER INSERTED -->\n" information "\n<!-- SHTRACER INSERTED -->");
-				print
+				if (match($0, / *<!-- INSERT INFORMATION -->/)) {
+					print "<!-- SHTRACER INSERTED -->"
+					for (i = 0; i < idx; i++) {
+						print lines[i]
+					}
+					print "<!-- SHTRACER INSERTED -->"
+				} else {
+					print
+				}
 			}' \
 		| awk '
 			BEGIN {
@@ -1675,6 +1682,7 @@ convert_template_html() {
                     /^[ \t]*<!-- INSERT TABLE -->/ {
                         print "<!-- SHTRACER INSERTED -->"
                         while ((getline line < table_html_file) > 0) {
+                            gsub(/\r$/, "", line)
                             print line
                         }
                         close(table_html_file)
@@ -1920,6 +1928,7 @@ convert_template_js() {
 			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u \
 				| awk -v template_file="$_convert_template_js_file" 'BEGIN{
 						while ((getline line < template_file) > 0) {
+							gsub(/\r$/, "", line)
 							if (init_js_template != "") init_js_template = init_js_template "\n"
 							init_js_template = init_js_template line
 						}
@@ -2131,6 +2140,7 @@ shtracer_viewer_main() {
 		'
 			function emit_file(path) {
 				while ((getline line < path) > 0) {
+					gsub(/\r$/, "", line)
 					print line
 				}
 				close(path)
