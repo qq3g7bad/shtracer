@@ -89,7 +89,10 @@ test_convert_template_js_with_valid_inputs() {
 		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 
 		# Use absolute path for test file
-		_TEST_FILE="$(unset CDPATH; cd "$OUTPUT_DIR/test_dir" && pwd -P)/test_file.md"
+		_TEST_FILE="$(
+			unset CDPATH
+			cd "$OUTPUT_DIR/test_dir" && pwd -P
+		)/test_file.md"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
 		_TEMPLATE_ASSETS_DIR="${SCRIPT_DIR%/}/scripts/main/template/assets"
 
