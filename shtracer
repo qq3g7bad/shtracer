@@ -11,13 +11,14 @@ AFTER_TAG=''
 EXPORT_JSON='false'
 EXPORT_SUMMARY='false'
 EXPORT_HTML='false'
+SHTRACER_DEBUG='false'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}
 
 # Export variables used in external scripts
 export NODATA_STRING="NONE"
-export OUTPUT_DIR="${SCRIPT_DIR%/}/output/"
+export OUTPUT_DIR="${SCRIPT_DIR%/}/shtracer_output/"
 ##
 # @}
 #
@@ -49,6 +50,7 @@ print_usage() {
 		  --json                           Export traceability data in JSON format
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --summary                        Print traceability summary to stdout (direct links only)
+		  --debug                          Keep ${OUTPUT_DIR} (do not auto-delete)
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -156,6 +158,10 @@ parse_arguments() {
 					_export_flag="--summary"
 					shift
 					;;
+				--debug)
+					SHTRACER_DEBUG='true'
+					shift
+					;;
 				-C)
 					# Legacy color mode (deprecated, silently ignore)
 					shift
@@ -232,6 +238,54 @@ parse_arguments() {
 	fi
 }
 
+_cleanup_output_dir() {
+	# Never delete when debugging or when OUTPUT_DIR is empty/unsafe.
+	if [ "${SHTRACER_DEBUG}" = 'true' ]; then
+		return 0
+	fi
+	if [ -z "${OUTPUT_DIR}" ]; then
+		return 0
+	fi
+	case "${OUTPUT_DIR}" in
+		"/" | "")
+			return 0
+			;;
+		*/output | */output/)
+			: # ok
+			;;
+		*)
+			# Safety: only delete known output dir names.
+			return 0
+			;;
+	esac
+	rm -rf -- "${OUTPUT_DIR}" >/dev/null 2>&1 || true
+}
+
+_install_cleanup_traps() {
+	# Install once per process.
+	if [ "${_SHTRACER_TRAPS_INSTALLED:-}" = 'true' ]; then
+		return 0
+	fi
+	_SHTRACER_TRAPS_INSTALLED='true'
+
+	trap '_cleanup_output_dir' EXIT
+	trap 'trap - EXIT; _cleanup_output_dir; exit 130' INT
+	trap 'trap - EXIT; _cleanup_output_dir; exit 143' TERM
+	trap 'trap - EXIT; _cleanup_output_dir; exit 129' HUP
+	trap 'trap - EXIT; _cleanup_output_dir; exit 131' QUIT
+
+	# Optional test hook: delay after traps are installed.
+	# (Used only by tests to reliably send SIGINT.)
+	if [ -n "${SHTRACER_TEST_HOLD_SECS:-}" ]; then
+		case "${SHTRACER_TEST_HOLD_SECS}" in
+			*[!0-9]* | '') : ;;
+			*)
+				sleep "${SHTRACER_TEST_HOLD_SECS}" || true
+				;;
+		esac
+	fi
+}
+
 ##
 # @brief  Main routine
 # @tag    @IMP1.4@ (FROM: @ARC1.1@)
@@ -241,15 +295,27 @@ main_routine() {
 	init_environment
 	parse_arguments "$@"
 
+	# Ensure output directory exists early in the process (normal/verify modes).
+	if [ -n "${OUTPUT_DIR:-}" ] && [ "$SHTRACER_MODE" != 'CHANGE' ] && [ "$SHTRACER_MODE" != 'TEST' ]; then
+		mkdir -p -- "${OUTPUT_DIR}" >/dev/null 2>&1 || true
+	fi
+
 	# Export mode for use in sub-functions
 	export SHTRACER_MODE
 	export EXPORT_JSON
 	export EXPORT_SUMMARY
 	export EXPORT_HTML
+	export SHTRACER_DEBUG
+
+	# Install cleanup traps after OUTPUT_DIR is resolved.
+	if [ "$SHTRACER_MODE" != 'TEST' ]; then
+		_install_cleanup_traps
+	fi
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
 		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+		_cleanup_output_dir
 		return 0
 
 	# Test mode
@@ -274,6 +340,7 @@ main_routine() {
 		if [ "$EXPORT_SUMMARY" = 'true' ]; then
 			_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 			print_summary_direct_links "$_TAGS" "${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
+			_cleanup_output_dir
 			return 0
 		fi
 
@@ -293,6 +360,7 @@ main_routine() {
 		# If --json flag is specified, output JSON to stdout and exit
 		if [ "$EXPORT_JSON" = 'true' ]; then
 			cat "$_JSON_OUTPUT_FILE"
+			_cleanup_output_dir
 			return 0
 		fi
 
@@ -302,7 +370,9 @@ main_routine() {
 				error_exit 1 "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
 			fi
 			sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"
-			return $?
+			_exit_code=$?
+			_cleanup_output_dir
+			return "$_exit_code"
 		fi
 	fi
 
@@ -313,6 +383,8 @@ main_routine() {
 			cat "$_TAG_TABLE_FILENAME"
 		fi
 	fi
+
+	_cleanup_output_dir
 }
 
 case "$0" in
