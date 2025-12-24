@@ -451,5 +451,5 @@ test_integration_verify_flexible_order() {
 	)
 }
 
-# shellcheck source=shunit2_minimal.sh
-. "${TEST_ROOT%/}/shunit2_minimal.sh"
+# shellcheck source=shunit2/shunit2
+. "${TEST_ROOT%/}/shunit2/shunit2"
