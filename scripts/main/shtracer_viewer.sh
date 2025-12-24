@@ -197,6 +197,31 @@ _viewer_emit_traceability_diagrams_js() {
 // traceability_diagrams.js - Traceability visualizations for shtracer
 // Renders the interactive full Sankey diagram and the requirements-centric Type view.
 
+// Initialize global color mapping based on traceTargetOrder
+(function() {
+    if (!window._traceTypeColorMap) {
+        window._traceTypeColorMap = new Map();
+    }
+
+    // Color scheme for trace targets
+    const colorScheme = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+                        '#1abc9c', '#e67e22', '#95a5a6', '#34495e', '#c0392b'];
+
+    // If traceTargetOrder exists, use it to initialize color mapping
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder)) {
+        traceTargetOrder.forEach((type, index) => {
+            if (!window._traceTypeColorMap.has(type)) {
+                window._traceTypeColorMap.set(type, colorScheme[index % colorScheme.length]);
+            }
+        });
+    }
+
+    // Always ensure Unknown has a color
+    if (!window._traceTypeColorMap.has('Unknown')) {
+        window._traceTypeColorMap.set('Unknown', '#7f8c8d');
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     // Use embedded JSON data instead of fetching
     if (typeof traceabilityData !== 'undefined') {
@@ -220,14 +245,13 @@ function traceTypeFromTraceTarget(traceTarget) {
 }
 
 function traceTypeColor(type) {
-    // This function is called early before renderSankey creates the global color scale
-    // We need to use a consistent color scheme. Store a global mapping.
+    // Use global color mapping initialized at startup
     if (!window._traceTypeColorMap) {
         window._traceTypeColorMap = new Map();
     }
 
     if (!window._traceTypeColorMap.has(type)) {
-        // Assign next color from scheme
+        // Fallback: assign color if type not in initial mapping
         const colorScheme = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
                             '#1abc9c', '#e67e22', '#95a5a6', '#34495e', '#c0392b'];
         const nextIndex = window._traceTypeColorMap.size;
@@ -242,14 +266,29 @@ function renderLegend(containerId, types) {
     const el = document.getElementById(containerId);
     if (!el) return;
 
-    // If types not provided, extract from traceabilityData
+    // If types not provided, use config.md order or extract from traceabilityData
     if (!types && typeof traceabilityData !== 'undefined') {
-        const uniqueTypes = new Set();
-        (traceabilityData.nodes || []).forEach(n => {
-            const t = traceTypeFromTraceTarget(n && n.trace_target);
-            if (t && t !== 'Unknown') uniqueTypes.add(t);
-        });
-        types = Array.from(uniqueTypes).sort();
+        if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+            // Use config.md order and filter to only types present in nodes
+            const nodesTypes = new Set();
+            (traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target);
+                if (t && t !== 'Unknown') nodesTypes.add(t);
+            });
+            types = traceTargetOrder.filter(t => nodesTypes.has(t));
+        } else {
+            // Fallback: extract unique trace types from nodes in order of first appearance
+            const seenTypes = new Set();
+            const extractedTypes = [];
+            (traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target);
+                if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                    seenTypes.add(t);
+                    extractedTypes.push(t);
+                }
+            });
+            types = extractedTypes;
+        }
     }
 
     if (!types || types.length === 0) {
@@ -371,13 +410,27 @@ function renderSummary(data) {
     // - Split node mass equally across distinct target layers on each side
     // - Format like the diagram: >=10% as integer, else 1 decimal; <0.5% as <1%
 
-    // Dynamically extract unique trace types from nodes
-    const uniqueTypes = new Set();
-    nodes.forEach(n => {
-        const t = traceTypeFromTraceTarget(n && n.trace_target);
-        if (t && t !== 'Unknown') uniqueTypes.add(t);
-    });
-    const dims = Array.from(uniqueTypes).sort();
+    // Use trace target order from config.md if available, otherwise extract from nodes
+    let dims = [];
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+        // Use config.md order and filter to only types present in nodes
+        const nodesTypes = new Set();
+        nodes.forEach(n => {
+            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            if (t && t !== 'Unknown') nodesTypes.add(t);
+        });
+        dims = traceTargetOrder.filter(t => nodesTypes.has(t));
+    } else {
+        // Fallback: extract unique trace types from nodes in order of first appearance
+        const seenTypes = new Set();
+        nodes.forEach(n => {
+            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                seenTypes.add(t);
+                dims.push(t);
+            }
+        });
+    }
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -540,13 +593,17 @@ function renderSummary(data) {
 function renderParallelSetsRequirements(containerId, nodes, links, colorScale, getTraceType) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
-    const height = container.clientHeight || 600;
+
+    // Calculate height proportionally based on number of nodes
+    // This ensures consistent node sizes across different diagrams
+    let heightPerNode = 25; // legacy fallback; actual height is recomputed from max layer size
+    let height = nodes.length * heightPerNode;
 
     container.innerHTML = '';
 
     const margin = { top: 30, right: 20, bottom: 20, left: 20 };
     const innerW = Math.max(0, width - margin.left - margin.right);
-    const innerH = Math.max(0, height - margin.top - margin.bottom);
+    let innerH = Math.max(0, height - margin.top - margin.bottom);
     const barW = 16;
 
     const svg = d3.select('#' + containerId)
@@ -575,13 +632,27 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Dynamically extract unique trace types from nodes
-    const uniqueTypes = new Set();
-    nodes.forEach(n => {
-        const t = getTraceType(n && n.trace_target);
-        if (t && t !== 'Unknown') uniqueTypes.add(t);
-    });
-    const dims = Array.from(uniqueTypes).sort();
+    // Use trace target order from config.md if available, otherwise extract from nodes
+    let dims = [];
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+        // Use config.md order and filter to only types present in nodes
+        const nodesTypes = new Set();
+        nodes.forEach(n => {
+            const t = getTraceType(n && n.trace_target);
+            if (t && t !== 'Unknown') nodesTypes.add(t);
+        });
+        dims = traceTargetOrder.filter(t => nodesTypes.has(t));
+    } else {
+        // Fallback: extract unique trace types from nodes in order of first appearance
+        const seenTypes = new Set();
+        nodes.forEach(n => {
+            const t = getTraceType(n && n.trace_target);
+            if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                seenTypes.add(t);
+                dims.push(t);
+            }
+        });
+    }
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -679,7 +750,20 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return;
     }
 
-    const pxPerNode = innerH / maxN;
+    // Compact sizing: fixed bar height per type (independent of node count).
+    // All coverage/ribbons are rendered as percentages within this fixed height.
+    const fixedBarHeight = 150;
+    innerH = fixedBarHeight;
+    height = margin.top + margin.bottom + innerH;
+    svg.attr('height', height);
+    container.style.height = height + 'px';
+    container.style.minHeight = height + 'px';
+    container.style.marginBottom = '20px';
+
+    const scaleForDim = (dim) => {
+        const total = N[dim] || 0;
+        return total > 0 ? (innerH / total) : 0;
+    };
     const x = d3.scalePoint().domain(dims).range([0, innerW]).padding(0.5);
 
     // Precompute band positions per layer/target for ribbon endpoints.
@@ -696,7 +780,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             const tgt = dims[k];
             if (tgt === src) continue;
             if (dimOrder.get(tgt) >= srcOrder) continue;
-            const h = (accUp[src][tgt] || 0) * pxPerNode;
+            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
             if (h <= 0) continue;
             bandsUp[src][tgt] = { y0: yu, y1: yu + h };
             yu += h;
@@ -709,7 +793,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             const tgt = dims[k];
             if (tgt === src) continue;
             if (dimOrder.get(tgt) <= srcOrder) continue;
-            const h = (accDown[src][tgt] || 0) * pxPerNode;
+            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
             if (h <= 0) continue;
             bandsDown[src][tgt] = { y0: yd, y1: yd + h };
             yd += h;
@@ -851,9 +935,9 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const total = N[d] || 0;
         if (!total) return;
 
-        const bH = total * pxPerNode;
-        const upH = (coveredUp[d] || 0) * pxPerNode;
-        const downH = (coveredDown[d] || 0) * pxPerNode;
+        const bH = innerH;
+        const upH = ((coveredUp[d] || 0) / total) * innerH;
+        const downH = ((coveredDown[d] || 0) / total) * innerH;
         const upPct = formatPct(coveredUp[d] || 0, total);
         const downPct = formatPct(coveredDown[d] || 0, total);
 
@@ -935,10 +1019,42 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     });
 }
 
-function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, clickable) {
+function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, clickable, typeOrder) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
-    const height = 600;
+
+    // Fixed sizing for the full (clickable) diagram nodes.
+    // Height should be based on the maximum number of nodes in any type column
+    // (not total nodes), otherwise the SVG becomes unnecessarily tall.
+    const fixedNodeHeight = 24; // px per node
+    const nodeGap = 6; // vertical gap between nodes
+    const topPadding = 20;
+    const bottomPadding = 60; // leave space for labels/legend
+
+    let height;
+    if (clickable) {
+        const nodesByTypeForSizing = d3.group(nodes, d => getTraceType(d.trace_target));
+        const presentTypes = Array.from(nodesByTypeForSizing.keys());
+
+        // Prefer caller-provided order (from config), then append any missing types.
+        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
+        presentTypes.forEach(t => {
+            if (!orderedTypes.includes(t)) orderedTypes.push(t);
+        });
+
+        const maxColumnCount = orderedTypes.reduce((max, t) => {
+            const cnt = (nodesByTypeForSizing.get(t) || []).length;
+            return cnt > max ? cnt : max;
+        }, 0);
+
+        const rows = Math.max(1, maxColumnCount);
+        height = topPadding + (rows * fixedNodeHeight) + Math.max(0, rows - 1) * nodeGap + bottomPadding;
+    } else {
+        // Default sizing (kept for compatibility if this function is reused for non-clickable diagrams).
+        const heightPerNode = 25; // px per node
+        height = nodes.length * heightPerNode;
+    }
 
     // Clear any existing content
     container.innerHTML = '';
@@ -953,12 +1069,12 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     const g = svg.append('g')
         .attr('transform', 'translate(10,10)');
 
-    // Create Sankey layout
+    // Create Sankey layout with better node sizing
     const sankey = d3.sankey()
-        .nodeWidth(15)
-        .nodePadding(10)
+        .nodeWidth(20)  // Increased from 15
+        .nodePadding(8)  // Decreased from 10 for tighter packing
         .extent([[5, 5], [width - 20, height - 20]]);
-    const nodeWidth = 15;
+    const nodeWidth = 20;
 
     // Prepare layout copies so we don't mutate the original arrays (separate state for 'all' vs 'type')
     let layoutNodes = nodes.map(n => Object.assign({}, n));
@@ -1057,42 +1173,31 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
             }
         });
 
-        // Finally override x positions to group by type (same layout as original behavior)
-        const typeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        // Finally override x/y positions to group by type in a fixed-size grid.
         const nodesByType = d3.group(nodes, d => getTraceType(d.trace_target));
-        // fixed sizing for full diagram nodes
-        const fixedNodeHeight = 24; // px per node
-        const nodeGap = 6; // vertical gap between nodes
-        const topPadding = 20;
-        const bottomPadding = 60; // leave space for legend/labels
-
-        // compute tallest column height to size SVG accordingly
-        let maxColumnHeight = 0;
-        typeOrder.forEach(type => {
-            const typeNodes = nodesByType.get(type) || [];
-            const count = typeNodes.length;
-            const columnHeight = count > 0 ? (count * fixedNodeHeight + Math.max(0, count - 1) * nodeGap) : 0;
-            if (columnHeight > maxColumnHeight) maxColumnHeight = columnHeight;
+        const presentTypes = Array.from(nodesByType.keys());
+        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
+        presentTypes.forEach(t => {
+            if (!orderedTypes.includes(t)) orderedTypes.push(t);
         });
 
-        const requiredHeight = topPadding + maxColumnHeight + bottomPadding;
-        // apply immediately so we can compute positions relative to this height
-        const finalHeight = Math.max(height, requiredHeight);
-        svg.attr('height', finalHeight);
-        // Match container height to SVG height and keep spacing so following sections never overlap.
-        container.style.height = finalHeight + 'px';
-        container.style.minHeight = finalHeight + 'px';
+        // Ensure SVG/container match the computed height so the diagram is not clipped.
+        svg.attr('height', height);
+        container.style.height = height + 'px';
+        container.style.minHeight = height + 'px';
         container.style.marginBottom = '20px';
 
-        typeOrder.forEach((type, typeIndex) => {
+        const denom = Math.max(1, orderedTypes.length - 1);
+        const availableH = Math.max(0, height - topPadding - bottomPadding);
+        orderedTypes.forEach((type, typeIndex) => {
             const typeNodes = nodesByType.get(type) || [];
-            let x = (typeIndex / (typeOrder.length - 1)) * (width - 40) + 20;
+            let x = (typeIndex / denom) * (width - 40) + 20;
             const maxX = width - 20 - nodeWidth;
             if (x > maxX) x = maxX;
             const count = typeNodes.length;
             const columnHeight = count > 0 ? (count * fixedNodeHeight + Math.max(0, count - 1) * nodeGap) : 0;
-            // center column vertically inside the allocated maxColumnHeight
-            const startY = topPadding + (maxColumnHeight - columnHeight) / 2;
+            const startY = topPadding + Math.max(0, (availableH - columnHeight) / 2);
             typeNodes.forEach((node, i) => {
                 node.x0 = x;
                 node.x1 = x + nodeWidth;
@@ -1371,22 +1476,32 @@ function renderSankey(data) {
 		// Function to extract type from trace_target (safe)
         const getTraceType = traceTypeFromTraceTarget;
 
-		// Dynamically extract unique trace types from nodes and create color scale
-		const uniqueTypes = new Set();
-		(data.nodes || []).forEach(n => {
-			const t = getTraceType(n && n.trace_target);
-			if (t && t !== 'Unknown') uniqueTypes.add(t);
-		});
-		const types = Array.from(uniqueTypes).sort();
+		// Use trace target order from config.md if available, otherwise extract from nodes
+		let types = [];
+		if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+			// Use config.md order and filter to only types present in nodes
+			const nodesTypes = new Set();
+			(data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target);
+				if (t && t !== 'Unknown') nodesTypes.add(t);
+			});
+			types = traceTargetOrder.filter(t => nodesTypes.has(t));
+		} else {
+			// Fallback: extract unique trace types from nodes in order of first appearance
+			const seenTypes = new Set();
+			(data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target);
+				if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+					seenTypes.add(t);
+					types.push(t);
+				}
+			});
+		}
 
-		// Use D3's categorical color schemes for better color distribution
-		const colorScheme = types.length <= 10
-			? d3.schemeCategory10
-			: d3.schemeTableau10.concat(d3.schemePaired);
-
+		// Use global color mapping for consistency across all diagrams
 		const colorScale = d3.scaleOrdinal()
 				.domain(types)
-				.range(colorScheme.slice(0, types.length));
+				.range(types.map(t => traceTypeColor(t)));
 
         // Legends and top-of-page metadata
         renderLegend('sankey-legend-full');
@@ -1413,7 +1528,7 @@ function renderSankey(data) {
 		});
 
 		// Render full diagram
-		renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true);
+        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true, types);
 
 		// Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
 		const directLinksRaw = Array.isArray(data.direct_links) ? data.direct_links : data.links;
@@ -1730,6 +1845,41 @@ convert_template_html() {
 		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
+		# Extract trace target order from TAG_INFO_TABLE (same as table headers)
+		profile_start "convert_template_html_extract_order"
+		_TRACE_TARGET_ORDER="$(
+			{
+				if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+					cat "$_TAG_INFO_TABLE"
+				else
+					printf '%s\n' "$_TAG_INFO_TABLE"
+				fi
+			} | awk -F"$SHTRACER_SEPARATOR" -v col_idx=0 '
+				function get_last_segment(s,   n, parts) {
+					n = split(s, parts, ":")
+					return n > 0 ? parts[n] : s
+				}
+				{
+					if (NF >= 4 && $4 != "") {
+						trace_target = $4
+						col_name = get_last_segment(trace_target)
+						if (!(col_name in seen)) {
+							seen[col_name] = 1
+							cols[col_idx++] = col_name
+						}
+					}
+				}
+				END {
+					for (i = 0; i < col_idx; i++) {
+						if (i > 0) printf ","
+						printf "\n  \"%s\"", cols[i]
+					}
+					if (col_idx > 0) printf "\n"
+				}
+			'
+		)"
+		profile_end "convert_template_html_extract_order"
+
 		profile_start "convert_template_html_insert_tag_table"
 		_tmp_table_html_file="$(shtracer_tmpfile)" || {
 			error_exit 1 "convert_template_html" "Failed to create temporary file"
@@ -1737,7 +1887,7 @@ convert_template_html() {
 		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
-				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" '
+				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" -v trace_order="$_TRACE_TARGET_ORDER" '
                     /^[ \t]*<!-- INSERT TABLE -->/ {
                         print "<!-- SHTRACER INSERTED -->"
                         while ((getline line < table_html_file) > 0) {
@@ -1749,6 +1899,10 @@ convert_template_html() {
                         next
                     }
                     /^[ \t]*<!-- INSERT JSON DATA -->/ {
+                        # Output trace target order
+                        print "const traceTargetOrder = [" trace_order
+                        print "];"
+                        # Output JSON data
                         print "const traceabilityData = "
                         while ((getline j < json_file) > 0) {
                             gsub(/\r$/, "", j)
