@@ -367,7 +367,7 @@ test_parse_arguments_with_config_file() {
 		_DIRNAME=$(cd "$(dirname "$SELF_PATH")" && pwd)
 		assertEquals "$SELF_PATH" "$CONFIG_PATH"
 		assertEquals "${_DIRNAME%/}" "$CONFIG_DIR"
-		assertEquals "${CONFIG_DIR%/}/output/" "$OUTPUT_DIR"
+		assertEquals "${CONFIG_DIR%/}/shtracer_output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"
 	)
 }

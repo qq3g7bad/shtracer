@@ -777,11 +777,13 @@ make_json() {
 			first=0
 			# Escape quotes and backslashes in description
 			desc = $4
-			gsub(/"/, "\\\"", desc)
+			# First escape backslashes, then other special characters
 			gsub(/\\/, "\\\\", desc)
-			gsub(/\n/, "\\n", desc)
-			gsub(/\r/, "\\r", desc)
-			gsub(/\t/, "\\t", desc)
+			gsub(/"/, "\\\"", desc)
+			# Use octal notation for control characters
+			gsub(/\015/, "\\r", desc)  # \r (CR)
+			gsub(/\012/, "\\n", desc)  # \n (LF)
+			gsub(/\011/, "\\t", desc)  # \t (TAB)
 			printf "    {\n"
 			printf "      \"id\": \"%s\",\n", $2
 			printf "      \"label\": \"%s\",\n", $2

@@ -12,13 +12,14 @@ EXPORT_JSON='false'
 EXPORT_SUMMARY='false'
 EXPORT_HTML='false'
 SHTRACER_DEBUG='false'
+OUTPUT_DIR_DEFAULT_NAME='shtracer_output'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 SCRIPT_DIR=${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}
 
 # Export variables used in external scripts
 export NODATA_STRING="NONE"
-OUTPUT_DIR=''
+OUTPUT_DIR="${OUTPUT_DIR:-}"
 export OUTPUT_DIR
 ##
 # @}
@@ -233,7 +234,25 @@ parse_arguments() {
 		# Resolve to absolute path
 		cd "$CURRENT_DIR" || error_exit 1 "parse_arguments" "Cannot change current directory"
 		CONFIG_DIR="$(cd "$(dirname "$_config_file")" && pwd)"
-		OUTPUT_DIR="${CONFIG_DIR%/}/output/"
+		# OUTPUT_DIR override semantics:
+		# - If unset/empty: use default name under CONFIG_DIR
+		# - If contains '/': treat as path (absolute, or relative to CONFIG_DIR)
+		# - Else: treat as directory name under CONFIG_DIR
+		if [ -z "${OUTPUT_DIR:-}" ]; then
+			OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR_DEFAULT_NAME}/"
+		else
+			case "${OUTPUT_DIR}" in
+				/*)
+					OUTPUT_DIR="${OUTPUT_DIR%/}/"
+					;;
+				*/*)
+					OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR%/}/"
+					;;
+				*)
+					OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR%/}/"
+					;;
+			esac
+		fi
 		CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$_config_file")"
 		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
 	fi
@@ -252,6 +271,9 @@ _cleanup_output_dir() {
 			return 0
 			;;
 		*/output | */output/)
+			: # ok
+			;;
+		*/shtracer_output|*/shtracer_output/)
 			: # ok
 			;;
 		*)
