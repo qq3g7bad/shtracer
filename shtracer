@@ -18,7 +18,8 @@ SCRIPT_DIR=${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}
 
 # Export variables used in external scripts
 export NODATA_STRING="NONE"
-export OUTPUT_DIR="${SCRIPT_DIR%/}/shtracer_output/"
+OUTPUT_DIR=''
+export OUTPUT_DIR
 ##
 # @}
 #
