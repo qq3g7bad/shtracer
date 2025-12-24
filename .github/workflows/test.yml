@@ -57,25 +57,25 @@ jobs:
       # Step 4: Run sample config (verify normal operation)
       - name: Run sample config
         run: |
-          rm -rf ./sample/output
-          ./shtracer ./sample/config.md
+          rm -rf ./sample/shtracer_output
+          ./shtracer --debug ./sample/config.md
 
       # Step 5: Verify that output files were generated
       - name: Verify output files
         run: |
           # Normal mode should generate tag table + JSON (HTML is generated via viewer)
-          test -f ./sample/output/tags/04_tag_table || exit 1
-          test -f ./sample/output/output.json || exit 1
-          test ! -f ./sample/output/output.html || exit 1
+          test -f ./sample/shtracer_output/tags/04_tag_table || exit 1
+          test -f ./sample/shtracer_output/output.json || exit 1
+          test ! -f ./sample/shtracer_output/output.html || exit 1
           echo "Normal mode outputs verified."
 
       # Step 6: Generate single HTML via viewer path
       - name: Generate HTML via --html
         run: |
-          ./shtracer ./sample/config.md --html > ./sample/output/output.html
-          test -f ./sample/output/output.html || exit 1
-          grep -q "<!DOCTYPE html>" ./sample/output/output.html || exit 1
-          grep -q "traceabilityData" ./sample/output/output.html || exit 1
+          ./shtracer ./sample/config.md --debug --html > ./sample/shtracer_output/output.html
+          test -f ./sample/shtracer_output/output.html || exit 1
+          grep -q "<!DOCTYPE html>" ./sample/shtracer_output/output.html || exit 1
+          grep -q "traceabilityData" ./sample/shtracer_output/output.html || exit 1
           echo "HTML generation verified."
 
       # Step 7: Upload logs if tests fail
@@ -85,7 +85,7 @@ jobs:
         with:
           name: test-logs-${{ matrix.os }}
           path: |
-            ./sample/output/
+            ./sample/shtracer_output/
             ./scripts/test/output/
           retention-days: 7
 

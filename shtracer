@@ -72,7 +72,7 @@ print_usage() {
 		     $ ./shtracer --summary ./sample/config.md
 
 		  6. HTML mode
-		     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
+		     $ ./shtracer --debug --html ./sample/config.md > ./sample/output.html
 
 		Note:
 		  - Arguments can be specified in any order.

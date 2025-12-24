@@ -2271,10 +2271,10 @@ print_usage() {
 		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
 
 		  # Explicit tag-table path
-		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/output/tags/04_tag_table > output.html
+          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
 
 		  # JSON file input
-		  ./scripts/main/shtracer_viewer.sh -i ./sample/output/output.json > output.html
+          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
 	USAGE
 	exit 1
 }
@@ -2359,7 +2359,7 @@ shtracer_viewer_main() {
 		_config_path="$(grep -m 1 '"config_path"' "$_json_tmp" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
 		if [ -n "$_config_path" ]; then
 			_config_dir="$(dirname "$_config_path")"
-			_inferred_table="${_config_dir%/}/output/tags/04_tag_table"
+            _inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
 			if [ -r "$_inferred_table" ]; then
 				TAG_TABLE_FILE="$_inferred_table"
 			fi

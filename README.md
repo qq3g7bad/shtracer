@@ -51,10 +51,10 @@ chmod +x ./scripts/main/shtracer_viewer.sh
 ./shtracer ./sample/config.md
 
 # Create a single self-contained HTML report (stdin JSON -> stdout HTML)
-./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+./shtracer --debug --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > ./sample/output.html
 
 # Or, generate HTML directly (JSON -> viewer internally)
-./shtracer --html ./sample/config.md > ./sample/output/output.html
+./shtracer --debug --html ./sample/config.md > ./sample/output.html
 ```
 
 ## 🚀 Usage
@@ -76,10 +76,10 @@ Examples:
      $ ./shtracer ./sample/config.md
 
   2. Generate HTML via viewer (recommended)
-     $ ./shtracer --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh > ./sample/output/output.html
+   $ ./shtracer --debug --json ./sample/config.md | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > ./sample/output.html
 
   3. Generate HTML directly
-     $ ./shtracer --html ./sample/config.md > ./sample/output/output.html
+   $ ./shtracer --debug --html ./sample/config.md > ./sample/output.html
 
   4. Change mode (swap or rename tags)
      $ ./shtracer -c old_tag new_tag ./sample/config.md
