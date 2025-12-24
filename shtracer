@@ -273,7 +273,7 @@ _cleanup_output_dir() {
 		*/output | */output/)
 			: # ok
 			;;
-		*/shtracer_output|*/shtracer_output/)
+		*/shtracer_output | */shtracer_output/)
 			: # ok
 			;;
 		*)

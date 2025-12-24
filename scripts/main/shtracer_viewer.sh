@@ -594,16 +594,12 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
 
-    // Calculate height proportionally based on number of nodes
-    // This ensures consistent node sizes across different diagrams
-    let heightPerNode = 25; // legacy fallback; actual height is recomputed from max layer size
-    let height = nodes.length * heightPerNode;
-
     container.innerHTML = '';
 
     const margin = { top: 30, right: 20, bottom: 20, left: 20 };
     const innerW = Math.max(0, width - margin.left - margin.right);
-    let innerH = Math.max(0, height - margin.top - margin.bottom);
+    let innerH = 200; // Initial value, will be recalculated based on bar heights
+    let height = margin.top + margin.bottom + innerH; // Initial height
     const barW = 16;
 
     const svg = d3.select('#' + containerId)
@@ -750,10 +746,91 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return;
     }
 
-    // Compact sizing: fixed bar height per type (independent of node count).
-    // All coverage/ribbons are rendered as percentages within this fixed height.
-    const fixedBarHeight = 150;
-    innerH = fixedBarHeight;
+    // Calculate bar heights and positions based on connection relationships
+    // Position bars to minimize ribbon overlap by placing connected bars near each other
+    const heightPerNode = 6; // Height per node in pixels
+    const minBarHeight = 30; // Minimum bar height
+    const maxBarHeight = 100; // Maximum bar height
+    const barHeights = {};
+    const barYOffsets = {};
+
+    // Calculate bar heights
+    dims.forEach(dim => {
+        const total = N[dim] || 0;
+        const upCov = coveredUp[dim] || 0;
+        const downCov = coveredDown[dim] || 0;
+        const maxCov = Math.max(upCov, downCov, total * 0.3);
+        const calcHeight = maxCov * heightPerNode;
+        barHeights[dim] = Math.min(maxBarHeight, Math.max(minBarHeight, calcHeight));
+    });
+
+    // Build connection map: source dimension -> [target dimensions]
+    // This helps us stack multiple targets from the same source vertically
+    const sourceToTargets = {};
+    dims.forEach(src => {
+        sourceToTargets[src] = [];
+        dims.forEach(tgt => {
+            if (src !== tgt) {
+                const srcOrder = dimOrder.get(src);
+                const tgtOrder = dimOrder.get(tgt);
+                if (srcOrder < tgtOrder && (accDown[src][tgt] > 0)) {
+                    sourceToTargets[src].push(tgt);
+                }
+            }
+        });
+    });
+
+    // Position bars to avoid link overlap
+    innerH = 400; // Initial canvas height
+    const barSpacing = 15; // Vertical spacing between stacked bars
+
+    // Position first dimension in center
+    barYOffsets[dims[0]] = (innerH - barHeights[dims[0]]) / 2;
+
+    // Position subsequent dimensions
+    for (let i = 1; i < dims.length; i++) {
+        const dim = dims[i];
+
+        // Find the strongest connection source (predecessor with most connections)
+        let strongestSource = null;
+        let maxWeight = 0;
+
+        for (let j = 0; j < i; j++) {
+            const prevDim = dims[j];
+            const weight = accDown[prevDim][dim] || accUp[dim][prevDim] || 0;
+            if (weight > maxWeight) {
+                maxWeight = weight;
+                strongestSource = prevDim;
+            }
+        }
+
+        if (strongestSource) {
+            // Get list of targets from this source
+            const siblings = sourceToTargets[strongestSource];
+            const siblingIndex = siblings.indexOf(dim);
+
+            if (siblingIndex === 0) {
+                // First target: align with source (same y coordinate)
+                barYOffsets[dim] = barYOffsets[strongestSource];
+            } else {
+                // Subsequent targets: stack below previous sibling to avoid overlap
+                const prevSibling = siblings[siblingIndex - 1];
+                barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
+            }
+        } else {
+            // No connection, place in center
+            barYOffsets[dim] = (innerH - barHeights[dim]) / 2;
+        }
+    }
+
+    // Adjust canvas height if needed
+    let maxY = 0;
+    dims.forEach(dim => {
+        maxY = Math.max(maxY, barYOffsets[dim] + barHeights[dim]);
+    });
+    innerH = Math.max(innerH, maxY + 20);
+
+    // Update svg height
     height = margin.top + margin.bottom + innerH;
     svg.attr('height', height);
     container.style.height = height + 'px';
@@ -762,20 +839,34 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     const scaleForDim = (dim) => {
         const total = N[dim] || 0;
-        return total > 0 ? (innerH / total) : 0;
+        const barHeight = barHeights[dim];
+        return total > 0 ? (barHeight / total) : 0;
     };
     const x = d3.scalePoint().domain(dims).range([0, innerW]).padding(0.5);
 
     // Precompute band positions per layer/target for ribbon endpoints.
     // Upstream (left) and downstream (right) are independent stacks.
+    // Position ribbons within each bar's vertical space.
     const bandsUp = {}; // bandsUp[src][tgt] = {y0,y1} where tgt is upstream of src
     const bandsDown = {}; // bandsDown[src][tgt] = {y0,y1} where tgt is downstream of src
     dims.forEach(src => {
         const srcOrder = dimOrder.get(src);
+        const srcYOffset = barYOffsets[src];
+        const srcBarHeight = barHeights[src];
 
+        // Calculate total heights first for center alignment within bar
         bandsUp[src] = {};
-        let yu = 0;
-        // upstream targets: stable order (closest first visually), i.e., reverse dims
+        let totalUpHeight = 0;
+        for (let k = dims.length - 1; k >= 0; k--) {
+            const tgt = dims[k];
+            if (tgt === src) continue;
+            if (dimOrder.get(tgt) >= srcOrder) continue;
+            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
+            if (h > 0) totalUpHeight += h;
+        }
+
+        // Start from center of this bar's vertical space
+        let yu = srcYOffset + (srcBarHeight - totalUpHeight) / 2;
         for (let k = dims.length - 1; k >= 0; k--) {
             const tgt = dims[k];
             if (tgt === src) continue;
@@ -787,8 +878,17 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         }
 
         bandsDown[src] = {};
-        let yd = 0;
-        // downstream targets: stable order (left-to-right dims)
+        let totalDownHeight = 0;
+        for (let k = 0; k < dims.length; k++) {
+            const tgt = dims[k];
+            if (tgt === src) continue;
+            if (dimOrder.get(tgt) <= srcOrder) continue;
+            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
+            if (h > 0) totalDownHeight += h;
+        }
+
+        // Start from center of this bar's vertical space
+        let yd = srcYOffset + (srcBarHeight - totalDownHeight) / 2;
         for (let k = 0; k < dims.length; k++) {
             const tgt = dims[k];
             if (tgt === src) continue;
@@ -836,6 +936,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return x(dim) + barW / 2;
     }
 
+    let ribbonCounter = 0;
     function drawRibbonBetween(a, b, isOverlay) {
         const oa = dimOrder.get(a);
         const ob = dimOrder.get(b);
@@ -876,7 +977,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const y1a = bBand.y0;
         const y1b = bBand.y1;
 
-        const gradId = `type-grad-${safeId(containerId)}-${safeId(a)}-${safeId(b)}`;
+        // Use numeric index for gradient ID to ensure uniqueness
+        const gradId = `type-grad-${safeId(containerId)}-ribbon-${ribbonCounter++}`;
         ensurePathGradient(gradId, x0, (y0a + y0b) / 2, x1, (y1a + y1b) / 2, colorScale(a), colorScale(b));
 
         const opacity = isOverlay ? 0.45 : 0.25;
@@ -935,15 +1037,16 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const total = N[d] || 0;
         if (!total) return;
 
-        const bH = innerH;
-        const upH = ((coveredUp[d] || 0) / total) * innerH;
-        const downH = ((coveredDown[d] || 0) / total) * innerH;
+        const bH = barHeights[d];
+        const yOffset = barYOffsets[d];
+        const upH = ((coveredUp[d] || 0) / total) * bH;
+        const downH = ((coveredDown[d] || 0) / total) * bH;
         const upPct = formatPct(coveredUp[d] || 0, total);
         const downPct = formatPct(coveredDown[d] || 0, total);
 
         barGroup.append('text')
             .attr('x', x(d))
-            .attr('y', -10)
+            .attr('y', yOffset - 10)
             .attr('text-anchor', 'middle')
             .attr('font-size', '12px')
             .attr('fill', '#333')
@@ -952,7 +1055,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         // Total nodes outline (with base fill to restore node color)
         barGroup.append('rect')
             .attr('x', barLeft(d))
-            .attr('y', 0)
+            .attr('y', yOffset)
             .attr('width', barW)
             .attr('height', Math.max(0, bH))
             .attr('fill', colorScale(d))
@@ -979,7 +1082,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (upH > 0) {
             barGroup.append('rect')
                 .attr('x', barLeft(d))
-                .attr('y', 0)
+                .attr('y', yOffset)
                 .attr('width', barW / 2)
                 .attr('height', Math.max(0, upH))
                 .attr('fill', colorScale(d))
@@ -988,7 +1091,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (downH > 0) {
             barGroup.append('rect')
                 .attr('x', barLeft(d) + barW / 2)
-                .attr('y', 0)
+                .attr('y', yOffset)
                 .attr('width', barW / 2)
                 .attr('height', Math.max(0, downH))
                 .attr('fill', colorScale(d))
@@ -999,7 +1102,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (upPct) {
             barGroup.append('text')
                 .attr('x', barLeft(d) - 6)
-                .attr('y', Math.min(Math.max(10, upH / 2), Math.max(10, bH - 10)))
+                .attr('y', yOffset + Math.min(Math.max(10, upH / 2), Math.max(10, bH - 10)))
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'end')
                 .attr('font-size', '11px')
@@ -1009,7 +1112,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (downPct) {
             barGroup.append('text')
                 .attr('x', barRight(d) + 6)
-                .attr('y', Math.min(Math.max(10, downH / 2), Math.max(10, bH - 10)))
+                .attr('y', yOffset + Math.min(Math.max(10, downH / 2), Math.max(10, bH - 10)))
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'start')
                 .attr('font-size', '11px')
@@ -1072,7 +1175,8 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     // Create Sankey layout with better node sizing
     const sankey = d3.sankey()
         .nodeWidth(20)  // Increased from 15
-        .nodePadding(8)  // Decreased from 10 for tighter packing
+        .nodePadding(12)  // Increased for better visual spacing
+        .nodeAlign(d3.sankeyCenter)  // Center-align nodes for better vertical distribution
         .extent([[5, 5], [width - 20, height - 20]]);
     const nodeWidth = 20;
 
@@ -1236,15 +1340,18 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     } else {
         linksToRender = (typeof layoutLinks !== 'undefined') ? layoutLinks : links;
     }
-    linksToRender.forEach((d, i) => { if (d.index == null) d.index = i; });
+    // Ensure each link has a unique index for gradient IDs
+    linksToRender.forEach((d, i) => { d.linkRenderIndex = i; });
     // Filter out padding links (internal-only) from rendering/gradients
     const visibleLinks = linksToRender.filter(l => !l._padding);
+    // Re-index visible links to ensure continuity
+    visibleLinks.forEach((d, i) => { d.visibleIndex = i; });
     const defs = svg.append('defs');
     const grads = defs.selectAll('linearGradient')
         .data(visibleLinks)
         .enter()
         .append('linearGradient')
-        .attr('id', d => `grad-${containerId}-${d.index}`)
+        .attr('id', d => `grad-${containerId}-${d.visibleIndex}`)
         .attr('gradientUnits', 'userSpaceOnUse')
         // Set coordinates so the gradient follows the link from source to target
         .attr('x1', d => d.source && d.source.x1 != null ? d.source.x1 : 0)
@@ -1269,7 +1376,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
                 const midX = (sourceX + targetX) / 2;
                 return `M${sourceX},${sourceY}C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`;
             })
-            .attr('stroke', d => `url(#grad-${containerId}-${d.index})`)
+            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
             .attr('stroke-width', d => Math.max(1, d.width || 2))
             .attr('fill', 'none')
             .attr('opacity', 0.6)
@@ -1297,7 +1404,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
             .enter()
             .append('path')
             .attr('d', d3.sankeyLinkHorizontal())
-            .attr('stroke', d => `url(#grad-${containerId}-${d.index})`)
+            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
             .attr('stroke-width', d => Math.max(1, d.width || 2))
             .attr('fill', 'none')
             .attr('opacity', 0.6)
@@ -1885,9 +1992,13 @@ convert_template_html() {
 			error_exit 1 "convert_template_html" "Failed to create temporary file"
 		}
 		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
+		_tmp_trace_order_file="$(shtracer_tmpfile)" || {
+			error_exit 1 "convert_template_html" "Failed to create temporary file for trace order"
+		}
+		printf '%s' "$_TRACE_TARGET_ORDER" >"$_tmp_trace_order_file"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
-				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" -v trace_order="$_TRACE_TARGET_ORDER" '
+				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" -v trace_order_file="$_tmp_trace_order_file" '
                     /^[ \t]*<!-- INSERT TABLE -->/ {
                         print "<!-- SHTRACER INSERTED -->"
                         while ((getline line < table_html_file) > 0) {
@@ -1900,7 +2011,12 @@ convert_template_html() {
                     }
                     /^[ \t]*<!-- INSERT JSON DATA -->/ {
                         # Output trace target order
-                        print "const traceTargetOrder = [" trace_order
+                        print "const traceTargetOrder = ["
+                        while ((getline ord_line < trace_order_file) > 0) {
+                            gsub(/\r$/, "", ord_line)
+                            print ord_line
+                        }
+                        close(trace_order_file)
                         print "];"
                         # Output JSON data
                         print "const traceabilityData = "
@@ -1916,10 +2032,8 @@ convert_template_html() {
                     { print }
                 '
 		)"
-		rm -f "$_tmp_table_html_file"
-		profile_end "convert_template_html_insert_tag_table"
-
-		profile_start "_html_insert_content_with_indentation"
+		rm -f "$_tmp_table_html_file" "$_tmp_trace_order_file"
+		profile_end "convert_template_html_insert_tag_table" profile_start "_html_insert_content_with_indentation"
 		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
 		profile_end "_html_insert_content_with_indentation"
 
@@ -2271,10 +2385,10 @@ print_usage() {
 		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
 
 		  # Explicit tag-table path
-          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
+		          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
 
 		  # JSON file input
-          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
+		          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
 	USAGE
 	exit 1
 }
@@ -2359,7 +2473,7 @@ shtracer_viewer_main() {
 		_config_path="$(grep -m 1 '"config_path"' "$_json_tmp" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
 		if [ -n "$_config_path" ]; then
 			_config_dir="$(dirname "$_config_path")"
-            _inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
+			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
 			if [ -r "$_inferred_table" ]; then
 				TAG_TABLE_FILE="$_inferred_table"
 			fi
