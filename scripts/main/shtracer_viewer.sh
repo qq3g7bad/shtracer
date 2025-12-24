@@ -214,32 +214,52 @@ document.addEventListener('DOMContentLoaded', function() {
 function traceTypeFromTraceTarget(traceTarget) {
     if (!traceTarget) return 'Unknown';
     const parts = String(traceTarget).split(':');
-    return parts[parts.length - 1].trim() || 'Unknown';
+    const type = parts[parts.length - 1].trim() || 'Unknown';
+    // Return the trace target as-is (after the last colon)
+    return type;
 }
 
 function traceTypeColor(type) {
-    switch (type) {
-        case 'Requirement': return '#e74c3c';
-        case 'Architecture': return '#3498db';
-        case 'Implementation': return '#2ecc71';
-        case 'Unit test': return '#f39c12';
-        case 'Integration test': return '#9b59b6';
-        default: return '#7f8c8d';
+    // This function is called early before renderSankey creates the global color scale
+    // We need to use a consistent color scheme. Store a global mapping.
+    if (!window._traceTypeColorMap) {
+        window._traceTypeColorMap = new Map();
     }
+
+    if (!window._traceTypeColorMap.has(type)) {
+        // Assign next color from scheme
+        const colorScheme = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+                            '#1abc9c', '#e67e22', '#95a5a6', '#34495e', '#c0392b'];
+        const nextIndex = window._traceTypeColorMap.size;
+        const color = type === 'Unknown' ? '#7f8c8d' : colorScheme[nextIndex % colorScheme.length];
+        window._traceTypeColorMap.set(type, color);
+    }
+
+    return window._traceTypeColorMap.get(type);
 }
 
-function renderLegend(containerId) {
+function renderLegend(containerId, types) {
     const el = document.getElementById(containerId);
     if (!el) return;
 
-    const legendData = [
-        {type: 'Requirement', color: traceTypeColor('Requirement')},
-        {type: 'Architecture', color: traceTypeColor('Architecture')},
-        {type: 'Implementation', color: traceTypeColor('Implementation')},
-        {type: 'Unit test', color: traceTypeColor('Unit test')},
-        {type: 'Integration test', color: traceTypeColor('Integration test')},
-        {type: 'Unknown', color: traceTypeColor('Unknown')}
-    ];
+    // If types not provided, extract from traceabilityData
+    if (!types && typeof traceabilityData !== 'undefined') {
+        const uniqueTypes = new Set();
+        (traceabilityData.nodes || []).forEach(n => {
+            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            if (t && t !== 'Unknown') uniqueTypes.add(t);
+        });
+        types = Array.from(uniqueTypes).sort();
+    }
+
+    if (!types || types.length === 0) {
+        types = ['Unknown'];
+    }
+
+    const legendData = types.map(type => ({
+        type: type,
+        color: traceTypeColor(type)
+    }));
 
     el.innerHTML = legendData.map(d =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${d.color}"></span><span>${d.type}</span></span>`
@@ -350,7 +370,14 @@ function renderSummary(data) {
     // - Compute upstream/downstream projections independently
     // - Split node mass equally across distinct target layers on each side
     // - Format like the diagram: >=10% as integer, else 1 decimal; <0.5% as <1%
-    const dims = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+
+    // Dynamically extract unique trace types from nodes
+    const uniqueTypes = new Set();
+    nodes.forEach(n => {
+        const t = traceTypeFromTraceTarget(n && n.trace_target);
+        if (t && t !== 'Unknown') uniqueTypes.add(t);
+    });
+    const dims = Array.from(uniqueTypes).sort();
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -548,7 +575,13 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const dims = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+    // Dynamically extract unique trace types from nodes
+    const uniqueTypes = new Set();
+    nodes.forEach(n => {
+        const t = getTraceType(n && n.trace_target);
+        if (t && t !== 'Unknown') uniqueTypes.add(t);
+    });
+    const dims = Array.from(uniqueTypes).sort();
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -1335,13 +1368,25 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
 }
 
 function renderSankey(data) {
-		// Color scale for trace targets - more distinct colors
-		const colorScale = d3.scaleOrdinal()
-				.domain(['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'])
-				.range(['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']); // More distinct colors
-
 		// Function to extract type from trace_target (safe)
         const getTraceType = traceTypeFromTraceTarget;
+
+		// Dynamically extract unique trace types from nodes and create color scale
+		const uniqueTypes = new Set();
+		(data.nodes || []).forEach(n => {
+			const t = getTraceType(n && n.trace_target);
+			if (t && t !== 'Unknown') uniqueTypes.add(t);
+		});
+		const types = Array.from(uniqueTypes).sort();
+
+		// Use D3's categorical color schemes for better color distribution
+		const colorScheme = types.length <= 10
+			? d3.schemeCategory10
+			: d3.schemeTableau10.concat(d3.schemePaired);
+
+		const colorScale = d3.scaleOrdinal()
+				.domain(types)
+				.range(colorScheme.slice(0, types.length));
 
         // Legends and top-of-page metadata
         renderLegend('sankey-legend-full');
@@ -1980,6 +2025,7 @@ convert_template_js() {
                         gsub(/"/, "\\\"", s)
                         gsub(/\t/, "\\t", s)
                         gsub(/\r/, "\\r", s)
+                        gsub(/<\//, "<\\/", s)
                         return s
                     }
                     function file_to_js_string(path,   line, out) {
