@@ -591,7 +591,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     container.innerHTML = '';
 
-    const margin = { top: 30, right: 20, bottom: 20, left: 20 };
+    const margin = { top: 5, right: 20, bottom: 20, left: 20 };
     const innerW = Math.max(0, width - margin.left - margin.right);
     let innerH = 200; // Initial value, will be recalculated based on bar heights
     let height = margin.top + margin.bottom + innerH; // Initial height
@@ -779,8 +779,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     innerH = 400; // Initial canvas height
     const barSpacing = 15; // Vertical spacing between stacked bars
 
-    // Position first dimension in center
-    barYOffsets[dims[0]] = (innerH - barHeights[dims[0]]) / 2;
+    // Position first dimension at top
+    barYOffsets[dims[0]] = 0;
 
     // Position subsequent dimensions
     for (let i = 1; i < dims.length; i++) {
@@ -813,8 +813,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
                 barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
             }
         } else {
-            // No connection, place in center
-            barYOffsets[dim] = (innerH - barHeights[dim]) / 2;
+            // No connection, place at top
+            barYOffsets[dim] = 0;
         }
     }
 
@@ -849,7 +849,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const srcYOffset = barYOffsets[src];
         const srcBarHeight = barHeights[src];
 
-        // Calculate total heights first for center alignment within bar
+        // Calculate total heights first for top alignment within bar
         bandsUp[src] = {};
         let totalUpHeight = 0;
         for (let k = dims.length - 1; k >= 0; k--) {
@@ -860,8 +860,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             if (h > 0) totalUpHeight += h;
         }
 
-        // Start from center of this bar's vertical space
-        let yu = srcYOffset + (srcBarHeight - totalUpHeight) / 2;
+        // Start from top of this bar's vertical space
+        let yu = srcYOffset;
         for (let k = dims.length - 1; k >= 0; k--) {
             const tgt = dims[k];
             if (tgt === src) continue;
@@ -882,8 +882,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             if (h > 0) totalDownHeight += h;
         }
 
-        // Start from center of this bar's vertical space
-        let yd = srcYOffset + (srcBarHeight - totalDownHeight) / 2;
+        // Start from top of this bar's vertical space
+        let yd = srcYOffset;
         for (let k = 0; k < dims.length; k++) {
             const tgt = dims[k];
             if (tgt === src) continue;
