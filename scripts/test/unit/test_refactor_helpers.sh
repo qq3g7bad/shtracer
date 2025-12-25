@@ -583,6 +583,112 @@ test_convert_markdown_bold_content() {
 	assertEquals "Section Title: description" "$result"
 }
 
+# ============================================================================
+# Phase 5: JSON and HTML Processing Tests
+# ============================================================================
+
+##
+# @brief Test extract_json_string_field with valid JSON
+#
+test_extract_json_string_field_basic() {
+	cat >"$TEMP_DIR/test.json" <<'EOF'
+{
+  "config_path": "/path/to/config.md",
+  "other_field": "value"
+}
+EOF
+	result=$(extract_json_string_field "$TEMP_DIR/test.json" "config_path")
+	assertEquals "/path/to/config.md" "$result"
+}
+
+##
+# @brief Test extract_json_string_field with whitespace variations
+#
+test_extract_json_string_field_whitespace() {
+	cat >"$TEMP_DIR/test2.json" <<'EOF'
+{
+  "field1"  :  "value1",
+  "field2":"value2"
+}
+EOF
+	result1=$(extract_json_string_field "$TEMP_DIR/test2.json" "field1")
+	result2=$(extract_json_string_field "$TEMP_DIR/test2.json" "field2")
+	assertEquals "value1" "$result1"
+	assertEquals "value2" "$result2"
+}
+
+##
+# @brief Test extract_json_string_field with missing field
+#
+test_extract_json_string_field_missing() {
+	cat >"$TEMP_DIR/test3.json" <<'EOF'
+{
+  "existing": "value"
+}
+EOF
+	result=$(extract_json_string_field "$TEMP_DIR/test3.json" "nonexistent")
+	assertEquals "" "$result"
+}
+
+##
+# @brief Test extract_json_string_field with missing file
+#
+test_extract_json_string_field_no_file() {
+	result=$(extract_json_string_field "$TEMP_DIR/nonexistent.json" "field" 2>/dev/null)
+	assertNotEquals "0" "$?"
+}
+
+##
+# @brief Test extract_json_string_field with path containing special chars
+#
+test_extract_json_string_field_special_chars() {
+	cat >"$TEMP_DIR/test4.json" <<'EOF'
+{
+  "path": "/path/with spaces/file.md"
+}
+EOF
+	result=$(extract_json_string_field "$TEMP_DIR/test4.json" "path")
+	assertEquals "/path/with spaces/file.md" "$result"
+}
+
+##
+# @brief Test remove_lines_with_pattern basic
+#
+test_remove_lines_with_pattern_basic() {
+	result=$(printf "line1\n<!-- MARKER -->\nline3\n" | remove_lines_with_pattern "<!-- MARKER -->")
+	expected=$(printf "line1\nline3\n")
+	assertEquals "$expected" "$result"
+}
+
+##
+# @brief Test remove_lines_with_pattern with HTML comment
+#
+test_remove_lines_with_pattern_html_comment() {
+	result=$(printf "keep\n<!-- SHTRACER INSERTED -->\nkeep too\n" | remove_lines_with_pattern "<!-- SHTRACER INSERTED -->")
+	expected=$(printf "keep\nkeep too\n")
+	assertEquals "$expected" "$result"
+}
+
+##
+# @brief Test remove_lines_with_pattern with no match
+#
+test_remove_lines_with_pattern_no_match() {
+	result=$(printf "line1\nline2\nline3\n" | remove_lines_with_pattern "NOTFOUND")
+	assertEquals "line1" "$(echo "$result" | head -1)"
+	# Count non-empty lines
+	line_count=$(echo "$result" | grep -c "^")
+	assertEquals "3" "$line_count"
+}
+
+##
+# @brief Test remove_lines_with_pattern with special regex chars
+#
+test_remove_lines_with_pattern_special_chars() {
+	result=$(printf "keep\n[test]\nkeep\n" | remove_lines_with_pattern "[test]")
+	expected=$(printf "keep\nkeep\n")
+	assertEquals "$expected" "$result"
+}
+
 # Load shunit2
 # shellcheck source=../shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"

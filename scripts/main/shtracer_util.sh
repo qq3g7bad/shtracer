@@ -357,3 +357,42 @@ remove_trailing_whitespace() {
 convert_markdown_bold() {
 	sed 's/\*\*//g'
 }
+
+##
+# ============================================================================
+# Refactoring Helper Functions (Phase 5: JSON and HTML Processing)
+# ============================================================================
+##
+
+##
+# @brief Extract a string field value from JSON file
+# @param $1 : JSON file path
+# @param $2 : Field name to extract
+# @return Extracted field value via stdout (empty if not found)
+# @example extract_json_string_field "data.json" "config_path"
+# @details Extracts value from pattern: "field_name": "value"
+#   Uses grep + sed for simple JSON parsing (not a full JSON parser)
+extract_json_string_field() {
+	_json_file="$1"
+	_field_name="$2"
+
+	if [ ! -r "$_json_file" ]; then
+		return 1
+	fi
+
+	# Pattern: "field_name"[whitespace]*:[whitespace]*"value"
+	# Extract the value between quotes after the field name
+	grep -m 1 "\"$_field_name\"" "$_json_file" 2>/dev/null \
+		| sed "s/.*\"$_field_name\"[[:space:]]*:[[:space:]]*\"//; s/\".*//"
+}
+
+##
+# @brief Remove lines matching a specific pattern
+# @param $1 : Pattern to match (plain string, not regex)
+# @return Filtered lines via stdout (reads stdin)
+# @example cat file.html | remove_lines_with_pattern "<!-- MARKER -->"
+remove_lines_with_pattern() {
+	_pattern="$1"
+	_escaped="$(escape_sed_pattern "$_pattern")"
+	sed "/^.*$_escaped.*$/d"
+}

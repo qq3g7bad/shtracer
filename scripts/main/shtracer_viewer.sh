@@ -1914,7 +1914,7 @@ _html_insert_content_with_indentation() {
 				}
 			}
 		' \
-		| sed '/<!-- SHTRACER INSERTED -->/d')
+		| remove_lines_with_pattern '<!-- SHTRACER INSERTED -->')
 
 	rm -f "$_html_insert_info_file" 2>/dev/null || true
 	trap - EXIT INT TERM
@@ -2054,7 +2054,7 @@ tag_info_table_from_json_file() {
 	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
 
 	# Extract trace target order from config.md (both ## and ### headings)
-	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+	_config_path="$(extract_json_string_field "$_JSON_FILE" "config_path")"
 	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
 		awk '
 			/^##+ / {
@@ -2465,7 +2465,7 @@ shtracer_viewer_main() {
 	fi
 
 	if [ -z "$TAG_TABLE_FILE" ]; then
-		_config_path="$(grep -m 1 '"config_path"' "$_json_tmp" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+		_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
 		if [ -n "$_config_path" ]; then
 			_config_dir="$(dirname "$_config_path")"
 			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
