@@ -248,3 +248,61 @@ extract_from_doublequotes() {
 extract_from_backticks() {
 	extract_from_delimiters "$1" '`'
 }
+
+##
+# ============================================================================
+# Refactoring Helper Functions (Phase 3: Escaping and Encoding)
+# ============================================================================
+##
+
+##
+# @brief Escape special characters for sed pattern matching
+# @param $1 : Pattern string
+# @return Escaped pattern via stdout
+# @example escape_sed_pattern "a.b*c" escapes regex metacharacters
+# @details Escapes BRE/ERE metacharacters: []\.^$*+?(){}|
+escape_sed_pattern() {
+	printf '%s' "$1" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
+}
+
+##
+# @brief Escape special characters for sed replacement string
+# @param $1 : Replacement string
+# @return Escaped replacement via stdout
+# @example escape_sed_replacement "a&b\\c" escapes &, \, and |
+# @details Escapes: backslash, ampersand, and pipe (our delimiter)
+escape_sed_replacement() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/&/\\&/g; s/|/\\|/g'
+}
+
+##
+# @brief Escape HTML special characters
+# @param $1 : Input string
+# @return HTML-escaped string via stdout
+# @example html_escape "<script>" returns "&lt;script&gt;"
+# @details Escapes: & < > " '
+html_escape() {
+	printf '%s' "$1" | sed -e 's/&/\&amp;/g' \
+		-e 's/</\&lt;/g' \
+		-e 's/>/\&gt;/g' \
+		-e 's/"/\&quot;/g' \
+		-e "s/'/\&#39;/g"
+}
+
+##
+# @brief Escape JavaScript special characters
+# @param $1 : Input string
+# @return JS-escaped string via stdout
+# @example js_escape 'text"newline' escapes quotes and special chars
+# @details Escapes: backslash, double-quote, newline, tab, CR
+js_escape() {
+	printf '%s' "$1" | awk '
+	{
+		gsub(/\\/, "\\\\")
+		gsub(/"/, "\\\"")
+		gsub(/\t/, "\\t")
+		gsub(/\r/, "\\r")
+		gsub(/\n/, "\\n")
+		print
+	}'
+}

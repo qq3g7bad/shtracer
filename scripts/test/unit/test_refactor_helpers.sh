@@ -338,35 +338,141 @@ test_extract_from_backticks_whitespace() {
 # ============================================================================
 
 ##
-# @brief Test html_escape
+# @brief Test escape_sed_pattern with basic metacharacters
 #
-test_html_escape() {
-	# Test will be implemented in Phase 3
-	assertTrue "Placeholder for Phase 3" true
+test_escape_sed_pattern_basic() {
+	result=$(escape_sed_pattern "a.b*c")
+	assertEquals "a\\.b\\*c" "$result"
 }
 
 ##
-# @brief Test js_escape
+# @brief Test escape_sed_pattern with brackets
 #
-test_js_escape() {
-	# Test will be implemented in Phase 3
-	assertTrue "Placeholder for Phase 3" true
+test_escape_sed_pattern_brackets() {
+	result=$(escape_sed_pattern "[a-z]")
+	assertEquals "\\[a-z\\]" "$result"
 }
 
 ##
-# @brief Test escape_sed_pattern
+# @brief Test escape_sed_pattern with anchors
 #
-test_escape_sed_pattern() {
-	# Test will be implemented in Phase 3
-	assertTrue "Placeholder for Phase 3" true
+test_escape_sed_pattern_anchors() {
+	result=$(escape_sed_pattern "^start$")
+	assertEquals "\\^start\\$" "$result"
 }
 
 ##
-# @brief Test escape_sed_replacement
+# @brief Test escape_sed_pattern with parens and pipe
 #
-test_escape_sed_replacement() {
-	# Test will be implemented in Phase 3
-	assertTrue "Placeholder for Phase 3" true
+test_escape_sed_pattern_complex() {
+	result=$(escape_sed_pattern "(foo|bar)")
+	assertEquals "\\(foo\\|bar\\)" "$result"
+}
+
+##
+# @brief Test escape_sed_replacement with backslash
+#
+test_escape_sed_replacement_backslash() {
+	result=$(escape_sed_replacement 'path\to\file')
+	assertEquals 'path\\to\\file' "$result"
+}
+
+##
+# @brief Test escape_sed_replacement with ampersand
+#
+test_escape_sed_replacement_ampersand() {
+	result=$(escape_sed_replacement 'foo&bar')
+	assertEquals 'foo\&bar' "$result"
+}
+
+##
+# @brief Test escape_sed_replacement with pipe
+#
+test_escape_sed_replacement_pipe() {
+	result=$(escape_sed_replacement 'a|b')
+	assertEquals 'a\|b' "$result"
+}
+
+##
+# @brief Test escape_sed_replacement with all special chars
+#
+test_escape_sed_replacement_all() {
+	result=$(escape_sed_replacement 'a\b&c|d')
+	assertEquals 'a\\b\&c\|d' "$result"
+}
+
+##
+# @brief Test html_escape with ampersand
+#
+test_html_escape_ampersand() {
+	result=$(html_escape 'a&b')
+	assertEquals 'a&amp;b' "$result"
+}
+
+##
+# @brief Test html_escape with less-than and greater-than
+#
+test_html_escape_brackets() {
+	result=$(html_escape '<script>')
+	assertEquals '&lt;script&gt;' "$result"
+}
+
+##
+# @brief Test html_escape with quotes
+#
+test_html_escape_quotes() {
+	result=$(html_escape 'say "hello"')
+	assertEquals 'say &quot;hello&quot;' "$result"
+}
+
+##
+# @brief Test html_escape with single quotes
+#
+test_html_escape_single_quotes() {
+	result=$(html_escape "it's")
+	assertEquals 'it&#39;s' "$result"
+}
+
+##
+# @brief Test html_escape with XSS attempt
+#
+test_html_escape_xss() {
+	result=$(html_escape '<script>alert("XSS")</script>')
+	assertEquals '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;' "$result"
+}
+
+##
+# @brief Test js_escape with backslash
+#
+test_js_escape_backslash() {
+	result=$(js_escape 'path\to\file')
+	assertEquals 'path\\to\\file' "$result"
+}
+
+##
+# @brief Test js_escape with double quotes
+#
+test_js_escape_quotes() {
+	result=$(js_escape 'say "hello"')
+	assertEquals 'say \"hello\"' "$result"
+}
+
+##
+# @brief Test js_escape with tab
+#
+test_js_escape_tab() {
+	# Create string with actual tab character
+	tab_str="a	b"
+	result=$(js_escape "$tab_str")
+	assertEquals 'a\tb' "$result"
+}
+
+##
+# @brief Test js_escape with combined escapes
+#
+test_js_escape_combined() {
+	result=$(js_escape 'a\"b\\c')
+	assertEquals 'a\\\"b\\\\c' "$result"
 }
 
 # Load shunit2

@@ -866,15 +866,9 @@ make_json() {
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
-	_escape_sed_pattern() {
-		# Escape BRE/ERE-ish metacharacters for sed pattern (treated as regex)
-		# Note: we avoid choosing sed delimiter as '/' to reduce escaping needs later.
-		printf '%s' "$1" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
-	}
-	_escape_sed_replacement() {
-		# Escape sed replacement metacharacters (& and \\) and our delimiter '|'
-		printf '%s' "$1" | sed 's/\\/\\\\/g; s/&/\\&/g; s/|/\\|/g'
-	}
+	# Note: Using global escape_sed_pattern() and escape_sed_replacement()
+	# functions from shtracer_util.sh instead of local definitions
+
 	_list_target_files() {
 		# $1: PATH (file or directory)
 		# $2: extension regex (grep -E style), optional
@@ -926,12 +920,12 @@ swap_tags() {
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
-			_before_pat="$(_escape_sed_pattern "$2")"
-			_after_pat="$(_escape_sed_pattern "$3")"
-			_tmp_pat="$(_escape_sed_pattern "$_TEMP_TAG")"
-			_before_rep="$(_escape_sed_replacement "$2")"
-			_after_rep="$(_escape_sed_replacement "$3")"
-			_tmp_rep="$(_escape_sed_replacement "$_TEMP_TAG")"
+			_before_pat="$(escape_sed_pattern "$2")"
+			_after_pat="$(escape_sed_pattern "$3")"
+			_tmp_pat="$(escape_sed_pattern "$_TEMP_TAG")"
+			_before_rep="$(escape_sed_replacement "$2")"
+			_after_rep="$(escape_sed_replacement "$3")"
+			_tmp_rep="$(escape_sed_replacement "$_TEMP_TAG")"
 			echo "$_FILE_LIST" \
 				| sort -u \
 				| while IFS= read -r t; do
