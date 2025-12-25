@@ -758,9 +758,9 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     // Calculate bar heights and positions based on connection relationships
     // Position bars to minimize ribbon overlap by placing connected bars near each other
-    const heightPerNode = 6; // Height per node in pixels
+    const heightPerNode = 15; // Height per node in pixels (increased from 6 for better visibility)
     const minBarHeight = 30; // Minimum bar height
-    const maxBarHeight = 100; // Maximum bar height
+    const maxBarHeight = 200; // Maximum bar height (increased from 100 to allow more vertical space)
     const barHeights = {};
     const barYOffsets = {};
 
@@ -791,7 +791,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     });
 
     // Position bars to avoid link overlap
-    innerH = 400; // Initial canvas height
+    innerH = 0; // Initial canvas height (will be calculated from actual bar positions)
     const barSpacing = 15; // Vertical spacing between stacked bars
 
     // Position first dimension at top
@@ -838,7 +838,11 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     dims.forEach(dim => {
         maxY = Math.max(maxY, barYOffsets[dim] + barHeights[dim]);
     });
-    innerH = Math.max(innerH, maxY + 20);
+    // Calculate natural height from bar positions, with reasonable min/max bounds
+    const naturalHeight = maxY + 20; // 20px bottom padding
+    const minHeight = 150; // Minimum to prevent tiny diagrams
+    const maxHeight = 800; // Maximum to prevent excessive scrolling
+    innerH = Math.min(maxHeight, Math.max(minHeight, naturalHeight));
 
     // Update svg height
     height = margin.top + margin.bottom + innerH;
