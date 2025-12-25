@@ -39,12 +39,12 @@ _check_config_remove_comments() {
 		/<!--/,/-->/ { if (in_comment) next }
 		!in_comment { print }
 		' \
-		| sed '/^[[:space:]]*$/d' \
+		| remove_empty_lines \
 		|
 		# Delete empty lines
-		sed 's/^[[:space:]]*\* //' \
+		remove_leading_bullets \
 		|
-		# Delete start spaces
+		# Delete start spaces (bullets)
 		sed 's/[[:space:]]*$//' \
 		|
 		# Delete end spaces

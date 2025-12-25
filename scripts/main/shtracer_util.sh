@@ -171,3 +171,80 @@ count_fields() {
 
 	awk -F "$_separator" 'BEGIN{max=0}{if(NF>max)max=NF}END{print max}' "$_input"
 }
+
+##
+# ============================================================================
+# Refactoring Helper Functions (Phase 2: Whitespace and Quote Processing)
+# ============================================================================
+##
+
+##
+# @brief Remove leading and trailing whitespace from string
+# @param $1 : Input string
+# @return Trimmed string via stdout
+# @example trim_whitespace "  text  " returns "text"
+trim_whitespace() {
+	printf '%s\n' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+##
+# @brief Remove blank lines from input stream
+# @return Non-empty lines via stdout (reads stdin)
+# @example cat file.txt | remove_empty_lines
+remove_empty_lines() {
+	sed '/^[[:space:]]*$/d'
+}
+
+##
+# @brief Remove markdown list bullets from start of lines
+# @return Cleaned lines via stdout (reads stdin)
+# @example echo "* item" | remove_leading_bullets returns "item"
+remove_leading_bullets() {
+	sed 's/^[[:space:]]*\* //'
+}
+
+##
+# @brief Extract content between delimiters (generic)
+# @param $1 : Input string
+# @param $2 : Delimiter character (e.g., ", `)
+# @return Extracted content via stdout
+# @example extract_from_delimiters '"content"' '"' returns "content"
+extract_from_delimiters() {
+	_str="$1"
+	_delim="$2"
+
+	# Trim whitespace first
+	_str="$(printf '%s' "$_str" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+	# Check if delimiters are present
+	case "$_str" in
+		"$_delim"*"$_delim")
+			# Extract content between delimiters using shell parameter expansion
+			_str="${_str#*"$_delim"}"     # Remove prefix including first delimiter
+			_str="${_str%"$_delim"*}"     # Remove suffix including last delimiter
+			printf '%s' "$_str"
+			;;
+		*)
+			# No delimiters, return trimmed string as-is
+			printf '%s' "$_str"
+			;;
+	esac
+}
+
+##
+# @brief Extract content from double-quoted string
+# @param $1 : Input string (may contain "quoted content")
+# @return Content without quotes via stdout
+# @example extract_from_doublequotes '  "value"  ' returns "value"
+extract_from_doublequotes() {
+	extract_from_delimiters "$1" '"'
+}
+
+##
+# @brief Extract content from backtick-quoted string
+# @param $1 : Input string (may contain `quoted content`)
+# @return Content without quotes via stdout
+# @example extract_from_backticks '  `value`  ' returns "value"
+extract_from_backticks() {
+	extract_from_delimiters "$1" '`'
+}

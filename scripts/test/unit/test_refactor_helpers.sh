@@ -184,27 +184,153 @@ EOF
 # ============================================================================
 
 ##
-# @brief Test trim_whitespace
+# @brief Test trim_whitespace with leading spaces
 #
-test_trim_whitespace() {
-	# Test will be implemented in Phase 2
-	assertTrue "Placeholder for Phase 2" true
+test_trim_whitespace_leading() {
+	result=$(trim_whitespace "   text")
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test trim_whitespace with trailing spaces
+#
+test_trim_whitespace_trailing() {
+	result=$(trim_whitespace "text   ")
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test trim_whitespace with both
+#
+test_trim_whitespace_both() {
+	result=$(trim_whitespace "  text  ")
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test trim_whitespace with tabs
+#
+test_trim_whitespace_tabs() {
+	result=$(trim_whitespace "		text		")
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test trim_whitespace with mixed whitespace
+#
+test_trim_whitespace_mixed() {
+	result=$(trim_whitespace " 	 text 	 ")
+	assertEquals "text" "$result"
 }
 
 ##
 # @brief Test remove_empty_lines
 #
 test_remove_empty_lines() {
-	# Test will be implemented in Phase 2
-	assertTrue "Placeholder for Phase 2" true
+	cat >"$TEMP_DIR/empty.txt" <<'EOF'
+line1
+
+line3
+
+line5
+EOF
+	result=$(cat "$TEMP_DIR/empty.txt" | remove_empty_lines | wc -l)
+	assertEquals "3" "$result"
 }
 
 ##
-# @brief Test extract_from_delimiters
+# @brief Test remove_empty_lines with whitespace-only lines
 #
-test_extract_from_delimiters() {
-	# Test will be implemented in Phase 2
-	assertTrue "Placeholder for Phase 2" true
+test_remove_empty_lines_whitespace() {
+	cat >"$TEMP_DIR/whitespace.txt" <<'EOF'
+line1
+
+line3
+
+line5
+EOF
+	result=$(cat "$TEMP_DIR/whitespace.txt" | remove_empty_lines | wc -l)
+	assertEquals "3" "$result"
+}
+
+##
+# @brief Test remove_leading_bullets
+#
+test_remove_leading_bullets() {
+	result=$(echo "* item" | remove_leading_bullets)
+	assertEquals "item" "$result"
+}
+
+##
+# @brief Test remove_leading_bullets with spaces
+#
+test_remove_leading_bullets_spaces() {
+	result=$(echo "  * item" | remove_leading_bullets)
+	assertEquals "item" "$result"
+}
+
+##
+# @brief Test extract_from_delimiters with double quotes
+#
+test_extract_from_delimiters_quotes() {
+	result=$(extract_from_delimiters '"content"' '"')
+	assertEquals "content" "$result"
+}
+
+##
+# @brief Test extract_from_delimiters with backticks
+#
+test_extract_from_delimiters_backticks() {
+	result=$(extract_from_delimiters '`test`' '`')
+	assertEquals "test" "$result"
+}
+
+##
+# @brief Test extract_from_delimiters with whitespace
+#
+test_extract_from_delimiters_whitespace() {
+	result=$(extract_from_delimiters '  "trimmed"  ' '"')
+	assertEquals "trimmed" "$result"
+}
+
+##
+# @brief Test extract_from_delimiters without delimiters
+#
+test_extract_from_delimiters_no_delim() {
+	result=$(extract_from_delimiters 'plain text' '"')
+	assertEquals "plain text" "$result"
+}
+
+##
+# @brief Test extract_from_doublequotes
+#
+test_extract_from_doublequotes() {
+	result=$(extract_from_doublequotes '"value"')
+	assertEquals "value" "$result"
+}
+
+##
+# @brief Test extract_from_doublequotes with whitespace
+#
+test_extract_from_doublequotes_whitespace() {
+	result=$(extract_from_doublequotes '  "value"  ')
+	assertEquals "value" "$result"
+}
+
+##
+# @brief Test extract_from_backticks
+#
+test_extract_from_backticks() {
+	result=$(extract_from_backticks '`command`')
+	assertEquals "command" "$result"
+}
+
+##
+# @brief Test extract_from_backticks with whitespace
+#
+test_extract_from_backticks_whitespace() {
+	result=$(extract_from_backticks '  `command`  ')
+	assertEquals "command" "$result"
 }
 
 # ============================================================================
