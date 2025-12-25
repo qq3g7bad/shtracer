@@ -69,8 +69,8 @@ test_make_json_basic() {
 
 	# Create test data
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>First requirement<shtracer_separator>/path/to/file1.md<shtracer_separator>10<shtracer_separator>1
-Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>First architecture<shtracer_separator>/path/to/file2.md<shtracer_separator>20<shtracer_separator>1
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>First requirement<shtracer_separator>/path/to/file1.md<shtracer_separator>10<shtracer_separator>1<shtracer_separator>unknown
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>First architecture<shtracer_separator>/path/to/file2.md<shtracer_separator>20<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -115,8 +115,8 @@ test_make_json_metadata() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-:Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/home/qq3g7bad/Desktop/repo/shtracer/scripts/main/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1
-Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1
+:Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/home/qq3g7bad/Desktop/repo/shtracer/scripts/main/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1<shtracer_separator>unknown
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -154,8 +154,8 @@ test_make_json_nodes() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1
-Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>2<shtracer_separator>1
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>2<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -194,9 +194,9 @@ test_make_json_links() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1
-Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>2<shtracer_separator>1
-Implementation<shtracer_separator>@IMP1.1@<shtracer_separator>NONE<shtracer_separator>Imp<shtracer_separator>/file3<shtracer_separator>3<shtracer_separator>1
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>2<shtracer_separator>1<shtracer_separator>unknown
+Implementation<shtracer_separator>@IMP1.1@<shtracer_separator>NONE<shtracer_separator>Imp<shtracer_separator>/file3<shtracer_separator>3<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -236,7 +236,7 @@ test_make_json_chains() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
