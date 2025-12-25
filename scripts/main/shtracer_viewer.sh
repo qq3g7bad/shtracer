@@ -568,22 +568,17 @@ function renderSummary(data) {
 
         const fileEntries = Array.from(fileCoverageByDim[src].entries())
             .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-        if (fileEntries.length) {
-            html += `<li><span class=\"summary-dir\">targets:</span>`;
-            html += '<ul class="summary-target-list">';
-            fileEntries.forEach(([rawName, stats]) => {
-                const up = formatPct(stats.up, stats.total);
-                const down = formatPct(stats.down, stats.total);
-                const id = fileIdFromRawName(rawName);
-                const ext = fileExtFromRawName(rawName);
-                html += `<li class=\"summary-target-item\">`;
-                html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
-                html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
-                html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
-                html += `</li>`;
-            });
-            html += '</ul></li>';
-        }
+        fileEntries.forEach(([rawName, stats]) => {
+            const up = formatPct(stats.up, stats.total);
+            const down = formatPct(stats.down, stats.total);
+            const id = fileIdFromRawName(rawName);
+            const ext = fileExtFromRawName(rawName);
+            html += `<li class=\"summary-target-item\">`;
+            html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
+            html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
+            html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
+            html += `</li>`;
+        });
         html += '</ul></li>';
     });
     html += '</ul>';
