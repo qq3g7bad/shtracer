@@ -60,7 +60,7 @@ uml --> html_output
 
 ```
 
-<!-- @ARC1.1@ (FROM: @REQ5.1@) -->
+<!-- @ARC1.1@ (FROM: @REQ6.1@) -->
 ## 🔵 `shtracer`
 
 <a id="tag-123"></a>
@@ -75,23 +75,50 @@ chmod +x ./shtracer
 ./shtracer ./sample/config.md
 ```
 
-<!-- @ARC1.2@ (FROM: @REQ4.1@, @REQ4.2@, @REQ4.3@, @REQ5.1@) -->
+<!-- @ARC1.2@ (FROM: @REQ4.1@, @REQ4.2@, @REQ4.3@, @REQ4.4@, @REQ5.1@, @REQ6.1@) -->
 ### Utility
 
 The `shtracer` file includes utility functions.
 
 * Initialize environment
-* Error and exit
-* Print usage
+* Error and exit with specific exit codes
+* Print usage (including exit code documentation)
 * Parse arguments
 * Load helper functions
 * Main routine
+
+<!-- @ARC1.3@ (FROM: @REQ5.1@, @REQ5.1.1@, @REQ5.1.2@, @REQ5.1.3@, @REQ5.1.4@) -->
+### Exit Code Management
+
+Exit codes are defined as constants for CI/CD integration:
+
+**Usage Errors (1-9)**
+* `EXIT_USAGE=1` - Invalid arguments or usage
+* `EXIT_CONFIG_NOT_FOUND=2` - Config file not found
+* `EXIT_CONFIG_INVALID=3` - Config file format invalid
+
+**Processing Errors (10-19)**
+* `EXIT_EXTRACT_TAGS_FAILED=10` - Failed to extract tags
+* `EXIT_MAKE_TABLE_FAILED=11` - Failed to create tag table
+* `EXIT_MAKE_JSON_FAILED=12` - Failed to generate JSON
+* `EXIT_VIEWER_FAILED=13` - Viewer script execution failed
+
+**Verification Errors (20-29)**
+* `EXIT_ISOLATED_TAGS=20` - Found isolated tags
+* `EXIT_DUPLICATE_TAGS=21` - Found duplicate tags
+* `EXIT_BOTH_ISSUES=22` - Found both isolated and duplicate tags
+
+**System Errors (30-39)**
+* `EXIT_INTERNAL_ERROR=30` - Internal error
+* `EXIT_VIEWER_NOT_FOUND=31` - Viewer script not found
+
+All error handling uses these constants instead of hardcoded values.
 
 ## 📂 scripts/main/
 
 ### 📄 `shtracer_func.sh`
 
-<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.3@) -->
+<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.5@) -->
 #### Check the config file
 
 * Read configuration file.
@@ -123,7 +150,7 @@ column | optional  | content                                                    
 7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
 
-<!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.1.1@) -->
+<!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.3.1@) -->
 #### Make tag table
 
 * Read trace targets.
@@ -164,7 +191,7 @@ NONE @REQ1.3@
 @ARC2.1@ @IMP4.1@
 ```
 
-<!-- @ARC2.3@ (FROM: @REQ2.1@, @REQ3.2.1@) -->
+<!-- @ARC2.3@ (FROM: @REQ2.1@, @REQ3.4.1@) -->
 #### Join tag table
 
 * Connect tag tables from right direction.
@@ -189,10 +216,34 @@ The following cases are invalid.
 * [ ] From tags that have no upstream tags.
 * [ ] Duplicated tags.
 
-<!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2.2@) -->
+Returns specific exit codes:
+* Return `1` if only isolated tags found
+* Return `2` if only duplicate tags found
+* Return `3` if both isolated and duplicate tags found
+* Return `0` if no issues found
+
+<!-- @ARC2.6@ (FROM: @REQ3.1@) -->
+#### Generate JSON output
+
+* Export traceability data in structured JSON format.
+* JSON schema includes:
+  * `metadata`: version, timestamp, config_path
+  * `traces`: array of trace chains with file references
+  * `nodes`: tag information (id, title, file, line)
+  * `links`: relationships between tags (source, target)
+  * `summary`: statistics (total_traces, complete_traces, orphaned_tags)
+* Output to designated file in OUTPUT_DIR.
+* Enable integration with CI/CD pipelines and custom tools.
+
+<!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2@, @REQ3.4.2@) -->
 ### 📄 `shtracer_viewer.sh`
 
 * Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
+* Read JSON from stdin or file argument.
+* Render interactive diagrams (D3.js network graph).
+* Display traceability matrix and summary tables.
+* Embed all assets inline (CSS, JavaScript) for standalone HTML.
+* Support syntax highlighting for code references.
 
 The viewer renders the diagrams and summary directly from the JSON payload (nodes/links/chains).
 subgraph "Optional scripts"
