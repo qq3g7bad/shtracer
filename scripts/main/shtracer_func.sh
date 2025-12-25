@@ -698,24 +698,40 @@ print_summary_direct_links() {
 ##
 # @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
+# @return 0 if no issues, 1 if isolated tags only, 2 if duplicate tags only, 3 if both
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
 	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
 	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
 
-	_RETURN_NUM="0"
+	_has_isolated="0"
+	_has_duplicated="0"
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-		_RETURN_NUM=$((_RETURN_NUM + 1))
+		_has_isolated="1"
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-		_RETURN_NUM=$((_RETURN_NUM + 1))
+		_has_duplicated="1"
 	fi
-	return "$_RETURN_NUM"
+
+	# Return specific codes:
+	# 0 = no issues
+	# 1 = isolated tags only
+	# 2 = duplicate tags only
+	# 3 = both isolated and duplicate tags
+	if [ "$_has_isolated" = "1" ] && [ "$_has_duplicated" = "1" ]; then
+		return 3
+	elif [ "$_has_isolated" = "1" ]; then
+		return 1
+	elif [ "$_has_duplicated" = "1" ]; then
+		return 2
+	else
+		return 0
+	fi
 }
 
 ##

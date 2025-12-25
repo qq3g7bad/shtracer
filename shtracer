@@ -1,6 +1,37 @@
 #!/bin/sh
 
 ##
+# @defgroup Exit codes for CI/CD integration
+# @{
+# Exit codes help CI/CD systems identify specific failure types
+#
+# SUCCESS
+EXIT_SUCCESS=0
+#
+# USAGE ERRORS (1-9)
+EXIT_USAGE=1                    # Invalid arguments or usage
+EXIT_CONFIG_NOT_FOUND=2         # Config file not found
+EXIT_CONFIG_INVALID=3           # Config file format invalid
+#
+# PROCESSING ERRORS (10-19)
+EXIT_EXTRACT_TAGS_FAILED=10     # Failed to extract tags
+EXIT_MAKE_TABLE_FAILED=11       # Failed to create tag table
+EXIT_MAKE_JSON_FAILED=12        # Failed to generate JSON
+EXIT_VIEWER_FAILED=13           # Viewer script execution failed
+#
+# VERIFICATION ERRORS (20-29)
+EXIT_ISOLATED_TAGS=20           # Found isolated tags (no downstream references)
+EXIT_DUPLICATE_TAGS=21          # Found duplicate tags
+EXIT_BOTH_ISSUES=22             # Found both isolated and duplicate tags
+#
+# SYSTEM ERRORS (30-39)
+EXIT_INTERNAL_ERROR=30          # Internal error (directory change, etc.)
+EXIT_VIEWER_NOT_FOUND=31        # Viewer script not found
+##
+# @}
+#
+
+##
 # @defgroup Global variables
 # @{
 
@@ -30,12 +61,12 @@ export OUTPUT_DIR
 # @tag    @IMP1.1@ (FROM: @ARC1.2@)
 load_functions() {
 	_PREVIOUS_DIR="$(pwd)"
-	cd "${SCRIPT_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
+	cd "${SCRIPT_DIR}" || error_exit "$EXIT_INTERNAL_ERROR" "load_functions" "Cannot change current directory"
 	# shellcheck source=scripts/main/shtracer_util.sh
 	. "./scripts/main/shtracer_util.sh"
 	# shellcheck source=scripts/main/shtracer_func.sh
 	. "./scripts/main/shtracer_func.sh"
-	cd "${_PREVIOUS_DIR}" || error_exit 1 "load_functions" "Cannot change current directory"
+	cd "${_PREVIOUS_DIR}" || error_exit "$EXIT_INTERNAL_ERROR" "load_functions" "Cannot change current directory"
 }
 
 ##
@@ -81,8 +112,23 @@ print_usage() {
 		Version:
 		  - 0.1.2
 
+		Exit Codes:
+		  0   - Success
+		  1   - Invalid usage or arguments
+		  2   - Config file not found
+		  3   - Config file format invalid
+		  10  - Failed to extract tags
+		  11  - Failed to create tag table
+		  12  - Failed to generate JSON
+		  13  - Viewer script execution failed
+		  20  - Found isolated tags (verify mode)
+		  21  - Found duplicate tags (verify mode)
+		  22  - Found both isolated and duplicate tags (verify mode)
+		  30  - Internal error
+		  31  - Viewer script not found
+
 	USAGE
-	exit 1
+	exit "$EXIT_USAGE"
 }
 
 ##
@@ -103,10 +149,10 @@ parse_arguments() {
 				;;
 			--json | --html | --summary)
 				# These options require a config file
-				error_exit 1 "parse_arguments" "Config file required"
+				error_exit "$EXIT_CONFIG_NOT_FOUND" "parse_arguments" "Config file required"
 				;;
 			-*)
-				error_exit 1 "parse_arguments" "Invalid argument"
+				error_exit "$EXIT_USAGE" "parse_arguments" "Invalid argument"
 				;;
 			*)
 				# Single argument: treat as config file
@@ -137,7 +183,7 @@ parse_arguments() {
 					_opt_mode="CHANGE"
 					_opt_flag="-c"
 					if [ $# -lt 3 ]; then
-						error_exit 1 "parse_arguments" "-c requires <before_tag> <after_tag>"
+						error_exit "$EXIT_USAGE" "parse_arguments" "-c requires <before_tag> <after_tag>"
 					fi
 					shift
 					_change_before="$1"
@@ -169,14 +215,14 @@ parse_arguments() {
 					shift
 					;;
 				-*)
-					error_exit 1 "parse_arguments" "Invalid option: $1"
+					error_exit "$EXIT_USAGE" "parse_arguments" "Invalid option: $1"
 					;;
 				*)
 					# Non-option argument: assume config file
 					if [ -z "$_config_file" ]; then
 						_config_file="$1"
 					else
-						error_exit 1 "parse_arguments" "Multiple config files specified"
+						error_exit "$EXIT_USAGE" "parse_arguments" "Multiple config files specified"
 					fi
 					shift
 					;;
@@ -185,12 +231,12 @@ parse_arguments() {
 
 		# Validation: reject multiple simultaneous options
 		if [ "$_found_option" -gt 1 ]; then
-			error_exit 1 "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --json, --html, --summary)"
+			error_exit "$EXIT_USAGE" "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --json, --html, --summary)"
 		fi
 
 		# Validation: mode flags and export flags are mutually exclusive
 		if [ -n "$_opt_flag" ] && [ -n "$_export_flag" ]; then
-			error_exit 1 "parse_arguments" "Cannot combine $_opt_flag with $_export_flag"
+			error_exit "$EXIT_USAGE" "parse_arguments" "Cannot combine $_opt_flag with $_export_flag"
 		fi
 
 		# Set mode
@@ -223,16 +269,16 @@ parse_arguments() {
 	# Validation: config file required for non-TEST modes
 	if [ "$SHTRACER_MODE" != "TEST" ]; then
 		if [ -z "$_config_file" ]; then
-			error_exit 1 "parse_arguments" "Config file required"
+			error_exit "$EXIT_CONFIG_NOT_FOUND" "parse_arguments" "Config file required"
 		fi
 
 		# Check if config file exists
 		if [ ! -r "$_config_file" ]; then
-			error_exit 1 "parse_arguments" "$_config_file does not exist"
+			error_exit "$EXIT_CONFIG_NOT_FOUND" "parse_arguments" "$_config_file does not exist"
 		fi
 
 		# Resolve to absolute path
-		cd "$CURRENT_DIR" || error_exit 1 "parse_arguments" "Cannot change current directory"
+		cd "$CURRENT_DIR" || error_exit "$EXIT_INTERNAL_ERROR" "parse_arguments" "Cannot change current directory"
 		CONFIG_DIR="$(cd "$(dirname "$_config_file")" && pwd)"
 		# OUTPUT_DIR override semantics:
 		# - If unset/empty: use default name under CONFIG_DIR
@@ -349,10 +395,10 @@ main_routine() {
 
 	# Normal mode or Verify mode
 	if ! _TAGS=$(extract_tags "$CONFIG_OUTPUT"); then
-		error_exit 1 "main_routine" "Error in extract_tags"
+		error_exit "$EXIT_EXTRACT_TAGS_FAILED" "main_routine" "Error in extract_tags"
 	fi
 	if ! _TAG_TABLE_FILENAMES=$(make_tag_table "$_TAGS"); then
-		error_exit 1 "main_routine" "Error in make_tag_table"
+		error_exit "$EXIT_MAKE_TABLE_FAILED" "main_routine" "Error in make_tag_table"
 	fi
 
 	_TAG_TABLE_FILENAME=${_TAG_TABLE_FILENAMES%%"$SHTRACER_SEPARATOR"*}
@@ -377,7 +423,7 @@ main_routine() {
 			"$_TAG_TABLE_FILENAME" \
 			"${_CONFIG_OUTPUT_DIR%/}/01_config_table" \
 			"$CONFIG_PATH"); then
-			error_exit 1 "main_routine" "Error in make_json"
+			error_exit "$EXIT_MAKE_JSON_FAILED" "main_routine" "Error in make_json"
 		fi
 
 		# If --json flag is specified, output JSON to stdout and exit
@@ -390,24 +436,51 @@ main_routine() {
 		# If --html flag is specified, generate HTML to stdout via viewer and exit
 		if [ "$EXPORT_HTML" = 'true' ]; then
 			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" ]; then
-				error_exit 1 "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
+				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
 			fi
-			sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"
-			_exit_code=$?
+			if ! sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
+				_cleanup_output_dir
+				error_exit "$EXIT_VIEWER_FAILED" "main_routine" "Viewer script execution failed"
+			fi
 			_cleanup_output_dir
-			return "$_exit_code"
+			return 0
 		fi
 	fi
 
 	if print_verification_result "$_VERIFICATION_FILENAME"; then
 		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-			:
+			# Verification passed - no issues found
+			_cleanup_output_dir
+			return 0
 		else
 			cat "$_TAG_TABLE_FILENAME"
+			_cleanup_output_dir
+			return 0
+		fi
+	else
+		# Verification failed - capture the return code
+		_verification_status=$?
+		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+			_cleanup_output_dir
+			# Map verification result to specific exit codes
+			case "$_verification_status" in
+				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Verification failed: found isolated tags" ;;
+				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Verification failed: found duplicate tags" ;;
+				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed: found both isolated and duplicate tags" ;;
+				*) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed with unknown error" ;;
+			esac
+		else
+			# In normal mode, still show the table but exit with error
+			cat "$_TAG_TABLE_FILENAME"
+			_cleanup_output_dir
+			case "$_verification_status" in
+				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Warning: found isolated tags" ;;
+				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Warning: found duplicate tags" ;;
+				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Warning: found both isolated and duplicate tags" ;;
+				*) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Warning: verification issues detected" ;;
+			esac
 		fi
 	fi
-
-	_cleanup_output_dir
 }
 
 case "$0" in
