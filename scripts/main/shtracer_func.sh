@@ -24,31 +24,12 @@ _check_config_remove_comments() {
 	_CONFIG_MARKDOWN_PATH="$1"
 
 	# Delete comment blocks from the configuration markdown file
-	awk <"$_CONFIG_MARKDOWN_PATH" \
-		'
-		/`.*<!--.*-->.*`/   {
-			match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
-			print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-			next;
-		}
-		{
-			sub(/<!--.*-->/, "")
-		}
-		/<!--/ { in_comment=1 }
-		/-->/ && in_comment { in_comment=0; next }
-		/<!--/,/-->/ { if (in_comment) next }
-		!in_comment { print }
-		' \
+	# Using refactored helper functions for better maintainability
+	remove_markdown_comments "$_CONFIG_MARKDOWN_PATH" \
 		| remove_empty_lines \
-		|
-		# Delete empty lines
-		remove_leading_bullets \
-		|
-		# Delete start spaces (bullets)
-		sed 's/[[:space:]]*$//' \
-		|
-		# Delete end spaces
-		sed 's/\*\*\(.*\)\*\*:/\1:/'
+		| remove_leading_bullets \
+		| remove_trailing_whitespace \
+		| convert_markdown_bold
 }
 
 ##

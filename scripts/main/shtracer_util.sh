@@ -306,3 +306,54 @@ js_escape() {
 		print
 	}'
 }
+
+##
+# ============================================================================
+# Refactoring Helper Functions (Phase 4: Complex Processing)
+# ============================================================================
+##
+
+##
+# @brief Remove HTML comments from markdown file
+# @param $1 : Input file path
+# @return Cleaned content via stdout
+# @details Handles three cases:
+#   1. Inline comments: text <!-- comment --> more
+#   2. Multi-line comments
+#   3. Exception: Preserves comments in backticks: `code <!-- keep -->`
+# @note This function extracts the core comment removal logic from
+#       _check_config_remove_comments() for better testability
+remove_markdown_comments() {
+	_file="$1"
+
+	awk <"$_file" '
+		/`.*<!--.*-->.*`/   {
+			match($0, /`.*<!--.*-->.*`/);               # Exception: comment in backticks
+			print(substr($0, 1, RSTART + RLENGTH - 1)); # Keep everything up to backtick end
+			next;
+		}
+		{
+			sub(/<!--.*-->/, "")  # Remove inline comments
+		}
+		/<!--/ { in_comment=1 }
+		/-->/ && in_comment { in_comment=0; next }
+		/<!--/,/-->/ { if (in_comment) next }
+		!in_comment { print }
+	'
+}
+
+##
+# @brief Remove trailing whitespace from lines
+# @return Lines with trailing whitespace removed (reads stdin)
+# @example cat file.txt | remove_trailing_whitespace
+remove_trailing_whitespace() {
+	sed 's/[[:space:]]*$//'
+}
+
+##
+# @brief Convert markdown bold headers to plain text
+# @return Converted lines (reads stdin)
+# @example echo "**Header:**" | convert_markdown_bold returns "Header:"
+convert_markdown_bold() {
+	sed 's/\*\*//g'
+}

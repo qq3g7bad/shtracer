@@ -475,6 +475,114 @@ test_js_escape_combined() {
 	assertEquals 'a\\\"b\\\\c' "$result"
 }
 
+# ============================================================================
+# Phase 4: Complex Processing Tests (Comment Removal)
+# ============================================================================
+
+##
+# @brief Test remove_markdown_comments with inline comment
+#
+test_remove_markdown_comments_inline() {
+	cat >"$TEMP_DIR/inline.md" <<'EOF'
+Text before <!-- comment --> text after
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/inline.md")
+	assertEquals "Text before  text after" "$result"
+}
+
+##
+# @brief Test remove_markdown_comments with multi-line comment
+#
+test_remove_markdown_comments_multiline() {
+	cat >"$TEMP_DIR/multiline.md" <<'EOF'
+Before
+<!-- Start
+Middle
+End -->
+After
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/multiline.md" | tr '\n' ' ' | sed 's/  */ /g')
+	assertEquals "Before After " "$result"
+}
+
+##
+# @brief Test remove_markdown_comments preserves backtick comments
+#
+test_remove_markdown_comments_backtick() {
+	cat >"$TEMP_DIR/backtick.md" <<'EOF'
+`code <!-- keep --> end`
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/backtick.md")
+	assertEquals "\`code <!-- keep --> end\`" "$result"
+}
+
+##
+# @brief Test remove_markdown_comments with no comments
+#
+test_remove_markdown_comments_none() {
+	cat >"$TEMP_DIR/none.md" <<'EOF'
+Line 1
+Line 2
+Line 3
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/none.md" | wc -l)
+	assertEquals "3" "$result"
+}
+
+##
+# @brief Test remove_markdown_comments with comment at start
+#
+test_remove_markdown_comments_start() {
+	cat >"$TEMP_DIR/start.md" <<'EOF'
+<!-- comment -->Text after
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/start.md")
+	assertEquals "Text after" "$result"
+}
+
+##
+# @brief Test remove_markdown_comments with comment at end
+#
+test_remove_markdown_comments_end() {
+	cat >"$TEMP_DIR/end.md" <<'EOF'
+Text before<!-- comment -->
+EOF
+	result=$(remove_markdown_comments "$TEMP_DIR/end.md")
+	assertEquals "Text before" "$result"
+}
+
+##
+# @brief Test remove_trailing_whitespace
+#
+test_remove_trailing_whitespace() {
+	result=$(echo "text   " | remove_trailing_whitespace)
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test remove_trailing_whitespace with tabs
+#
+test_remove_trailing_whitespace_tabs() {
+	result=$(printf "text\t\t\n" | remove_trailing_whitespace)
+	assertEquals "text" "$result"
+}
+
+##
+# @brief Test convert_markdown_bold
+#
+test_convert_markdown_bold() {
+	result=$(echo "**Header:**" | convert_markdown_bold)
+	assertEquals "Header:" "$result"
+}
+
+##
+# @brief Test convert_markdown_bold with text content
+#
+test_convert_markdown_bold_content() {
+	result=$(echo "**Section Title:** description" | convert_markdown_bold)
+	assertEquals "Section Title: description" "$result"
+}
+
 # Load shunit2
 # shellcheck source=../shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"
