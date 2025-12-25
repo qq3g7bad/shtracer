@@ -506,7 +506,7 @@ join_tag_pairs() {
 			error_exit 1 "join_tag_pairs" "Circular reference detected: Maximum recursion depth ($_MAX_DEPTH) exceeded. Please check your tag relationships for cycles (e.g., A -> B -> A)."
 		fi
 
-		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
+		_NF="$(count_fields "$_TAG_TABLE" " ")"
 		_NF_PLUS1="$((_NF + 1))"
 
 		if ! _JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM")"; then
@@ -719,8 +719,8 @@ print_summary_direct_links() {
 # @param  $1 : filenames of verification output
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
-	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
-	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
+	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
 
 	_RETURN_NUM="0"
 
@@ -917,8 +917,8 @@ swap_tags() {
 		_FILE_LIST="$(
 			echo "$_TARGET_DATA" \
 				| while read -r _DATA; do
-					_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
-					_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
+					_PATH="$(extract_field_unquoted "$_DATA" 2 "$SHTRACER_SEPARATOR")"
+					_EXTENSION="$(extract_field_unquoted "$_DATA" 3 "$SHTRACER_SEPARATOR")"
 					cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
 					_list_target_files "$_PATH" "$_EXTENSION"
 				done

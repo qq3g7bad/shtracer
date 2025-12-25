@@ -60,45 +60,123 @@ tearDown() {
 # ============================================================================
 
 ##
-# @brief Test extract_field with basic input
+# @brief Test extract_field with basic colon-separated input
 #
 test_extract_field_basic() {
-	# Test will be implemented in Phase 1
-	# result=$(extract_field "a:b:c" 2 ":")
-	# assertEquals "b" "$result"
-	assertTrue "Placeholder for Phase 1" true
+	result=$(extract_field "a:b:c" 2 ":")
+	assertEquals "b" "$result"
 }
 
 ##
-# @brief Test extract_field with edge cases
+# @brief Test extract_field with first field
 #
-test_extract_field_edge_cases() {
-	# Test will be implemented in Phase 1
-	assertTrue "Placeholder for Phase 1" true
+test_extract_field_first() {
+	result=$(extract_field "one:two:three" 1 ":")
+	assertEquals "one" "$result"
 }
 
 ##
-# @brief Test extract_field with special characters
+# @brief Test extract_field with last field
 #
-test_extract_field_with_special_chars() {
-	# Test will be implemented in Phase 1
-	assertTrue "Placeholder for Phase 1" true
+test_extract_field_last() {
+	result=$(extract_field "one:two:three" 3 ":")
+	assertEquals "three" "$result"
 }
 
 ##
-# @brief Test extract_field_unquoted
+# @brief Test extract_field with empty field
 #
-test_extract_field_unquoted() {
-	# Test will be implemented in Phase 1
-	assertTrue "Placeholder for Phase 1" true
+test_extract_field_empty() {
+	result=$(extract_field "a::c" 2 ":")
+	assertEquals "" "$result"
 }
 
 ##
-# @brief Test count_fields with file input
+# @brief Test extract_field with multi-character separator
+#
+test_extract_field_multichar_separator() {
+	result=$(extract_field "data1<shtracer_separator>data2<shtracer_separator>data3" 2 "<shtracer_separator>")
+	assertEquals "data2" "$result"
+}
+
+##
+# @brief Test extract_field with pipe separator
+#
+test_extract_field_pipe() {
+	result=$(extract_field "field1|field2|field3" 2 "|")
+	assertEquals "field2" "$result"
+}
+
+##
+# @brief Test extract_field with space separator
+#
+test_extract_field_space() {
+	result=$(extract_field "word1 word2 word3" 3 " ")
+	assertEquals "word3" "$result"
+}
+
+##
+# @brief Test extract_field_unquoted with double quotes
+#
+test_extract_field_unquoted_basic() {
+	result=$(extract_field_unquoted '"value1"::"value2"' 1 "::")
+	assertEquals "value1" "$result"
+}
+
+##
+# @brief Test extract_field_unquoted with second field
+#
+test_extract_field_unquoted_second() {
+	result=$(extract_field_unquoted '"val1"::"val2"::"val3"' 2 "::")
+	assertEquals "val2" "$result"
+}
+
+##
+# @brief Test extract_field_unquoted with no quotes (should return as-is)
+#
+test_extract_field_unquoted_no_quotes() {
+	result=$(extract_field_unquoted 'plain::text' 1 "::")
+	assertEquals "plain" "$result"
+}
+
+##
+# @brief Test count_fields with varying field counts
 #
 test_count_fields() {
-	# Test will be implemented in Phase 1
-	assertTrue "Placeholder for Phase 1" true
+	# Create temp file with different field counts per line
+	cat >"$TEMP_DIR/fields.txt" <<'EOF'
+a b c
+d e f g
+h i
+EOF
+	result=$(count_fields "$TEMP_DIR/fields.txt" " ")
+	assertEquals "4" "$result"
+}
+
+##
+# @brief Test count_fields with single field
+#
+test_count_fields_single() {
+	cat >"$TEMP_DIR/single.txt" <<'EOF'
+one
+two
+three
+EOF
+	result=$(count_fields "$TEMP_DIR/single.txt" " ")
+	assertEquals "1" "$result"
+}
+
+##
+# @brief Test count_fields with colon separator
+#
+test_count_fields_colon() {
+	cat >"$TEMP_DIR/colon.txt" <<'EOF'
+a:b
+c:d:e:f
+x:y:z
+EOF
+	result=$(count_fields "$TEMP_DIR/colon.txt" ":")
+	assertEquals "4" "$result"
 }
 
 # ============================================================================

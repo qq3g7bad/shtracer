@@ -121,3 +121,53 @@ profile_end() {
 	echo "[shtracer][profile][$PROCESS_NAME]: ${ELAPSED} sec" >&2
 	eval "unset PROFILE_START_TIME_$PROCESS_NAME"
 }
+
+##
+# ============================================================================
+# Refactoring Helper Functions (Phase 1: Field Extraction)
+# ============================================================================
+#
+# These functions extract common awk/sed patterns into reusable utilities
+# to improve code maintainability and reduce complexity.
+##
+
+##
+# @brief Extract a specific field from separator-delimited string
+# @param $1 : Input string
+# @param $2 : Field number (1-indexed)
+# @param $3 : Field separator
+# @return Extracted field via stdout
+# @example extract_field "a:b:c" 2 ":" returns "b"
+extract_field() {
+	_input="$1"
+	_field_num="$2"
+	_separator="$3"
+
+	printf '%s\n' "$_input" | awk -F "$_separator" -v n="$_field_num" '{print $n}'
+}
+
+##
+# @brief Extract field and remove surrounding double quotes
+# @param $1 : Input string
+# @param $2 : Field number (1-indexed)
+# @param $3 : Field separator
+# @return Unquoted field via stdout
+# @example extract_field_unquoted '"val1"::"val2"' 1 "::" returns "val1"
+extract_field_unquoted() {
+	_field="$(extract_field "$1" "$2" "$3")"
+	# Remove quotes: "value" -> value
+	printf '%s\n' "$_field" | sed 's/^"\(.*\)"$/\1/'
+}
+
+##
+# @brief Count number of fields in a file or string
+# @param $1 : Input file path
+# @param $2 : Field separator
+# @return Maximum field count via stdout
+# @example count_fields "data.txt" " " returns max fields across all lines
+count_fields() {
+	_input="$1"
+	_separator="$2"
+
+	awk -F "$_separator" 'BEGIN{max=0}{if(NF>max)max=NF}END{print max}' "$_input"
+}
