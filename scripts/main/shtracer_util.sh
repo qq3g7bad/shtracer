@@ -396,3 +396,95 @@ remove_lines_with_pattern() {
 	_escaped="$(escape_sed_pattern "$_pattern")"
 	sed "/^.*$_escaped.*$/d"
 }
+
+##
+# ============================================================================
+# File Version Information Helpers (Phase 1: Git Integration)
+# ============================================================================
+##
+
+##
+# @brief Get version information for a file (git hash or last modified time)
+# @param $1 : Absolute file path
+# @return Echoes version string to stdout (format: "git:HASH" or "mtime:ISO8601")
+# @details
+#   - If file is in git repo and tracked: returns "git:<commit-hash>" (7 chars)
+#   - Otherwise: returns "mtime:<ISO8601-timestamp>"
+#   - Handles errors gracefully (git not installed, file doesn't exist, etc.)
+# @example get_file_version_info "/path/to/file.md" returns "git:abc1234" or "mtime:2025-12-26T10:30:00Z"
+get_file_version_info() {
+	_file_path="$1"
+
+	# Validate file exists
+	if [ ! -f "$_file_path" ]; then
+		printf '%s' "unknown"
+		return 1
+	fi
+
+	# Try git first (if available)
+	if command -v git >/dev/null 2>&1; then
+		# Check if file is in a git repo and tracked
+		_git_hash="$(cd "$(dirname "$_file_path")" 2>/dev/null && \
+		             git log -1 --format='%H' -- "$(basename "$_file_path")" 2>/dev/null)"
+
+		if [ -n "$_git_hash" ]; then
+			# Get short hash (first 7 chars) - more readable
+			_short_hash="$(printf '%s' "$_git_hash" | cut -c1-7)"
+			printf 'git:%s' "$_short_hash"
+			return 0
+		fi
+	fi
+
+	# Fallback: use last modified time in ISO 8601 format
+	# POSIX-compliant approach using stat or ls
+	if command -v stat >/dev/null 2>&1; then
+		# Try GNU stat (Linux)
+		_mtime="$(stat -c '%Y' "$_file_path" 2>/dev/null)"
+		if [ -z "$_mtime" ]; then
+			# Try BSD stat (macOS)
+			_mtime="$(stat -f '%m' "$_file_path" 2>/dev/null)"
+		fi
+
+		if [ -n "$_mtime" ]; then
+			# Convert Unix timestamp to ISO 8601 using date
+			# Try GNU date format first, then BSD format
+			_iso_time="$(date -u -d "@$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+			            date -u -r "$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)"
+			if [ -n "$_iso_time" ]; then
+				printf 'mtime:%s' "$_iso_time"
+				return 0
+			fi
+		fi
+	fi
+
+	# Last resort: return unknown
+	printf '%s' "unknown"
+	return 0
+}
+
+##
+# @brief Format version info for compact display (text summary)
+# @param $1 : Version string (from get_file_version_info)
+# @return Formatted string for display
+# @example format_version_info_short "git:abc1234" returns "abc1234"
+# @example format_version_info_short "mtime:2025-12-26T10:30:45Z" returns "2025-12-26 10:30"
+format_version_info_short() {
+	_version="$1"
+
+	case "$_version" in
+		git:*)
+			# Strip "git:" prefix
+			printf '%s' "${_version#git:}"
+			;;
+		mtime:*)
+			# Strip "mtime:" and format timestamp shorter
+			_timestamp="${_version#mtime:}"
+			# Extract date and time (remove 'Z' and seconds)
+			# 2025-12-26T10:30:45Z -> 2025-12-26 10:30
+			printf '%s' "$_timestamp" | sed 's/T/ /; s/:[0-9][0-9]Z$//'
+			;;
+		*)
+			printf '%s' "$_version"
+			;;
+	esac
+}

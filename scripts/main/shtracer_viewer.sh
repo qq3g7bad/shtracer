@@ -391,6 +391,19 @@ function renderSummary(data) {
         return m ? m[1] : 'sh';
     }
 
+    function formatVersionDisplay(versionRaw) {
+        if (!versionRaw || versionRaw === 'unknown') return 'unknown';
+        if (versionRaw.startsWith('git:')) {
+            return versionRaw.substring(4); // Remove "git:" prefix
+        }
+        if (versionRaw.startsWith('mtime:')) {
+            // Convert "mtime:2025-12-26T10:30:45Z" to "2025-12-26 10:30"
+            const timestamp = versionRaw.substring(6); // Remove "mtime:" prefix
+            return timestamp.replace('T', ' ').replace(/:\d{2}Z$/, '');
+        }
+        return versionRaw;
+    }
+
     function nodeIdFromLinkEnd(end) {
         if (typeof end === 'string') return end;
         if (typeof end === 'number') {
@@ -527,7 +540,7 @@ function renderSummary(data) {
                 else if (o > srcOrder) hasDown = true;
             });
 
-            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0 };
+            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0, version: n.file_version || 'unknown' };
             m.total += 1;
             if (hasUp) m.up += 1;
             if (hasDown) m.down += 1;
@@ -573,9 +586,11 @@ function renderSummary(data) {
             const down = formatPct(stats.down, stats.total);
             const id = fileIdFromRawName(rawName);
             const ext = fileExtFromRawName(rawName);
+            const versionDisplay = formatVersionDisplay(stats.version);
             html += `<li class=\"summary-target-item\">`;
             html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
             html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
+            html += ` <span class=\"summary-version\">(${escapeHtml(versionDisplay)})</span>`;
             html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
             html += `</li>`;
         });

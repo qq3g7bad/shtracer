@@ -232,7 +232,7 @@ _extract_tags_process_files() {
 	#      - Capture file path and line number for reference
 	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
 	echo "$1" \
-		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" -v util_script="$SCRIPT_DIR/scripts/main/shtracer_util.sh" '
 			{
 				title = $1
 				path = $2
@@ -255,6 +255,21 @@ _extract_tags_process_files() {
 					absolute_file_path = path
 				}
 
+
+				# Get version info for this file (cache to avoid repeated calls)
+				if (absolute_file_path in file_version_cache) {
+					file_version = file_version_cache[absolute_file_path]
+				} else {
+					cmd = ". \"" util_script "\" && get_file_version_info \"" absolute_file_path "\""
+					if ((cmd | getline file_version) > 0) {
+						close(cmd)
+						file_version_cache[absolute_file_path] = file_version
+					} else {
+						close(cmd)
+						file_version = "unknown"
+						file_version_cache[absolute_file_path] = file_version
+					}
+				}
 				line_num = 0
 				counter = -1
 				while (getline line < path > 0) {
@@ -288,7 +303,8 @@ _extract_tags_process_files() {
 						printf("%s%s", line, separator)                        # column 4: title
 						printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
 						printf("%s%s", line_num, separator)                    # column 6: line number including title
-						printf("%s\n", NR, separator)                          # column 7: file num
+						printf("%s%s", NR, separator)                          # column 7: file num
+						printf("%s\n", file_version)                          # column 8: file version
 					}
 					if (counter >= 0) {
 						counter--;
@@ -402,6 +418,42 @@ _detect_isolated_tags() {
 		| awk '{print $2}' >"$2"
 }
 
+
+##
+# @brief Create file version aggregation table
+# @param $1 : TAG_OUTPUT_DATA (01_tags with 8 columns)
+# @param $2 : Output file path (05_file_versions)
+# @return Creates file with format: trace_target<SEP>file_path<SEP>version_info
+create_file_versions_table() {
+	_TAGS_FILE="$1"
+	_OUTPUT="$2"
+
+	if [ ! -r "$_TAGS_FILE" ]; then
+		error_exit 1 "create_file_versions_table" "Cannot read tags file: $_TAGS_FILE"
+	fi
+
+	# Extract unique combinations of trace_target, file_path, and version
+	awk -F"$SHTRACER_SEPARATOR" -v SEP="$SHTRACER_SEPARATOR" '
+	NF >= 8 {
+		trace_target = $1
+		file_path = $5
+		version = $8
+
+		# Create unique key
+		key = trace_target SEP file_path
+
+		if (!(key in seen)) {
+			seen[key] = 1
+			versions[key] = version
+		}
+	}
+	END {
+		for (key in versions) {
+			print key SEP versions[key]
+		}
+	}
+	' "$_TAGS_FILE" | sort >"$_OUTPUT"
+}
 ##
 # @brief  Create tag relationship pairs and build complete traceability matrix
 # @param  $1 : TAG_OUTPUT_DATA
@@ -439,6 +491,10 @@ make_tag_table() {
 		}' >"$_TAG_PAIRS"
 
 		# Prepare upstream and downstream tables
+
+		# Create file version aggregation table (05_file_versions)
+		_FILE_VERSIONS="${_TAG_OUTPUT_DIR%/}/05_file_versions"
+		create_file_versions_table "$1" "$_FILE_VERSIONS"
 		_prepare_upstream_table "$_TAG_PAIRS" "$_TAG_TABLE"
 		_prepare_downstream_table "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
@@ -518,12 +574,13 @@ join_tag_pairs() {
 # @param  $2 : TAG_PAIRS path (02_tag_pairs)
 # @return  Prints summary lines to stdout
 print_summary_direct_links() {
-	if [ $# -ne 2 ] || [ ! -r "$1" ] || [ ! -r "$2" ]; then
+	if [ $# -ne 3 ] || [ ! -r "$1" ] || [ ! -r "$2" ] || [ ! -r "$3" ]; then
 		error_exit 1 "print_summary_direct_links" "incorrect argument."
 	fi
 
 	_TAGS_FILE="$1"
 	_TAG_PAIRS_FILE="$2"
+	_FILE_VERSIONS_FILE="$3"
 
 	# Output format:
 	#   <layer>
@@ -538,6 +595,7 @@ print_summary_direct_links() {
 	awk \
 		-v SEP="$SHTRACER_SEPARATOR" \
 		-v TAGS_FILE="$_TAGS_FILE" \
+		-v VERSIONS_FILE="$_FILE_VERSIONS_FILE" \
 		'
 		function trim(s) {
 			gsub(/^[[:space:]]+/, "", s)
@@ -574,6 +632,30 @@ print_summary_direct_links() {
 				}
 			}
 			close(TAGS_FILE)
+
+	# Load file versions and track unique files per layer
+	while ((getline line < VERSIONS_FILE) > 0) {
+		n = split(line, f, SEP)
+		if (n < 3) { continue }
+		trace_target = trim(f[1])
+		file_path = trim(f[2])
+		version = trim(f[3])
+		key = trace_target SEP file_path
+		file_versions[key] = version
+
+		# Track unique files per layer
+		layer = layer_suffix(trace_target)
+		if (layer != "") {
+			file_key = layer SEP file_path
+			if (!(file_key in layer_files_seen)) {
+				layer_files_seen[file_key] = 1
+				idx = layer_file_count[layer]++
+				layer_files[layer, idx] = file_path
+				layer_trace_targets[layer, idx] = trace_target
+			}
+		}
+	}
+	close(VERSIONS_FILE)
 
 			# Preferred stable order
 			order[1] = "Requirement"
@@ -660,6 +742,37 @@ print_summary_direct_links() {
 				if (!hasLine) { continue }
 
 				print src
+
+				# Display file information for this layer
+				if (layer_file_count[src] > 0) {
+					print "  files:"
+					for (file_idx = 0; file_idx < layer_file_count[src]; file_idx++) {
+						file_path = layer_files[src, file_idx]
+						trace_target = layer_trace_targets[src, file_idx]
+						# Get basename for display
+						n_slash = split(file_path, path_parts, "/")
+						file_name = path_parts[n_slash]
+
+						# Get version info
+						key = trace_target SEP file_path
+						version_raw = file_versions[key]
+						
+						# Format version for display
+						if (version_raw ~ /^git:/) {
+							version_display = substr(version_raw, 5)  # Remove "git:" prefix
+						} else if (version_raw ~ /^mtime:/) {
+							# Convert "mtime:2025-12-26T10:30:45Z" to "2025-12-26 10:30"
+							timestamp = substr(version_raw, 7)  # Remove "mtime:" prefix
+							sub(/T/, " ", timestamp)
+							sub(/:[0-9][0-9]Z$/, "", timestamp)
+							version_display = timestamp
+						} else {
+							version_display = version_raw
+						}
+						
+						printf "    - %s (%s)\n", file_name, version_display
+					}
+				}
 
 				# upstream: reverse order (closest previous layer first visually)
 				upStr = ""
@@ -769,7 +882,7 @@ make_json() {
 		printf '  "nodes": [\n'
 		awk -F"$SHTRACER_SEPARATOR" '
 		BEGIN { first=1 }
-		NF >= 6 {
+		NF >= 8 {
 			if (!first) printf ",\n"
 			first=0
 			# Escape quotes and backslashes in description
@@ -787,7 +900,8 @@ make_json() {
 			printf "      \"description\": \"%s\",\n", desc
 			printf "      \"file\": \"%s\",\n", $5
 			printf "      \"line\": %d,\n", $6
-			printf "      \"trace_target\": \"%s\"\n", $1
+			printf "      \"trace_target\": \"%s\",\n", $1
+			printf "      \"file_version\": \"%s\"\n", $8
 			printf "    }"
 		}
 		END { printf "\n" }

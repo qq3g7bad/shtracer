@@ -408,7 +408,7 @@ main_routine() {
 		# If --summary flag is specified, print summary to stdout and exit
 		if [ "$EXPORT_SUMMARY" = 'true' ]; then
 			_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
-			print_summary_direct_links "$_TAGS" "${_TAG_OUTPUT_DIR%/}/02_tag_pairs"
+			print_summary_direct_links "$_TAGS" "${_TAG_OUTPUT_DIR%/}/02_tag_pairs" "${_TAG_OUTPUT_DIR%/}/05_file_versions"
 			_cleanup_output_dir
 			return 0
 		fi
