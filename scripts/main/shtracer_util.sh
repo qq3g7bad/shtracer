@@ -220,8 +220,8 @@ extract_from_delimiters() {
 	case "$_str" in
 		"$_delim"*"$_delim")
 			# Extract content between delimiters using shell parameter expansion
-			_str="${_str#*"$_delim"}"     # Remove prefix including first delimiter
-			_str="${_str%"$_delim"*}"     # Remove suffix including last delimiter
+			_str="${_str#*"$_delim"}" # Remove prefix including first delimiter
+			_str="${_str%"$_delim"*}" # Remove suffix including last delimiter
 			printf '%s' "$_str"
 			;;
 		*)
@@ -424,8 +424,8 @@ get_file_version_info() {
 	# Try git first (if available)
 	if command -v git >/dev/null 2>&1; then
 		# Check if file is in a git repo and tracked
-		_git_hash="$(cd "$(dirname "$_file_path")" 2>/dev/null && \
-		             git log -1 --format='%H' -- "$(basename "$_file_path")" 2>/dev/null)"
+		_git_hash="$(cd "$(dirname "$_file_path")" 2>/dev/null \
+			&& git log -1 --format='%H' -- "$(basename "$_file_path")" 2>/dev/null)"
 
 		if [ -n "$_git_hash" ]; then
 			# Get short hash (first 7 chars) - more readable
@@ -448,8 +448,8 @@ get_file_version_info() {
 		if [ -n "$_mtime" ]; then
 			# Convert Unix timestamp to ISO 8601 using date
 			# Try GNU date format first, then BSD format
-			_iso_time="$(date -u -d "@$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
-			            date -u -r "$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)"
+			_iso_time="$(date -u -d "@$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
+				|| date -u -r "$_mtime" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)"
 			if [ -n "$_iso_time" ]; then
 				printf 'mtime:%s' "$_iso_time"
 				return 0

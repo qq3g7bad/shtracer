@@ -104,12 +104,12 @@ test_get_file_version_info_no_git() {
 
 	# Assert - should start with "mtime:" or "unknown"
 	case "$_result" in
-	mtime:* | unknown)
-		assertTrue "Result is mtime: or unknown" true
-		;;
-	*)
-		fail "Expected mtime: or unknown, got: $_result"
-		;;
+		mtime:* | unknown)
+			assertTrue "Result is mtime: or unknown" true
+			;;
+		*)
+			fail "Expected mtime: or unknown, got: $_result"
+			;;
 	esac
 }
 

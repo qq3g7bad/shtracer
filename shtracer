@@ -10,25 +10,25 @@
 EXIT_SUCCESS=0
 #
 # USAGE ERRORS (1-9)
-EXIT_USAGE=1                    # Invalid arguments or usage
-EXIT_CONFIG_NOT_FOUND=2         # Config file not found
+EXIT_USAGE=1            # Invalid arguments or usage
+EXIT_CONFIG_NOT_FOUND=2 # Config file not found
 # shellcheck disable=SC2034  # Used for documentation
-EXIT_CONFIG_INVALID=3           # Config file format invalid
+EXIT_CONFIG_INVALID=3 # Config file format invalid
 #
 # PROCESSING ERRORS (10-19)
-EXIT_EXTRACT_TAGS_FAILED=10     # Failed to extract tags
-EXIT_MAKE_TABLE_FAILED=11       # Failed to create tag table
-EXIT_MAKE_JSON_FAILED=12        # Failed to generate JSON
-EXIT_VIEWER_FAILED=13           # Viewer script execution failed
+EXIT_EXTRACT_TAGS_FAILED=10 # Failed to extract tags
+EXIT_MAKE_TABLE_FAILED=11   # Failed to create tag table
+EXIT_MAKE_JSON_FAILED=12    # Failed to generate JSON
+EXIT_VIEWER_FAILED=13       # Viewer script execution failed
 #
 # VERIFICATION ERRORS (20-29)
-EXIT_ISOLATED_TAGS=20           # Found isolated tags (no downstream references)
-EXIT_DUPLICATE_TAGS=21          # Found duplicate tags
-EXIT_BOTH_ISSUES=22             # Found both isolated and duplicate tags
+EXIT_ISOLATED_TAGS=20  # Found isolated tags (no downstream references)
+EXIT_DUPLICATE_TAGS=21 # Found duplicate tags
+EXIT_BOTH_ISSUES=22    # Found both isolated and duplicate tags
 #
 # SYSTEM ERRORS (30-39)
-EXIT_INTERNAL_ERROR=30          # Internal error (directory change, etc.)
-EXIT_VIEWER_NOT_FOUND=31        # Viewer script not found
+EXIT_INTERNAL_ERROR=30   # Internal error (directory change, etc.)
+EXIT_VIEWER_NOT_FOUND=31 # Viewer script not found
 ##
 # @}
 #

@@ -418,7 +418,6 @@ _detect_isolated_tags() {
 		| awk '{print $2}' >"$2"
 }
 
-
 ##
 # @brief Create file version aggregation table
 # @param $1 : TAG_OUTPUT_DATA (01_tags with 8 columns)

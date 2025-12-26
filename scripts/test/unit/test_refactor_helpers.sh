@@ -234,7 +234,7 @@ line3
 
 line5
 EOF
-	result=$(remove_empty_lines < "$TEMP_DIR/empty.txt" | wc -l)
+	result=$(remove_empty_lines <"$TEMP_DIR/empty.txt" | wc -l)
 	assertEquals "3" "$result"
 }
 
@@ -249,7 +249,7 @@ line3
 
 line5
 EOF
-	result=$(remove_empty_lines < "$TEMP_DIR/whitespace.txt" | wc -l)
+	result=$(remove_empty_lines <"$TEMP_DIR/whitespace.txt" | wc -l)
 	assertEquals "3" "$result"
 }
 
