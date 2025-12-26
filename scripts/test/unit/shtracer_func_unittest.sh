@@ -1,15 +1,10 @@
 #!/bin/sh
 
 # Source test target
-SCRIPT_DIR=$(
-	unset CDPATH
-	cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P
-)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
 if [ -z "$SCRIPT_DIR" ]; then
-	SCRIPT_DIR=$(
-		unset CDPATH
-		cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P
-	)
+	echo "[ERROR] Failed to determine script directory" >&2
+	exit 1
 fi
 
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
@@ -41,6 +36,7 @@ setUp() {
 	export NODATA_STRING="NONE"
 	export OUTPUT_DIR="${TEST_ROOT%/}/output/"
 	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 	cd "${TEST_ROOT}" || exit 1
 }
 
@@ -129,6 +125,7 @@ test_extract_tags() {
 		assertEquals "01_tags" "${_RETURN_VALUE##*/}"
 
 		# Level1
+		# Compare only first 7 fields (exclude git version info which is environment-dependent)
 		_ANSWER="$(awk <"./testdata/answer/unit_test/tags/tags" -F"$SHTRACER_SEPARATOR" '
 			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
 			{
@@ -137,9 +134,15 @@ test_extract_tags() {
 				cmd	=	"cd	\"'"$CONFIG_DIR"'\";cd	"dirname_result";PWD=\"$(pwd)\";	\
 					echo	\"${PWD%/}/\"";	cmd	|	getline	absolute_path;	close(cmd)
 				$5	=	absolute_path	filename_result
-				print	$0
+				# Print only first 7 fields (excluding field 8: git version)
+				printf "%s%s%s%s%s%s%s%s%s%s%s%s%s\n", $1, OFS, $2, OFS, $3, OFS, $4, OFS, $5, OFS, $6, OFS, $7
 			}')"
-		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/01_tags")"
+		_TEST_DATA="$(awk <"${OUTPUT_DIR%/}/tags/01_tags" -F"$SHTRACER_SEPARATOR" '
+			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
+			{
+				# Print only first 7 fields (excluding field 8: git version)
+				printf "%s%s%s%s%s%s%s%s%s%s%s%s%s\n", $1, OFS, $2, OFS, $3, OFS, $4, OFS, $5, OFS, $6, OFS, $7
+			}')"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
 }

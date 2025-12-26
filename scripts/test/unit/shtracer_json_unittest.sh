@@ -5,15 +5,10 @@
 # @brief   Unit tests for JSON export functionality
 #
 
-SCRIPT_DIR=$(
-	unset CDPATH
-	cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P
-)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
 if [ -z "$SCRIPT_DIR" ]; then
-	SCRIPT_DIR=$(
-		unset CDPATH
-		cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P
-	)
+	echo "[ERROR] Failed to determine script directory" >&2
+	exit 1
 fi
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
