@@ -495,7 +495,8 @@ test_parse_arguments_json_without_config() {
 			parse_arguments "--json" 2>&1
 		)"
 		# Assert ----------
-		assertEquals 1 "$?"
+		# Should exit with EXIT_CONFIG_NOT_FOUND=2 (not EXIT_USAGE=1)
+		assertEquals 2 "$?"
 		echo "$_RETURN_VALUE" | grep -q "Config file required"
 		assertEquals 0 "$?"
 	)
