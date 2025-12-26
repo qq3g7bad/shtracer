@@ -391,6 +391,19 @@ function renderSummary(data) {
         return m ? m[1] : 'sh';
     }
 
+    function formatVersionDisplay(versionRaw) {
+        if (!versionRaw || versionRaw === 'unknown') return 'unknown';
+        if (versionRaw.startsWith('git:')) {
+            return versionRaw.substring(4); // Remove "git:" prefix
+        }
+        if (versionRaw.startsWith('mtime:')) {
+            // Convert "mtime:2025-12-26T10:30:45Z" to "2025-12-26 10:30"
+            const timestamp = versionRaw.substring(6); // Remove "mtime:" prefix
+            return timestamp.replace('T', ' ').replace(/:\d{2}Z$/, '');
+        }
+        return versionRaw;
+    }
+
     function nodeIdFromLinkEnd(end) {
         if (typeof end === 'string') return end;
         if (typeof end === 'number') {
@@ -527,7 +540,7 @@ function renderSummary(data) {
                 else if (o > srcOrder) hasDown = true;
             });
 
-            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0 };
+            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0, version: n.file_version || 'unknown' };
             m.total += 1;
             if (hasUp) m.up += 1;
             if (hasDown) m.down += 1;
@@ -568,22 +581,19 @@ function renderSummary(data) {
 
         const fileEntries = Array.from(fileCoverageByDim[src].entries())
             .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-        if (fileEntries.length) {
-            html += `<li><span class=\"summary-dir\">targets:</span>`;
-            html += '<ul class="summary-target-list">';
-            fileEntries.forEach(([rawName, stats]) => {
-                const up = formatPct(stats.up, stats.total);
-                const down = formatPct(stats.down, stats.total);
-                const id = fileIdFromRawName(rawName);
-                const ext = fileExtFromRawName(rawName);
-                html += `<li class=\"summary-target-item\">`;
-                html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
-                html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
-                html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
-                html += `</li>`;
-            });
-            html += '</ul></li>';
-        }
+        fileEntries.forEach(([rawName, stats]) => {
+            const up = formatPct(stats.up, stats.total);
+            const down = formatPct(stats.down, stats.total);
+            const id = fileIdFromRawName(rawName);
+            const ext = fileExtFromRawName(rawName);
+            const versionDisplay = formatVersionDisplay(stats.version);
+            html += `<li class=\"summary-target-item\">`;
+            html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
+            html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
+            html += ` <span class=\"summary-version\">(${escapeHtml(versionDisplay)})</span>`;
+            html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
+            html += `</li>`;
+        });
         html += '</ul></li>';
     });
     html += '</ul>';
@@ -596,7 +606,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     container.innerHTML = '';
 
-    const margin = { top: 30, right: 20, bottom: 20, left: 20 };
+    const margin = { top: 5, right: 20, bottom: 20, left: 20 };
     const innerW = Math.max(0, width - margin.left - margin.right);
     let innerH = 200; // Initial value, will be recalculated based on bar heights
     let height = margin.top + margin.bottom + innerH; // Initial height
@@ -748,9 +758,9 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     // Calculate bar heights and positions based on connection relationships
     // Position bars to minimize ribbon overlap by placing connected bars near each other
-    const heightPerNode = 6; // Height per node in pixels
+    const heightPerNode = 15; // Height per node in pixels (increased from 6 for better visibility)
     const minBarHeight = 30; // Minimum bar height
-    const maxBarHeight = 100; // Maximum bar height
+    const maxBarHeight = 200; // Maximum bar height (increased from 100 to allow more vertical space)
     const barHeights = {};
     const barYOffsets = {};
 
@@ -781,11 +791,11 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     });
 
     // Position bars to avoid link overlap
-    innerH = 400; // Initial canvas height
+    innerH = 0; // Initial canvas height (will be calculated from actual bar positions)
     const barSpacing = 15; // Vertical spacing between stacked bars
 
-    // Position first dimension in center
-    barYOffsets[dims[0]] = (innerH - barHeights[dims[0]]) / 2;
+    // Position first dimension at top
+    barYOffsets[dims[0]] = 0;
 
     // Position subsequent dimensions
     for (let i = 1; i < dims.length; i++) {
@@ -818,8 +828,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
                 barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
             }
         } else {
-            // No connection, place in center
-            barYOffsets[dim] = (innerH - barHeights[dim]) / 2;
+            // No connection, place at top
+            barYOffsets[dim] = 0;
         }
     }
 
@@ -828,7 +838,11 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     dims.forEach(dim => {
         maxY = Math.max(maxY, barYOffsets[dim] + barHeights[dim]);
     });
-    innerH = Math.max(innerH, maxY + 20);
+    // Calculate natural height from bar positions, with reasonable min/max bounds
+    const naturalHeight = maxY + 20; // 20px bottom padding
+    const minHeight = 150; // Minimum to prevent tiny diagrams
+    const maxHeight = 800; // Maximum to prevent excessive scrolling
+    innerH = Math.min(maxHeight, Math.max(minHeight, naturalHeight));
 
     // Update svg height
     height = margin.top + margin.bottom + innerH;
@@ -854,7 +868,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const srcYOffset = barYOffsets[src];
         const srcBarHeight = barHeights[src];
 
-        // Calculate total heights first for center alignment within bar
+        // Calculate total heights first for top alignment within bar
         bandsUp[src] = {};
         let totalUpHeight = 0;
         for (let k = dims.length - 1; k >= 0; k--) {
@@ -865,8 +879,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             if (h > 0) totalUpHeight += h;
         }
 
-        // Start from center of this bar's vertical space
-        let yu = srcYOffset + (srcBarHeight - totalUpHeight) / 2;
+        // Start from top of this bar's vertical space
+        let yu = srcYOffset;
         for (let k = dims.length - 1; k >= 0; k--) {
             const tgt = dims[k];
             if (tgt === src) continue;
@@ -887,8 +901,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             if (h > 0) totalDownHeight += h;
         }
 
-        // Start from center of this bar's vertical space
-        let yd = srcYOffset + (srcBarHeight - totalDownHeight) / 2;
+        // Start from top of this bar's vertical space
+        let yd = srcYOffset;
         for (let k = 0; k < dims.length; k++) {
             const tgt = dims[k];
             if (tgt === src) continue;
@@ -1919,7 +1933,7 @@ _html_insert_content_with_indentation() {
 				}
 			}
 		' \
-		| sed '/<!-- SHTRACER INSERTED -->/d')
+		| remove_lines_with_pattern '<!-- SHTRACER INSERTED -->')
 
 	rm -f "$_html_insert_info_file" 2>/dev/null || true
 	trap - EXIT INT TERM
@@ -2059,7 +2073,7 @@ tag_info_table_from_json_file() {
 	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
 
 	# Extract trace target order from config.md (both ## and ### headings)
-	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+	_config_path="$(extract_json_string_field "$_JSON_FILE" "config_path")"
 	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
 		awk '
 			/^##+ / {
@@ -2470,7 +2484,7 @@ shtracer_viewer_main() {
 	fi
 
 	if [ -z "$TAG_TABLE_FILE" ]; then
-		_config_path="$(grep -m 1 '"config_path"' "$_json_tmp" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+		_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
 		if [ -n "$_config_path" ]; then
 			_config_dir="$(dirname "$_config_path")"
 			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"

@@ -24,31 +24,12 @@ _check_config_remove_comments() {
 	_CONFIG_MARKDOWN_PATH="$1"
 
 	# Delete comment blocks from the configuration markdown file
-	awk <"$_CONFIG_MARKDOWN_PATH" \
-		'
-		/`.*<!--.*-->.*`/   {
-			match($0, /`.*<!--.*-->.*`/);               # Exception for comment blocks that is surrounded by backquotes.
-			print(substr($0, 1, RSTART + RLENGTH - 1)); # Delete comments
-			next;
-		}
-		{
-			sub(/<!--.*-->/, "")
-		}
-		/<!--/ { in_comment=1 }
-		/-->/ && in_comment { in_comment=0; next }
-		/<!--/,/-->/ { if (in_comment) next }
-		!in_comment { print }
-		' \
-		| sed '/^[[:space:]]*$/d' \
-		|
-		# Delete empty lines
-		sed 's/^[[:space:]]*\* //' \
-		|
-		# Delete start spaces
-		sed 's/[[:space:]]*$//' \
-		|
-		# Delete end spaces
-		sed 's/\*\*\(.*\)\*\*:/\1:/'
+	# Using refactored helper functions for better maintainability
+	remove_markdown_comments "$_CONFIG_MARKDOWN_PATH" \
+		| remove_empty_lines \
+		| remove_leading_bullets \
+		| remove_trailing_whitespace \
+		| convert_markdown_bold
 }
 
 ##
@@ -251,7 +232,7 @@ _extract_tags_process_files() {
 	#      - Capture file path and line number for reference
 	# Output: Multi-column data (trace target, tag, from_tag, title, abs_path, line_num, file_num)
 	echo "$1" \
-		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" '
+		| awk -F "$SHTRACER_SEPARATOR" -v separator="$SHTRACER_SEPARATOR" -v util_script="$SCRIPT_DIR/scripts/main/shtracer_util.sh" '
 			{
 				title = $1
 				path = $2
@@ -274,6 +255,21 @@ _extract_tags_process_files() {
 					absolute_file_path = path
 				}
 
+
+				# Get version info for this file (cache to avoid repeated calls)
+				if (absolute_file_path in file_version_cache) {
+					file_version = file_version_cache[absolute_file_path]
+				} else {
+					cmd = ". \"" util_script "\" && get_file_version_info \"" absolute_file_path "\""
+					if ((cmd | getline file_version) > 0) {
+						close(cmd)
+						file_version_cache[absolute_file_path] = file_version
+					} else {
+						close(cmd)
+						file_version = "unknown"
+						file_version_cache[absolute_file_path] = file_version
+					}
+				}
 				line_num = 0
 				counter = -1
 				while (getline line < path > 0) {
@@ -307,7 +303,8 @@ _extract_tags_process_files() {
 						printf("%s%s", line, separator)                        # column 4: title
 						printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
 						printf("%s%s", line_num, separator)                    # column 6: line number including title
-						printf("%s\n", NR, separator)                          # column 7: file num
+						printf("%s%s", NR, separator)                          # column 7: file num
+						printf("%s\n", file_version)                          # column 8: file version
 					}
 					if (counter >= 0) {
 						counter--;
@@ -422,6 +419,41 @@ _detect_isolated_tags() {
 }
 
 ##
+# @brief Create file version aggregation table
+# @param $1 : TAG_OUTPUT_DATA (01_tags with 8 columns)
+# @param $2 : Output file path (05_file_versions)
+# @return Creates file with format: trace_target<SEP>file_path<SEP>version_info
+create_file_versions_table() {
+	_TAGS_FILE="$1"
+	_OUTPUT="$2"
+
+	if [ ! -r "$_TAGS_FILE" ]; then
+		error_exit 1 "create_file_versions_table" "Cannot read tags file: $_TAGS_FILE"
+	fi
+
+	# Extract unique combinations of trace_target, file_path, and version
+	awk -F"$SHTRACER_SEPARATOR" -v SEP="$SHTRACER_SEPARATOR" '
+	NF >= 8 {
+		trace_target = $1
+		file_path = $5
+		version = $8
+
+		# Create unique key
+		key = trace_target SEP file_path
+
+		if (!(key in seen)) {
+			seen[key] = 1
+			versions[key] = version
+		}
+	}
+	END {
+		for (key in versions) {
+			print key SEP versions[key]
+		}
+	}
+	' "$_TAGS_FILE" | sort >"$_OUTPUT"
+}
+##
 # @brief  Create tag relationship pairs and build complete traceability matrix
 # @param  $1 : TAG_OUTPUT_DATA
 # @return TAG_MATRIX
@@ -458,6 +490,10 @@ make_tag_table() {
 		}' >"$_TAG_PAIRS"
 
 		# Prepare upstream and downstream tables
+
+		# Create file version aggregation table (05_file_versions)
+		_FILE_VERSIONS="${_TAG_OUTPUT_DIR%/}/05_file_versions"
+		create_file_versions_table "$1" "$_FILE_VERSIONS"
 		_prepare_upstream_table "$_TAG_PAIRS" "$_TAG_TABLE"
 		_prepare_downstream_table "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
@@ -506,7 +542,7 @@ join_tag_pairs() {
 			error_exit 1 "join_tag_pairs" "Circular reference detected: Maximum recursion depth ($_MAX_DEPTH) exceeded. Please check your tag relationships for cycles (e.g., A -> B -> A)."
 		fi
 
-		_NF="$(awk <"$_TAG_TABLE" 'BEGIN{a=0}{if(a<NF){a=NF}}END{print a}')"
+		_NF="$(count_fields "$_TAG_TABLE" " ")"
 		_NF_PLUS1="$((_NF + 1))"
 
 		if ! _JOINED_TMP="$(join -1 "$_NF" -2 1 -a 1 "$_TAG_TABLE" "$_TAG_TABLE_DOWNSTREAM")"; then
@@ -537,12 +573,13 @@ join_tag_pairs() {
 # @param  $2 : TAG_PAIRS path (02_tag_pairs)
 # @return  Prints summary lines to stdout
 print_summary_direct_links() {
-	if [ $# -ne 2 ] || [ ! -r "$1" ] || [ ! -r "$2" ]; then
+	if [ $# -ne 3 ] || [ ! -r "$1" ] || [ ! -r "$2" ] || [ ! -r "$3" ]; then
 		error_exit 1 "print_summary_direct_links" "incorrect argument."
 	fi
 
 	_TAGS_FILE="$1"
 	_TAG_PAIRS_FILE="$2"
+	_FILE_VERSIONS_FILE="$3"
 
 	# Output format:
 	#   <layer>
@@ -557,6 +594,7 @@ print_summary_direct_links() {
 	awk \
 		-v SEP="$SHTRACER_SEPARATOR" \
 		-v TAGS_FILE="$_TAGS_FILE" \
+		-v VERSIONS_FILE="$_FILE_VERSIONS_FILE" \
 		'
 		function trim(s) {
 			gsub(/^[[:space:]]+/, "", s)
@@ -593,6 +631,30 @@ print_summary_direct_links() {
 				}
 			}
 			close(TAGS_FILE)
+
+	# Load file versions and track unique files per layer
+	while ((getline line < VERSIONS_FILE) > 0) {
+		n = split(line, f, SEP)
+		if (n < 3) { continue }
+		trace_target = trim(f[1])
+		file_path = trim(f[2])
+		version = trim(f[3])
+		key = trace_target SEP file_path
+		file_versions[key] = version
+
+		# Track unique files per layer
+		layer = layer_suffix(trace_target)
+		if (layer != "") {
+			file_key = layer SEP file_path
+			if (!(file_key in layer_files_seen)) {
+				layer_files_seen[file_key] = 1
+				idx = layer_file_count[layer]++
+				layer_files[layer, idx] = file_path
+				layer_trace_targets[layer, idx] = trace_target
+			}
+		}
+	}
+	close(VERSIONS_FILE)
 
 			# Preferred stable order
 			order[1] = "Requirement"
@@ -680,6 +742,37 @@ print_summary_direct_links() {
 
 				print src
 
+				# Display file information for this layer
+				if (layer_file_count[src] > 0) {
+					print "  files:"
+					for (file_idx = 0; file_idx < layer_file_count[src]; file_idx++) {
+						file_path = layer_files[src, file_idx]
+						trace_target = layer_trace_targets[src, file_idx]
+						# Get basename for display
+						n_slash = split(file_path, path_parts, "/")
+						file_name = path_parts[n_slash]
+
+						# Get version info
+						key = trace_target SEP file_path
+						version_raw = file_versions[key]
+						
+						# Format version for display
+						if (version_raw ~ /^git:/) {
+							version_display = substr(version_raw, 5)  # Remove "git:" prefix
+						} else if (version_raw ~ /^mtime:/) {
+							# Convert "mtime:2025-12-26T10:30:45Z" to "2025-12-26 10:30"
+							timestamp = substr(version_raw, 7)  # Remove "mtime:" prefix
+							sub(/T/, " ", timestamp)
+							sub(/:[0-9][0-9]Z$/, "", timestamp)
+							version_display = timestamp
+						} else {
+							version_display = version_raw
+						}
+						
+						printf "    - %s (%s)\n", file_name, version_display
+					}
+				}
+
 				# upstream: reverse order (closest previous layer first visually)
 				upStr = ""
 				for (j = 5; j >= 1; j--) {
@@ -717,24 +810,40 @@ print_summary_direct_links() {
 ##
 # @brief  Display tag verification results (isolated and duplicated tags)
 # @param  $1 : filenames of verification output
+# @return 0 if no issues, 1 if isolated tags only, 2 if duplicate tags only, 3 if both
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
-	_TAG_TABLE_ISOLATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $1}')"
-	_TAG_TABLE_DUPLICATED="$(echo "$1" | awk -F"$SHTRACER_SEPARATOR" '{print $2}')"
+	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
 
-	_RETURN_NUM="0"
+	_has_isolated="0"
+	_has_duplicated="0"
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "1) Following tags are isolated.\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-		_RETURN_NUM=$((_RETURN_NUM + 1))
+		_has_isolated="1"
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
 		printf "2) Following tags are duplicated.\n" 1>&2
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-		_RETURN_NUM=$((_RETURN_NUM + 1))
+		_has_duplicated="1"
 	fi
-	return "$_RETURN_NUM"
+
+	# Return specific codes:
+	# 0 = no issues
+	# 1 = isolated tags only
+	# 2 = duplicate tags only
+	# 3 = both isolated and duplicate tags
+	if [ "$_has_isolated" = "1" ] && [ "$_has_duplicated" = "1" ]; then
+		return 3
+	elif [ "$_has_isolated" = "1" ]; then
+		return 1
+	elif [ "$_has_duplicated" = "1" ]; then
+		return 2
+	else
+		return 0
+	fi
 }
 
 ##
@@ -772,7 +881,7 @@ make_json() {
 		printf '  "nodes": [\n'
 		awk -F"$SHTRACER_SEPARATOR" '
 		BEGIN { first=1 }
-		NF >= 6 {
+		NF >= 8 {
 			if (!first) printf ",\n"
 			first=0
 			# Escape quotes and backslashes in description
@@ -790,7 +899,8 @@ make_json() {
 			printf "      \"description\": \"%s\",\n", desc
 			printf "      \"file\": \"%s\",\n", $5
 			printf "      \"line\": %d,\n", $6
-			printf "      \"trace_target\": \"%s\"\n", $1
+			printf "      \"trace_target\": \"%s\",\n", $1
+			printf "      \"file_version\": \"%s\"\n", $8
 			printf "    }"
 		}
 		END { printf "\n" }
@@ -866,15 +976,9 @@ make_json() {
 # @param  $3 : AFTER_TAG
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
-	_escape_sed_pattern() {
-		# Escape BRE/ERE-ish metacharacters for sed pattern (treated as regex)
-		# Note: we avoid choosing sed delimiter as '/' to reduce escaping needs later.
-		printf '%s' "$1" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
-	}
-	_escape_sed_replacement() {
-		# Escape sed replacement metacharacters (& and \\) and our delimiter '|'
-		printf '%s' "$1" | sed 's/\\/\\\\/g; s/&/\\&/g; s/|/\\|/g'
-	}
+	# Note: Using global escape_sed_pattern() and escape_sed_replacement()
+	# functions from shtracer_util.sh instead of local definitions
+
 	_list_target_files() {
 		# $1: PATH (file or directory)
 		# $2: extension regex (grep -E style), optional
@@ -917,8 +1021,8 @@ swap_tags() {
 		_FILE_LIST="$(
 			echo "$_TARGET_DATA" \
 				| while read -r _DATA; do
-					_PATH="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $2 }' | sed 's/"\(.*\)"/\1/')"
-					_EXTENSION="$(echo "$_DATA" | awk -F "$SHTRACER_SEPARATOR" '{ print $3 }' | sed 's/"\(.*\)"/\1/')"
+					_PATH="$(extract_field_unquoted "$_DATA" 2 "$SHTRACER_SEPARATOR")"
+					_EXTENSION="$(extract_field_unquoted "$_DATA" 3 "$SHTRACER_SEPARATOR")"
 					cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
 					_list_target_files "$_PATH" "$_EXTENSION"
 				done
@@ -926,12 +1030,12 @@ swap_tags() {
 
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
-			_before_pat="$(_escape_sed_pattern "$2")"
-			_after_pat="$(_escape_sed_pattern "$3")"
-			_tmp_pat="$(_escape_sed_pattern "$_TEMP_TAG")"
-			_before_rep="$(_escape_sed_replacement "$2")"
-			_after_rep="$(_escape_sed_replacement "$3")"
-			_tmp_rep="$(_escape_sed_replacement "$_TEMP_TAG")"
+			_before_pat="$(escape_sed_pattern "$2")"
+			_after_pat="$(escape_sed_pattern "$3")"
+			_tmp_pat="$(escape_sed_pattern "$_TEMP_TAG")"
+			_before_rep="$(escape_sed_replacement "$2")"
+			_after_rep="$(escape_sed_replacement "$3")"
+			_tmp_rep="$(escape_sed_replacement "$_TEMP_TAG")"
 			echo "$_FILE_LIST" \
 				| sort -u \
 				| while IFS= read -r t; do
