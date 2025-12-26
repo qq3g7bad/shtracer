@@ -234,7 +234,7 @@ line3
 
 line5
 EOF
-	result=$(cat "$TEMP_DIR/empty.txt" | remove_empty_lines | wc -l)
+	result=$(remove_empty_lines < "$TEMP_DIR/empty.txt" | wc -l)
 	assertEquals "3" "$result"
 }
 
@@ -249,7 +249,7 @@ line3
 
 line5
 EOF
-	result=$(cat "$TEMP_DIR/whitespace.txt" | remove_empty_lines | wc -l)
+	result=$(remove_empty_lines < "$TEMP_DIR/whitespace.txt" | wc -l)
 	assertEquals "3" "$result"
 }
 
@@ -281,6 +281,7 @@ test_extract_from_delimiters_quotes() {
 # @brief Test extract_from_delimiters with backticks
 #
 test_extract_from_delimiters_backticks() {
+	# shellcheck disable=SC2016  # Backticks in single quotes are intentional for testing
 	result=$(extract_from_delimiters '`test`' '`')
 	assertEquals "test" "$result"
 }
@@ -321,6 +322,7 @@ test_extract_from_doublequotes_whitespace() {
 # @brief Test extract_from_backticks
 #
 test_extract_from_backticks() {
+	# shellcheck disable=SC2016  # Backticks in single quotes are intentional for testing
 	result=$(extract_from_backticks '`command`')
 	assertEquals "command" "$result"
 }
@@ -329,6 +331,7 @@ test_extract_from_backticks() {
 # @brief Test extract_from_backticks with whitespace
 #
 test_extract_from_backticks_whitespace() {
+	# shellcheck disable=SC2016  # Backticks in single quotes are intentional for testing
 	result=$(extract_from_backticks '  `command`  ')
 	assertEquals "command" "$result"
 }

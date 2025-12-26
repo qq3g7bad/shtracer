@@ -6,11 +6,13 @@
 # Exit codes help CI/CD systems identify specific failure types
 #
 # SUCCESS
+# shellcheck disable=SC2034  # Used for documentation
 EXIT_SUCCESS=0
 #
 # USAGE ERRORS (1-9)
 EXIT_USAGE=1                    # Invalid arguments or usage
 EXIT_CONFIG_NOT_FOUND=2         # Config file not found
+# shellcheck disable=SC2034  # Used for documentation
 EXIT_CONFIG_INVALID=3           # Config file format invalid
 #
 # PROCESSING ERRORS (10-19)
