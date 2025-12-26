@@ -1,5 +1,5 @@
 # Generated output
-sample/output/
+sample/*output/
 
 # Editor/IDE files
 .vimconf

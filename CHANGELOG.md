@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Section Sequence Swapping** ([2d052f3](https://github.com/qq3g7bad/shtracer/commit/2d052f3))
+  - New feature to swap the order of sections in the output
+  - Improves flexibility in organizing traceability documentation
+
+### Changed
+- **Output Directory Cleanup** ([cec6b0e](https://github.com/qq3g7bad/shtracer/commit/cec6b0e))
+  - Output directory is now cleaned up by default before generation
+  - Prevents stale files from accumulating
+  - Can be disabled with `--debug` flag ([a74d2bb](https://github.com/qq3g7bad/shtracer/commit/a74d2bb))
+- **Documentation Updates**
+  - Updated screenshots in README ([d553739](https://github.com/qq3g7bad/shtracer/commit/d553739))
+  - Updated README.md content ([3e6136a](https://github.com/qq3g7bad/shtracer/commit/3e6136a), [08d229b](https://github.com/qq3g7bad/shtracer/commit/08d229b))
+
+### Fixed
+- **Viewer Improvements**
+  - Stack multiple targets from same source vertically ([9ab676f](https://github.com/qq3g7bad/shtracer/commit/9ab676f))
+  - Stabilize traceability flow diagram sizing ([3155be4](https://github.com/qq3g7bad/shtracer/commit/3155be4))
+  - Fix viewer hardcoding issues ([d3bd8f3](https://github.com/qq3g7bad/shtracer/commit/d3bd8f3))
+- **Parser and Output Fixes**
+  - Allow TAG-TITLE OFFSET value of 0 for table format tags ([74e92bb](https://github.com/qq3g7bad/shtracer/commit/74e92bb))
+  - Fix JSON parse escape error ([7735763](https://github.com/qq3g7bad/shtracer/commit/7735763))
+  - Fix output directory naming ([4f576fe](https://github.com/qq3g7bad/shtracer/commit/4f576fe))
+- **Testing**
+  - Restore original shunit2; remove incorrect reimplementation ([71c5042](https://github.com/qq3g7bad/shtracer/commit/71c5042))
+
 ## [0.1.2] - 2025-12-23
 
 ### Added
@@ -68,11 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tag type badges with distinctive colors
   - Improved visual hierarchy in HTML output
   - Better readability for large matrices
-- **Comprehensive JSON Unit Tests** ([new test suite](https://github.com/qq3g7bad/shtracer/commit/297a33d))
+- **Comprehensive JSON Unit Tests** ([297a33d](https://github.com/qq3g7bad/shtracer/commit/297a33d))
   - Added `shtracer_json_unittest.sh` with 20+ test cases
   - Validates JSON output structure and content
   - Ensures parser correctness
-- **Flexible Argument Order** (current commit)
+- **Flexible Argument Order** ([483a4ca](https://github.com/qq3g7bad/shtracer/commit/483a4ca))
   - Options can now be specified before or after the config file
   - Examples: `shtracer --json config.md` and `shtracer config.md --json` both work
   - Full backward compatibility maintained
@@ -96,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated Documentation** ([054fba5](https://github.com/qq3g7bad/shtracer/commit/054fba5))
   - Removed "(fork)" annotations from config examples
   - Clarified that configs are project-specific, not fork-specific
-- **Argument Parsing** (current commit)
+- **Argument Parsing** ([483a4ca](https://github.com/qq3g7bad/shtracer/commit/483a4ca))
   - Switched from case pattern matching to two-pass while-loop parsing
   - Enables flexible argument ordering
   - Single-option-only constraint enforced more explicitly

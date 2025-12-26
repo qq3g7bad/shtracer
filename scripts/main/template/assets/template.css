@@ -166,6 +166,13 @@ body[data-theme="light"] .matrix-tag-badge.matrix-tag-badge-nodata {
     margin-left: 6px;
 }
 
+.summary-version {
+    color: #666;
+    font-size: 0.9em;
+    font-style: italic;
+    margin-left: 4px;
+}
+
 .summary-pct {
     font-weight: normal;
 }

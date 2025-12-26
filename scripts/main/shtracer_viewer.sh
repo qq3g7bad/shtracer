@@ -197,6 +197,31 @@ _viewer_emit_traceability_diagrams_js() {
 // traceability_diagrams.js - Traceability visualizations for shtracer
 // Renders the interactive full Sankey diagram and the requirements-centric Type view.
 
+// Initialize global color mapping based on traceTargetOrder
+(function() {
+    if (!window._traceTypeColorMap) {
+        window._traceTypeColorMap = new Map();
+    }
+
+    // Color scheme for trace targets
+    const colorScheme = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+                        '#1abc9c', '#e67e22', '#95a5a6', '#34495e', '#c0392b'];
+
+    // If traceTargetOrder exists, use it to initialize color mapping
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder)) {
+        traceTargetOrder.forEach((type, index) => {
+            if (!window._traceTypeColorMap.has(type)) {
+                window._traceTypeColorMap.set(type, colorScheme[index % colorScheme.length]);
+            }
+        });
+    }
+
+    // Always ensure Unknown has a color
+    if (!window._traceTypeColorMap.has('Unknown')) {
+        window._traceTypeColorMap.set('Unknown', '#7f8c8d');
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     // Use embedded JSON data instead of fetching
     if (typeof traceabilityData !== 'undefined') {
@@ -214,32 +239,66 @@ document.addEventListener('DOMContentLoaded', function() {
 function traceTypeFromTraceTarget(traceTarget) {
     if (!traceTarget) return 'Unknown';
     const parts = String(traceTarget).split(':');
-    return parts[parts.length - 1].trim() || 'Unknown';
+    const type = parts[parts.length - 1].trim() || 'Unknown';
+    // Return the trace target as-is (after the last colon)
+    return type;
 }
 
 function traceTypeColor(type) {
-    switch (type) {
-        case 'Requirement': return '#e74c3c';
-        case 'Architecture': return '#3498db';
-        case 'Implementation': return '#2ecc71';
-        case 'Unit test': return '#f39c12';
-        case 'Integration test': return '#9b59b6';
-        default: return '#7f8c8d';
+    // Use global color mapping initialized at startup
+    if (!window._traceTypeColorMap) {
+        window._traceTypeColorMap = new Map();
     }
+
+    if (!window._traceTypeColorMap.has(type)) {
+        // Fallback: assign color if type not in initial mapping
+        const colorScheme = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+                            '#1abc9c', '#e67e22', '#95a5a6', '#34495e', '#c0392b'];
+        const nextIndex = window._traceTypeColorMap.size;
+        const color = type === 'Unknown' ? '#7f8c8d' : colorScheme[nextIndex % colorScheme.length];
+        window._traceTypeColorMap.set(type, color);
+    }
+
+    return window._traceTypeColorMap.get(type);
 }
 
-function renderLegend(containerId) {
+function renderLegend(containerId, types) {
     const el = document.getElementById(containerId);
     if (!el) return;
 
-    const legendData = [
-        {type: 'Requirement', color: traceTypeColor('Requirement')},
-        {type: 'Architecture', color: traceTypeColor('Architecture')},
-        {type: 'Implementation', color: traceTypeColor('Implementation')},
-        {type: 'Unit test', color: traceTypeColor('Unit test')},
-        {type: 'Integration test', color: traceTypeColor('Integration test')},
-        {type: 'Unknown', color: traceTypeColor('Unknown')}
-    ];
+    // If types not provided, use config.md order or extract from traceabilityData
+    if (!types && typeof traceabilityData !== 'undefined') {
+        if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+            // Use config.md order and filter to only types present in nodes
+            const nodesTypes = new Set();
+            (traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target);
+                if (t && t !== 'Unknown') nodesTypes.add(t);
+            });
+            types = traceTargetOrder.filter(t => nodesTypes.has(t));
+        } else {
+            // Fallback: extract unique trace types from nodes in order of first appearance
+            const seenTypes = new Set();
+            const extractedTypes = [];
+            (traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target);
+                if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                    seenTypes.add(t);
+                    extractedTypes.push(t);
+                }
+            });
+            types = extractedTypes;
+        }
+    }
+
+    if (!types || types.length === 0) {
+        types = ['Unknown'];
+    }
+
+    const legendData = types.map(type => ({
+        type: type,
+        color: traceTypeColor(type)
+    }));
 
     el.innerHTML = legendData.map(d =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${d.color}"></span><span>${d.type}</span></span>`
@@ -332,6 +391,19 @@ function renderSummary(data) {
         return m ? m[1] : 'sh';
     }
 
+    function formatVersionDisplay(versionRaw) {
+        if (!versionRaw || versionRaw === 'unknown') return 'unknown';
+        if (versionRaw.startsWith('git:')) {
+            return versionRaw.substring(4); // Remove "git:" prefix
+        }
+        if (versionRaw.startsWith('mtime:')) {
+            // Convert "mtime:2025-12-26T10:30:45Z" to "2025-12-26 10:30"
+            const timestamp = versionRaw.substring(6); // Remove "mtime:" prefix
+            return timestamp.replace('T', ' ').replace(/:\d{2}Z$/, '');
+        }
+        return versionRaw;
+    }
+
     function nodeIdFromLinkEnd(end) {
         if (typeof end === 'string') return end;
         if (typeof end === 'number') {
@@ -350,7 +422,28 @@ function renderSummary(data) {
     // - Compute upstream/downstream projections independently
     // - Split node mass equally across distinct target layers on each side
     // - Format like the diagram: >=10% as integer, else 1 decimal; <0.5% as <1%
-    const dims = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+
+    // Use trace target order from config.md if available, otherwise extract from nodes
+    let dims = [];
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+        // Use config.md order and filter to only types present in nodes
+        const nodesTypes = new Set();
+        nodes.forEach(n => {
+            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            if (t && t !== 'Unknown') nodesTypes.add(t);
+        });
+        dims = traceTargetOrder.filter(t => nodesTypes.has(t));
+    } else {
+        // Fallback: extract unique trace types from nodes in order of first appearance
+        const seenTypes = new Set();
+        nodes.forEach(n => {
+            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                seenTypes.add(t);
+                dims.push(t);
+            }
+        });
+    }
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -447,7 +540,7 @@ function renderSummary(data) {
                 else if (o > srcOrder) hasDown = true;
             });
 
-            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0 };
+            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0, version: n.file_version || 'unknown' };
             m.total += 1;
             if (hasUp) m.up += 1;
             if (hasDown) m.down += 1;
@@ -488,22 +581,19 @@ function renderSummary(data) {
 
         const fileEntries = Array.from(fileCoverageByDim[src].entries())
             .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-        if (fileEntries.length) {
-            html += `<li><span class=\"summary-dir\">targets:</span>`;
-            html += '<ul class="summary-target-list">';
-            fileEntries.forEach(([rawName, stats]) => {
-                const up = formatPct(stats.up, stats.total);
-                const down = formatPct(stats.down, stats.total);
-                const id = fileIdFromRawName(rawName);
-                const ext = fileExtFromRawName(rawName);
-                html += `<li class=\"summary-target-item\">`;
-                html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
-                html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
-                html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
-                html += `</li>`;
-            });
-            html += '</ul></li>';
-        }
+        fileEntries.forEach(([rawName, stats]) => {
+            const up = formatPct(stats.up, stats.total);
+            const down = formatPct(stats.down, stats.total);
+            const id = fileIdFromRawName(rawName);
+            const ext = fileExtFromRawName(rawName);
+            const versionDisplay = formatVersionDisplay(stats.version);
+            html += `<li class=\"summary-target-item\">`;
+            html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
+            html += `onmouseover=\"showTooltip(event, '${escapeJsSingle(id)}')\" onmouseout=\"hideTooltip()\">${escapeHtml(rawName)}</a>`;
+            html += ` <span class=\"summary-version\">(${escapeHtml(versionDisplay)})</span>`;
+            html += ` <span class=\"summary-target-cov\">upstream ${escapeHtml(up)} / downstream ${escapeHtml(down)}</span>`;
+            html += `</li>`;
+        });
         html += '</ul></li>';
     });
     html += '</ul>';
@@ -513,13 +603,13 @@ function renderSummary(data) {
 function renderParallelSetsRequirements(containerId, nodes, links, colorScale, getTraceType) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
-    const height = container.clientHeight || 600;
 
     container.innerHTML = '';
 
-    const margin = { top: 30, right: 20, bottom: 20, left: 20 };
+    const margin = { top: 5, right: 20, bottom: 20, left: 20 };
     const innerW = Math.max(0, width - margin.left - margin.right);
-    const innerH = Math.max(0, height - margin.top - margin.bottom);
+    let innerH = 200; // Initial value, will be recalculated based on bar heights
+    let height = margin.top + margin.bottom + innerH; // Initial height
     const barW = 16;
 
     const svg = d3.select('#' + containerId)
@@ -548,7 +638,27 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const dims = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+    // Use trace target order from config.md if available, otherwise extract from nodes
+    let dims = [];
+    if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+        // Use config.md order and filter to only types present in nodes
+        const nodesTypes = new Set();
+        nodes.forEach(n => {
+            const t = getTraceType(n && n.trace_target);
+            if (t && t !== 'Unknown') nodesTypes.add(t);
+        });
+        dims = traceTargetOrder.filter(t => nodesTypes.has(t));
+    } else {
+        // Fallback: extract unique trace types from nodes in order of first appearance
+        const seenTypes = new Set();
+        nodes.forEach(n => {
+            const t = getTraceType(n && n.trace_target);
+            if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+                seenTypes.add(t);
+                dims.push(t);
+            }
+        });
+    }
     const dimOrder = new Map(dims.map((d, i) => [d, i]));
     const isDim = (d) => dimOrder.has(d);
 
@@ -646,37 +756,158 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return;
     }
 
-    const pxPerNode = innerH / maxN;
+    // Calculate bar heights and positions based on connection relationships
+    // Position bars to minimize ribbon overlap by placing connected bars near each other
+    const heightPerNode = 15; // Height per node in pixels (increased from 6 for better visibility)
+    const minBarHeight = 30; // Minimum bar height
+    const maxBarHeight = 200; // Maximum bar height (increased from 100 to allow more vertical space)
+    const barHeights = {};
+    const barYOffsets = {};
+
+    // Calculate bar heights
+    dims.forEach(dim => {
+        const total = N[dim] || 0;
+        const upCov = coveredUp[dim] || 0;
+        const downCov = coveredDown[dim] || 0;
+        const maxCov = Math.max(upCov, downCov, total * 0.3);
+        const calcHeight = maxCov * heightPerNode;
+        barHeights[dim] = Math.min(maxBarHeight, Math.max(minBarHeight, calcHeight));
+    });
+
+    // Build connection map: source dimension -> [target dimensions]
+    // This helps us stack multiple targets from the same source vertically
+    const sourceToTargets = {};
+    dims.forEach(src => {
+        sourceToTargets[src] = [];
+        dims.forEach(tgt => {
+            if (src !== tgt) {
+                const srcOrder = dimOrder.get(src);
+                const tgtOrder = dimOrder.get(tgt);
+                if (srcOrder < tgtOrder && (accDown[src][tgt] > 0)) {
+                    sourceToTargets[src].push(tgt);
+                }
+            }
+        });
+    });
+
+    // Position bars to avoid link overlap
+    innerH = 0; // Initial canvas height (will be calculated from actual bar positions)
+    const barSpacing = 15; // Vertical spacing between stacked bars
+
+    // Position first dimension at top
+    barYOffsets[dims[0]] = 0;
+
+    // Position subsequent dimensions
+    for (let i = 1; i < dims.length; i++) {
+        const dim = dims[i];
+
+        // Find the strongest connection source (predecessor with most connections)
+        let strongestSource = null;
+        let maxWeight = 0;
+
+        for (let j = 0; j < i; j++) {
+            const prevDim = dims[j];
+            const weight = accDown[prevDim][dim] || accUp[dim][prevDim] || 0;
+            if (weight > maxWeight) {
+                maxWeight = weight;
+                strongestSource = prevDim;
+            }
+        }
+
+        if (strongestSource) {
+            // Get list of targets from this source
+            const siblings = sourceToTargets[strongestSource];
+            const siblingIndex = siblings.indexOf(dim);
+
+            if (siblingIndex === 0) {
+                // First target: align with source (same y coordinate)
+                barYOffsets[dim] = barYOffsets[strongestSource];
+            } else {
+                // Subsequent targets: stack below previous sibling to avoid overlap
+                const prevSibling = siblings[siblingIndex - 1];
+                barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
+            }
+        } else {
+            // No connection, place at top
+            barYOffsets[dim] = 0;
+        }
+    }
+
+    // Adjust canvas height if needed
+    let maxY = 0;
+    dims.forEach(dim => {
+        maxY = Math.max(maxY, barYOffsets[dim] + barHeights[dim]);
+    });
+    // Calculate natural height from bar positions, with reasonable min/max bounds
+    const naturalHeight = maxY + 20; // 20px bottom padding
+    const minHeight = 150; // Minimum to prevent tiny diagrams
+    const maxHeight = 800; // Maximum to prevent excessive scrolling
+    innerH = Math.min(maxHeight, Math.max(minHeight, naturalHeight));
+
+    // Update svg height
+    height = margin.top + margin.bottom + innerH;
+    svg.attr('height', height);
+    container.style.height = height + 'px';
+    container.style.minHeight = height + 'px';
+    container.style.marginBottom = '20px';
+
+    const scaleForDim = (dim) => {
+        const total = N[dim] || 0;
+        const barHeight = barHeights[dim];
+        return total > 0 ? (barHeight / total) : 0;
+    };
     const x = d3.scalePoint().domain(dims).range([0, innerW]).padding(0.5);
 
     // Precompute band positions per layer/target for ribbon endpoints.
     // Upstream (left) and downstream (right) are independent stacks.
+    // Position ribbons within each bar's vertical space.
     const bandsUp = {}; // bandsUp[src][tgt] = {y0,y1} where tgt is upstream of src
     const bandsDown = {}; // bandsDown[src][tgt] = {y0,y1} where tgt is downstream of src
     dims.forEach(src => {
         const srcOrder = dimOrder.get(src);
+        const srcYOffset = barYOffsets[src];
+        const srcBarHeight = barHeights[src];
 
+        // Calculate total heights first for top alignment within bar
         bandsUp[src] = {};
-        let yu = 0;
-        // upstream targets: stable order (closest first visually), i.e., reverse dims
+        let totalUpHeight = 0;
         for (let k = dims.length - 1; k >= 0; k--) {
             const tgt = dims[k];
             if (tgt === src) continue;
             if (dimOrder.get(tgt) >= srcOrder) continue;
-            const h = (accUp[src][tgt] || 0) * pxPerNode;
+            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
+            if (h > 0) totalUpHeight += h;
+        }
+
+        // Start from top of this bar's vertical space
+        let yu = srcYOffset;
+        for (let k = dims.length - 1; k >= 0; k--) {
+            const tgt = dims[k];
+            if (tgt === src) continue;
+            if (dimOrder.get(tgt) >= srcOrder) continue;
+            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
             if (h <= 0) continue;
             bandsUp[src][tgt] = { y0: yu, y1: yu + h };
             yu += h;
         }
 
         bandsDown[src] = {};
-        let yd = 0;
-        // downstream targets: stable order (left-to-right dims)
+        let totalDownHeight = 0;
         for (let k = 0; k < dims.length; k++) {
             const tgt = dims[k];
             if (tgt === src) continue;
             if (dimOrder.get(tgt) <= srcOrder) continue;
-            const h = (accDown[src][tgt] || 0) * pxPerNode;
+            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
+            if (h > 0) totalDownHeight += h;
+        }
+
+        // Start from top of this bar's vertical space
+        let yd = srcYOffset;
+        for (let k = 0; k < dims.length; k++) {
+            const tgt = dims[k];
+            if (tgt === src) continue;
+            if (dimOrder.get(tgt) <= srcOrder) continue;
+            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
             if (h <= 0) continue;
             bandsDown[src][tgt] = { y0: yd, y1: yd + h };
             yd += h;
@@ -719,6 +950,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return x(dim) + barW / 2;
     }
 
+    let ribbonCounter = 0;
     function drawRibbonBetween(a, b, isOverlay) {
         const oa = dimOrder.get(a);
         const ob = dimOrder.get(b);
@@ -759,7 +991,8 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const y1a = bBand.y0;
         const y1b = bBand.y1;
 
-        const gradId = `type-grad-${safeId(containerId)}-${safeId(a)}-${safeId(b)}`;
+        // Use numeric index for gradient ID to ensure uniqueness
+        const gradId = `type-grad-${safeId(containerId)}-ribbon-${ribbonCounter++}`;
         ensurePathGradient(gradId, x0, (y0a + y0b) / 2, x1, (y1a + y1b) / 2, colorScale(a), colorScale(b));
 
         const opacity = isOverlay ? 0.45 : 0.25;
@@ -818,15 +1051,16 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const total = N[d] || 0;
         if (!total) return;
 
-        const bH = total * pxPerNode;
-        const upH = (coveredUp[d] || 0) * pxPerNode;
-        const downH = (coveredDown[d] || 0) * pxPerNode;
+        const bH = barHeights[d];
+        const yOffset = barYOffsets[d];
+        const upH = ((coveredUp[d] || 0) / total) * bH;
+        const downH = ((coveredDown[d] || 0) / total) * bH;
         const upPct = formatPct(coveredUp[d] || 0, total);
         const downPct = formatPct(coveredDown[d] || 0, total);
 
         barGroup.append('text')
             .attr('x', x(d))
-            .attr('y', -10)
+            .attr('y', yOffset - 10)
             .attr('text-anchor', 'middle')
             .attr('font-size', '12px')
             .attr('fill', '#333')
@@ -835,7 +1069,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         // Total nodes outline (with base fill to restore node color)
         barGroup.append('rect')
             .attr('x', barLeft(d))
-            .attr('y', 0)
+            .attr('y', yOffset)
             .attr('width', barW)
             .attr('height', Math.max(0, bH))
             .attr('fill', colorScale(d))
@@ -862,7 +1096,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (upH > 0) {
             barGroup.append('rect')
                 .attr('x', barLeft(d))
-                .attr('y', 0)
+                .attr('y', yOffset)
                 .attr('width', barW / 2)
                 .attr('height', Math.max(0, upH))
                 .attr('fill', colorScale(d))
@@ -871,7 +1105,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (downH > 0) {
             barGroup.append('rect')
                 .attr('x', barLeft(d) + barW / 2)
-                .attr('y', 0)
+                .attr('y', yOffset)
                 .attr('width', barW / 2)
                 .attr('height', Math.max(0, downH))
                 .attr('fill', colorScale(d))
@@ -882,7 +1116,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (upPct) {
             barGroup.append('text')
                 .attr('x', barLeft(d) - 6)
-                .attr('y', Math.min(Math.max(10, upH / 2), Math.max(10, bH - 10)))
+                .attr('y', yOffset + Math.min(Math.max(10, upH / 2), Math.max(10, bH - 10)))
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'end')
                 .attr('font-size', '11px')
@@ -892,7 +1126,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         if (downPct) {
             barGroup.append('text')
                 .attr('x', barRight(d) + 6)
-                .attr('y', Math.min(Math.max(10, downH / 2), Math.max(10, bH - 10)))
+                .attr('y', yOffset + Math.min(Math.max(10, downH / 2), Math.max(10, bH - 10)))
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'start')
                 .attr('font-size', '11px')
@@ -902,10 +1136,42 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     });
 }
 
-function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, clickable) {
+function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, clickable, typeOrder) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
-    const height = 600;
+
+    // Fixed sizing for the full (clickable) diagram nodes.
+    // Height should be based on the maximum number of nodes in any type column
+    // (not total nodes), otherwise the SVG becomes unnecessarily tall.
+    const fixedNodeHeight = 24; // px per node
+    const nodeGap = 6; // vertical gap between nodes
+    const topPadding = 20;
+    const bottomPadding = 60; // leave space for labels/legend
+
+    let height;
+    if (clickable) {
+        const nodesByTypeForSizing = d3.group(nodes, d => getTraceType(d.trace_target));
+        const presentTypes = Array.from(nodesByTypeForSizing.keys());
+
+        // Prefer caller-provided order (from config), then append any missing types.
+        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
+        presentTypes.forEach(t => {
+            if (!orderedTypes.includes(t)) orderedTypes.push(t);
+        });
+
+        const maxColumnCount = orderedTypes.reduce((max, t) => {
+            const cnt = (nodesByTypeForSizing.get(t) || []).length;
+            return cnt > max ? cnt : max;
+        }, 0);
+
+        const rows = Math.max(1, maxColumnCount);
+        height = topPadding + (rows * fixedNodeHeight) + Math.max(0, rows - 1) * nodeGap + bottomPadding;
+    } else {
+        // Default sizing (kept for compatibility if this function is reused for non-clickable diagrams).
+        const heightPerNode = 25; // px per node
+        height = nodes.length * heightPerNode;
+    }
 
     // Clear any existing content
     container.innerHTML = '';
@@ -920,12 +1186,13 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     const g = svg.append('g')
         .attr('transform', 'translate(10,10)');
 
-    // Create Sankey layout
+    // Create Sankey layout with better node sizing
     const sankey = d3.sankey()
-        .nodeWidth(15)
-        .nodePadding(10)
+        .nodeWidth(20)  // Increased from 15
+        .nodePadding(12)  // Increased for better visual spacing
+        .nodeAlign(d3.sankeyCenter)  // Center-align nodes for better vertical distribution
         .extent([[5, 5], [width - 20, height - 20]]);
-    const nodeWidth = 15;
+    const nodeWidth = 20;
 
     // Prepare layout copies so we don't mutate the original arrays (separate state for 'all' vs 'type')
     let layoutNodes = nodes.map(n => Object.assign({}, n));
@@ -1024,42 +1291,31 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
             }
         });
 
-        // Finally override x positions to group by type (same layout as original behavior)
-        const typeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        // Finally override x/y positions to group by type in a fixed-size grid.
         const nodesByType = d3.group(nodes, d => getTraceType(d.trace_target));
-        // fixed sizing for full diagram nodes
-        const fixedNodeHeight = 24; // px per node
-        const nodeGap = 6; // vertical gap between nodes
-        const topPadding = 20;
-        const bottomPadding = 60; // leave space for legend/labels
-
-        // compute tallest column height to size SVG accordingly
-        let maxColumnHeight = 0;
-        typeOrder.forEach(type => {
-            const typeNodes = nodesByType.get(type) || [];
-            const count = typeNodes.length;
-            const columnHeight = count > 0 ? (count * fixedNodeHeight + Math.max(0, count - 1) * nodeGap) : 0;
-            if (columnHeight > maxColumnHeight) maxColumnHeight = columnHeight;
+        const presentTypes = Array.from(nodesByType.keys());
+        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
+        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
+        presentTypes.forEach(t => {
+            if (!orderedTypes.includes(t)) orderedTypes.push(t);
         });
 
-        const requiredHeight = topPadding + maxColumnHeight + bottomPadding;
-        // apply immediately so we can compute positions relative to this height
-        const finalHeight = Math.max(height, requiredHeight);
-        svg.attr('height', finalHeight);
-        // Match container height to SVG height and keep spacing so following sections never overlap.
-        container.style.height = finalHeight + 'px';
-        container.style.minHeight = finalHeight + 'px';
+        // Ensure SVG/container match the computed height so the diagram is not clipped.
+        svg.attr('height', height);
+        container.style.height = height + 'px';
+        container.style.minHeight = height + 'px';
         container.style.marginBottom = '20px';
 
-        typeOrder.forEach((type, typeIndex) => {
+        const denom = Math.max(1, orderedTypes.length - 1);
+        const availableH = Math.max(0, height - topPadding - bottomPadding);
+        orderedTypes.forEach((type, typeIndex) => {
             const typeNodes = nodesByType.get(type) || [];
-            let x = (typeIndex / (typeOrder.length - 1)) * (width - 40) + 20;
+            let x = (typeIndex / denom) * (width - 40) + 20;
             const maxX = width - 20 - nodeWidth;
             if (x > maxX) x = maxX;
             const count = typeNodes.length;
             const columnHeight = count > 0 ? (count * fixedNodeHeight + Math.max(0, count - 1) * nodeGap) : 0;
-            // center column vertically inside the allocated maxColumnHeight
-            const startY = topPadding + (maxColumnHeight - columnHeight) / 2;
+            const startY = topPadding + Math.max(0, (availableH - columnHeight) / 2);
             typeNodes.forEach((node, i) => {
                 node.x0 = x;
                 node.x1 = x + nodeWidth;
@@ -1098,15 +1354,18 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     } else {
         linksToRender = (typeof layoutLinks !== 'undefined') ? layoutLinks : links;
     }
-    linksToRender.forEach((d, i) => { if (d.index == null) d.index = i; });
+    // Ensure each link has a unique index for gradient IDs
+    linksToRender.forEach((d, i) => { d.linkRenderIndex = i; });
     // Filter out padding links (internal-only) from rendering/gradients
     const visibleLinks = linksToRender.filter(l => !l._padding);
+    // Re-index visible links to ensure continuity
+    visibleLinks.forEach((d, i) => { d.visibleIndex = i; });
     const defs = svg.append('defs');
     const grads = defs.selectAll('linearGradient')
         .data(visibleLinks)
         .enter()
         .append('linearGradient')
-        .attr('id', d => `grad-${containerId}-${d.index}`)
+        .attr('id', d => `grad-${containerId}-${d.visibleIndex}`)
         .attr('gradientUnits', 'userSpaceOnUse')
         // Set coordinates so the gradient follows the link from source to target
         .attr('x1', d => d.source && d.source.x1 != null ? d.source.x1 : 0)
@@ -1131,7 +1390,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
                 const midX = (sourceX + targetX) / 2;
                 return `M${sourceX},${sourceY}C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`;
             })
-            .attr('stroke', d => `url(#grad-${containerId}-${d.index})`)
+            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
             .attr('stroke-width', d => Math.max(1, d.width || 2))
             .attr('fill', 'none')
             .attr('opacity', 0.6)
@@ -1159,7 +1418,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
             .enter()
             .append('path')
             .attr('d', d3.sankeyLinkHorizontal())
-            .attr('stroke', d => `url(#grad-${containerId}-${d.index})`)
+            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
             .attr('stroke-width', d => Math.max(1, d.width || 2))
             .attr('fill', 'none')
             .attr('opacity', 0.6)
@@ -1335,13 +1594,35 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
 }
 
 function renderSankey(data) {
-		// Color scale for trace targets - more distinct colors
-		const colorScale = d3.scaleOrdinal()
-				.domain(['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'])
-				.range(['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']); // More distinct colors
-
 		// Function to extract type from trace_target (safe)
         const getTraceType = traceTypeFromTraceTarget;
+
+		// Use trace target order from config.md if available, otherwise extract from nodes
+		let types = [];
+		if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
+			// Use config.md order and filter to only types present in nodes
+			const nodesTypes = new Set();
+			(data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target);
+				if (t && t !== 'Unknown') nodesTypes.add(t);
+			});
+			types = traceTargetOrder.filter(t => nodesTypes.has(t));
+		} else {
+			// Fallback: extract unique trace types from nodes in order of first appearance
+			const seenTypes = new Set();
+			(data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target);
+				if (t && t !== 'Unknown' && !seenTypes.has(t)) {
+					seenTypes.add(t);
+					types.push(t);
+				}
+			});
+		}
+
+		// Use global color mapping for consistency across all diagrams
+		const colorScale = d3.scaleOrdinal()
+				.domain(types)
+				.range(types.map(t => traceTypeColor(t)));
 
         // Legends and top-of-page metadata
         renderLegend('sankey-legend-full');
@@ -1368,7 +1649,7 @@ function renderSankey(data) {
 		});
 
 		// Render full diagram
-		renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true);
+        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true, types);
 
 		// Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
 		const directLinksRaw = Array.isArray(data.direct_links) ? data.direct_links : data.links;
@@ -1652,7 +1933,7 @@ _html_insert_content_with_indentation() {
 				}
 			}
 		' \
-		| sed '/<!-- SHTRACER INSERTED -->/d')
+		| remove_lines_with_pattern '<!-- SHTRACER INSERTED -->')
 
 	rm -f "$_html_insert_info_file" 2>/dev/null || true
 	trap - EXIT INT TERM
@@ -1685,14 +1966,53 @@ convert_template_html() {
 		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
+		# Extract trace target order from TAG_INFO_TABLE (same as table headers)
+		profile_start "convert_template_html_extract_order"
+		_TRACE_TARGET_ORDER="$(
+			{
+				if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+					cat "$_TAG_INFO_TABLE"
+				else
+					printf '%s\n' "$_TAG_INFO_TABLE"
+				fi
+			} | awk -F"$SHTRACER_SEPARATOR" -v col_idx=0 '
+				function get_last_segment(s,   n, parts) {
+					n = split(s, parts, ":")
+					return n > 0 ? parts[n] : s
+				}
+				{
+					if (NF >= 4 && $4 != "") {
+						trace_target = $4
+						col_name = get_last_segment(trace_target)
+						if (!(col_name in seen)) {
+							seen[col_name] = 1
+							cols[col_idx++] = col_name
+						}
+					}
+				}
+				END {
+					for (i = 0; i < col_idx; i++) {
+						if (i > 0) printf ","
+						printf "\n  \"%s\"", cols[i]
+					}
+					if (col_idx > 0) printf "\n"
+				}
+			'
+		)"
+		profile_end "convert_template_html_extract_order"
+
 		profile_start "convert_template_html_insert_tag_table"
 		_tmp_table_html_file="$(shtracer_tmpfile)" || {
 			error_exit 1 "convert_template_html" "Failed to create temporary file"
 		}
 		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
+		_tmp_trace_order_file="$(shtracer_tmpfile)" || {
+			error_exit 1 "convert_template_html" "Failed to create temporary file for trace order"
+		}
+		printf '%s' "$_TRACE_TARGET_ORDER" >"$_tmp_trace_order_file"
 		_HTML_CONTENT="$(
 			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
-				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" '
+				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" -v trace_order_file="$_tmp_trace_order_file" '
                     /^[ \t]*<!-- INSERT TABLE -->/ {
                         print "<!-- SHTRACER INSERTED -->"
                         while ((getline line < table_html_file) > 0) {
@@ -1704,6 +2024,15 @@ convert_template_html() {
                         next
                     }
                     /^[ \t]*<!-- INSERT JSON DATA -->/ {
+                        # Output trace target order
+                        print "const traceTargetOrder = ["
+                        while ((getline ord_line < trace_order_file) > 0) {
+                            gsub(/\r$/, "", ord_line)
+                            print ord_line
+                        }
+                        close(trace_order_file)
+                        print "];"
+                        # Output JSON data
                         print "const traceabilityData = "
                         while ((getline j < json_file) > 0) {
                             gsub(/\r$/, "", j)
@@ -1717,10 +2046,8 @@ convert_template_html() {
                     { print }
                 '
 		)"
-		rm -f "$_tmp_table_html_file"
-		profile_end "convert_template_html_insert_tag_table"
-
-		profile_start "_html_insert_content_with_indentation"
+		rm -f "$_tmp_table_html_file" "$_tmp_trace_order_file"
+		profile_end "convert_template_html_insert_tag_table" profile_start "_html_insert_content_with_indentation"
 		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
 		profile_end "_html_insert_content_with_indentation"
 
@@ -1746,7 +2073,7 @@ tag_info_table_from_json_file() {
 	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
 
 	# Extract trace target order from config.md (both ## and ### headings)
-	_config_path="$(grep -m 1 '"config_path"' "$_JSON_FILE" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+	_config_path="$(extract_json_string_field "$_JSON_FILE" "config_path")"
 	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
 		awk '
 			/^##+ / {
@@ -1980,6 +2307,7 @@ convert_template_js() {
                         gsub(/"/, "\\\"", s)
                         gsub(/\t/, "\\t", s)
                         gsub(/\r/, "\\r", s)
+                        gsub(/<\//, "<\\/", s)
                         return s
                     }
                     function file_to_js_string(path,   line, out) {
@@ -2071,10 +2399,10 @@ print_usage() {
 		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
 
 		  # Explicit tag-table path
-		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/output/tags/04_tag_table > output.html
+		          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
 
 		  # JSON file input
-		  ./scripts/main/shtracer_viewer.sh -i ./sample/output/output.json > output.html
+		          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
 	USAGE
 	exit 1
 }
@@ -2156,10 +2484,10 @@ shtracer_viewer_main() {
 	fi
 
 	if [ -z "$TAG_TABLE_FILE" ]; then
-		_config_path="$(grep -m 1 '"config_path"' "$_json_tmp" 2>/dev/null | sed 's/.*"config_path"[[:space:]]*:[[:space:]]*"//; s/".*//')"
+		_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
 		if [ -n "$_config_path" ]; then
 			_config_dir="$(dirname "$_config_path")"
-			_inferred_table="${_config_dir%/}/output/tags/04_tag_table"
+			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
 			if [ -r "$_inferred_table" ]; then
 				TAG_TABLE_FILE="$_inferred_table"
 			fi

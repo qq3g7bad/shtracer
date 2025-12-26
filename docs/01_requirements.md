@@ -93,9 +93,29 @@ column | optional  | content                                                    
 
 ## 📤 3. Output
 
+<!-- @REQ3.1@ -->
+### JSON Output for CI/CD Integration
+
+* Export traceability data in structured JSON format for programmatic processing.
+* JSON output should be sent to stdout for pipeline integration.
+* JSON schema should include:
+  * Metadata (version, timestamp, config path)
+  * Trace chains (complete tag sequences)
+  * Tag relationships (nodes and links)
+  * Summary statistics (total traces, completeness)
+* Enable seamless integration with CI/CD tools (jq, custom scripts, etc.).
+
+<!-- @REQ3.2@ -->
+### HTML Output
+
+* Generate standalone HTML reports with embedded visualization.
+* HTML output should be self-contained (no external dependencies).
+* Support interactive diagrams and tables.
+* HTML should be generated via viewer script from JSON data.
+
 ### Between two trace targets.
 
-<!-- @REQ3.1.1@ -->
+<!-- @REQ3.3.1@ -->
 #### Make a text file which explain the relationship between two trace targets.
 
 * The relationship between tags are shown by a simple text table (n x 2).
@@ -103,7 +123,7 @@ column | optional  | content                                                    
   * column 2: next connected tag
 * Each tag has a hyperlink to the file that contains it.
 
-<!-- @REQ3.1.2@ -->
+<!-- @REQ3.3.2@ -->
 #### Make a cross-reference table for easy reference.
 
 * Cross-reference tables are made in markdown format.
@@ -119,7 +139,7 @@ column | optional  | content                                                    
 
 ### Between all trace targets.
 
-<!-- @REQ3.2.1@ -->
+<!-- @REQ3.4.1@ -->
 #### Make a text file which explain the relationship between all trace targets.
 
 * The relationship between tags are shown by a simple text table.
@@ -127,12 +147,12 @@ column | optional  | content                                                    
 * Isolated tags which have no relationship with other tags, those should be shown as is.
 * Each tag has a hyperlink to the file that contains it.
 
-<!-- @REQ3.2.2@ -->
+<!-- @REQ3.4.2@ -->
 #### Make a UML which explain the relationship between all trace targets.
 
 * The relationship between tags are shown by UML that can be written as text format.
 
-<!-- @REQ3.3@ -->
+<!-- @REQ3.5@ -->
 ### (Optional) Convert trace output markdown files to MSexcel (`*.xlsx`) or MSword (`*.docx`) format.
 
 * It is not mandatory.
@@ -153,8 +173,52 @@ column | optional  | content                                                    
 
 * Check if there are invalid config/tag information.
 
+<!-- @REQ4.4@ -->
+### Export modes
+
+* `--json`: Export traceability data as JSON to stdout
+* `--html`: Generate standalone HTML report to stdout
+* `--summary`: Print traceability summary (direct links only)
+
+## 🔢 5. Error Codes for CI/CD Integration
+
 <!-- @REQ5.1@ -->
-## ⭕ 5. Nice-to-have requirements
+### Exit codes must clearly indicate error types
+
+* Exit codes should enable CI/CD systems to identify specific failure types.
+* Each error category should have a distinct exit code range.
+* Exit code `0` indicates success.
+
+<!-- @REQ5.1.1@ -->
+#### Usage Errors (1-9)
+
+* `1` - Invalid usage or arguments
+* `2` - Config file not found
+* `3` - Config file format invalid
+
+<!-- @REQ5.1.2@ -->
+#### Processing Errors (10-19)
+
+* `10` - Failed to extract tags
+* `11` - Failed to create tag table
+* `12` - Failed to generate JSON
+* `13` - Viewer script execution failed
+
+<!-- @REQ5.1.3@ -->
+#### Verification Errors (20-29)
+
+* `20` - Found isolated tags (no downstream references)
+* `21` - Found duplicate tags
+* `22` - Found both isolated and duplicate tags
+
+<!-- @REQ5.1.4@ -->
+#### System Errors (30-39)
+
+* `30` - Internal error (directory change failure, etc.)
+* `31` - Viewer script not found
+
+<!-- @REQ6.1@ -->
+## ⭕ 6. Nice-to-have requirements
 
 * Must-have-requirements (these are written above) have their own tags for trace.
 * Nice-to-have requirements don't have any tag and not traced.
@@ -172,7 +236,7 @@ column | optional  | content                                                    
 
 ### Reduce dependence on specific shells and be as POSIX compliant as possible.
 
-## 📗 6. Definition
+## 📗 7. Definition
 
 * **Trace target**: File or directory which has information to trace.
 * **Tag** : In trace target, there are some tags to discriminate details of trace information. `shtracer` trace the relationship between each tag.
