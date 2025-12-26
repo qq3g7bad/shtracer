@@ -106,7 +106,7 @@ test_authenticate_user() {
       "chain": ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@"],
       "files": [
         "requirements.md",
-        "architecture.md", 
+        "architecture.md",
         "auth.sh",
         "auth_test.sh"
       ]
@@ -134,9 +134,17 @@ test_authenticate_user() {
 
 ### Interactive HTML Report
 
-**Traceability Flow Diagram**
+#### Coverage
 
-![Sankey Diagram](./docs/img/type.png)
+![type](./docs/img/type.png)
+
+#### Full trace
+
+![full](./docs/img/full.png)
+
+#### Sortable matrix
+
+![matrix](./docs/img/matrix.png)
 
 *Visualize requirement flows from requirements to tests. Click badges to jump to source files.*
 
@@ -187,7 +195,7 @@ The `config.md` file defines which files to trace and how to organize traceabili
 - ./docs/requirements.md
 - ./docs/use_cases/*.md
 
-## Architecture  
+## Architecture
 - ./docs/architecture.md
 - ./docs/design/*.md
 
@@ -230,7 +238,7 @@ Examples:
 
   # CI/CD pipeline integration
   ./shtracer --json ./sample/config.md | jq '.traces'
-  
+
   # Create HTML report
   ./shtracer --html ./sample/config.md > report.html
 
@@ -256,15 +264,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Verify traceability
         run: |
           chmod +x ./shtracer
-          
+
           # Run verification mode
           ./shtracer -v config.md
           exit_code=$?
-          
+
           # Handle specific error types
           case $exit_code in
             0)
@@ -287,11 +295,11 @@ jobs:
               exit 1
               ;;
           esac
-      
+
       - name: Check JSON output for completeness
         run: |
           ./shtracer --json config.md > trace.json
-          
+
           # Ensure all requirements are traced to tests
           orphaned=$(jq '[.traces[] | select(.chain | length < 4)] | length' trace.json)
           if [ "$orphaned" -gt 0 ]; then
@@ -474,7 +482,7 @@ See [`.git-hooks/README.md`](.git-hooks/README.md) for details.
 
 We welcome contributions from **all domains**—not just software! Requirements traceability is valuable in:
 - 🏗️ Engineering & manufacturing
-- 🏥 Healthcare & medical devices  
+- 🏥 Healthcare & medical devices
 - ✈️ Aerospace & defense
 - 📜 Regulatory compliance
 
@@ -493,7 +501,7 @@ We welcome contributions from **all domains**—not just software! Requirements 
 - [ ] Markdown export format
 - [ ] Enhanced JSON schema with metadata
 
-### Future Enhancements  
+### Future Enhancements
 - [ ] Excel/CSV export formats
 - [ ] Colorblind-friendly HTML themes
 - [ ] OR conditions in file extension filters
