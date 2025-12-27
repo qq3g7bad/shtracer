@@ -488,3 +488,99 @@ format_version_info_short() {
 			;;
 	esac
 }
+
+##
+# ============================================================================
+# Cross-Reference Table Helpers
+# ============================================================================
+##
+
+##
+# @brief   Compute relative path from one directory to a target file
+# @param   $1 : From directory (absolute path)
+# @param   $2 : To file (absolute path)
+# @return  Relative path via stdout (e.g., "../../docs/file.md")
+# @example _compute_relative_path "/a/b/c/output" "/a/b/docs/file.md" returns "../../docs/file.md"
+# @tag     @IMP3.3.2.6@ (FROM: @ARC3.3.2@)
+_compute_relative_path() {
+	_from_dir="$1"
+	_to_file="$2"
+
+	# Normalize paths: remove trailing slashes
+	_from_dir="${_from_dir%/}"
+	_to_file="${_to_file%/}"
+
+	# Handle edge cases
+	if [ -z "$_from_dir" ] || [ -z "$_to_file" ]; then
+		printf '%s' "$_to_file"
+		return 1
+	fi
+
+	# Find common prefix using IFS and set
+	_from_clean="$_from_dir/"
+	_to_clean="$_to_file"
+
+	# Split paths into components and find common prefix
+	_common=""
+	_remaining_from="$_from_clean"
+	_remaining_to="$_to_clean"
+
+	# Build common prefix character by character
+	_i=1
+	_max_len=${#_from_clean}
+	[ ${#_to_clean} -lt "$_max_len" ] && _max_len=${#_to_clean}
+
+	while [ "$_i" -le "$_max_len" ]; do
+		_from_char="$(printf '%s' "$_from_clean" | cut -c "$_i")"
+		_to_char="$(printf '%s' "$_to_clean" | cut -c "$_i")"
+
+		if [ "$_from_char" = "$_to_char" ]; then
+			_common="${_common}${_from_char}"
+		else
+			break
+		fi
+		_i=$((_i + 1))
+	done
+
+	# Trim common prefix to last directory separator
+	case "$_common" in
+		*/*)
+			# Find last '/' in common prefix
+			_common="${_common%/*}/"
+			;;
+		*)
+			_common=""
+			;;
+	esac
+
+	# Remove common prefix from both paths
+	_remaining_from="${_from_clean#"$_common"}"
+	_remaining_to="${_to_clean#"$_common"}"
+
+	# Count directory levels in remaining FROM path
+	_up_levels=0
+	_temp="$_remaining_from"
+	while [ -n "$_temp" ]; do
+		case "$_temp" in
+			*/*)
+				_up_levels=$((_up_levels + 1))
+				_temp="${_temp#*/}"
+				;;
+			*)
+				_temp=""
+				;;
+		esac
+	done
+
+	# Build relative path
+	_relative=""
+	_i=0
+	while [ "$_i" -lt "$_up_levels" ]; do
+		_relative="${_relative}../"
+		_i=$((_i + 1))
+	done
+	_relative="${_relative}${_remaining_to}"
+
+	printf '%s' "$_relative"
+	return 0
+}

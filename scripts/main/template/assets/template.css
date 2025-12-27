@@ -547,3 +547,109 @@ body[data-theme="dark"] .hljs-deletion {
     color: #ffdcd7;
     background-color: #67060c;
 }
+
+/* ============================================================================
+   Cross-Reference Matrix Tab UI
+   ============================================================================ */
+
+.matrix-tabs-container {
+    margin: 0;
+}
+
+.matrix-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--border-default);
+    flex-wrap: wrap;
+}
+
+.matrix-tab {
+    padding: 8px 16px;
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -2px;
+}
+
+.matrix-tab:hover {
+    background-color: var(--table-row-hover);
+    color: var(--text-primary);
+}
+
+.matrix-tab.active {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+    border-bottom: 2px solid var(--bg-primary);
+    font-weight: 600;
+}
+
+.matrix-content {
+    position: relative;
+    overflow-x: auto;
+}
+
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: none;
+}
+
+.matrix-table.active {
+    display: table;
+}
+
+.matrix-table td {
+    border: 1px solid var(--border-default);
+    padding: 4px 6px;
+    text-align: center;
+    vertical-align: top;
+}
+
+.matrix-table th {
+    border: 1px solid var(--border-default);
+    padding: 8px;
+    text-align: center;
+    background-color: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.matrix-table tr:hover {
+    background-color: var(--table-row-hover);
+}
+
+.matrix-table .xref-link {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.matrix-table .xref-empty {
+    color: var(--text-secondary);
+    opacity: 0.3;
+}
+
+/* Responsive: stack tabs on narrow screens */
+@media (max-width: 768px) {
+    .matrix-tabs {
+        flex-direction: column;
+    }
+
+    .matrix-tab {
+        border-radius: 6px;
+        border-bottom: 1px solid var(--border-default);
+        bottom: 0;
+    }
+
+    .matrix-tab.active {
+        border-bottom: 1px solid var(--border-default);
+    }
+}

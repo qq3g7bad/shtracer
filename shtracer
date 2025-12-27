@@ -415,6 +415,21 @@ main_routine() {
 			return 0
 		fi
 
+		# Generate cross-reference intermediate files
+		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
+		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
+		if _XREF_DIR=$(make_cross_reference_tables \
+			"${_CONFIG_OUTPUT_DIR%/}/01_config_table" \
+			"${_TAG_OUTPUT_DIR%/}/01_tags" \
+			"${_TAG_OUTPUT_DIR%/}/02_tag_pairs"); then
+			# Generate Markdown output from intermediate files
+			markdown_cross_reference "$_XREF_DIR" "$CONFIG_PATH" >/dev/null || {
+				echo "[shtracer][warning]: Failed to generate markdown cross-reference tables" >&2
+			}
+		else
+			echo "[shtracer][warning]: Failed to generate cross-reference intermediate files" >&2
+		fi
+
 		# Generate JSON (now mandatory for visualization)
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"

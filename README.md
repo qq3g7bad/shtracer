@@ -241,6 +241,55 @@ The `config.md` file defines which files to trace and how to organize traceabili
 
 For a complete example, see [`./sample/config.md`](./sample/config.md).
 
+### Cross-Reference Tables
+
+**Automatically generated for every traceability run** (when using normal mode), cross-reference tables show the relationships between adjacent traceability levels in an easy-to-read matrix format.
+
+**Generated tables** (based on your `config.md` structure):
+- `output/cross_reference/01_REQ_ARC.md` - Requirements vs Architecture
+- `output/cross_reference/02_ARC_IMP.md` - Architecture vs Implementation
+- `output/cross_reference/03_IMP_UT.md` - Implementation vs Unit Tests
+- `output/cross_reference/04_IMP_IT.md` - Implementation vs Integration Tests
+
+**Example output:**
+
+```markdown
+# Cross-Reference Table: REQ vs ARC
+
+**Legend**:
+- Row headers: REQ tags
+- Column headers: ARC tags
+- `x` indicates a traceability link exists
+- Click tag IDs to navigate to source location
+
+. | [@ARC1.1@](../docs/02_architecture.md#L64) | [@ARC2.1@](../docs/02_architecture.md#L122) |
+--- | --- | --- |
+[@REQ1.1@](../docs/01_requirements.md#L6) |   | x |
+[@REQ1.2@](../docs/01_requirements.md#L14) |   | x |
+[@REQ2.1@](../docs/01_requirements.md#L77) |   | x |
+
+---
+
+**Statistics**:
+- Total REQ tags: 24
+- Total ARC tags: 10
+- Total links: 28
+- Coverage: 100.0% (10/10 ARC tags have upstream links)
+- Orphaned REQ tags: 2 (no links)
+```
+
+**Key features:**
+- **Clickable hyperlinks**: Each tag ID links directly to the source file and line number (GitHub/GitLab compatible)
+- **Coverage statistics**: See at a glance which requirements are fully traced and which are orphaned
+- **Sparse matrix**: Empty cells indicate no direct traceability link
+- **Dynamic generation**: Tables adapt automatically to your `config.md` structure
+
+**Use cases:**
+- Quick visual verification of traceability coverage
+- Gap analysis for requirements without downstream implementation
+- Documentation for compliance audits
+- Inclusion in design review documents
+
 ---
 
 ## 🔧 Command Reference
@@ -547,16 +596,20 @@ We welcome contributions from **all domains**—not just software! Requirements 
 
 ## 🗺️ Roadmap
 
-### Current Focus
-- [ ] Cross-reference table generation
-- [ ] Markdown export format
-- [ ] Enhanced JSON schema with metadata
+### Completed ✅
+- [x] Cross-reference table generation (Markdown format with clickable hyperlinks)
+- [x] Markdown export format
+- [x] Enhanced JSON schema with metadata
 
-### Future Enhancements
+### Current Focus
+- [ ] HTML cross-reference tables with interactive features
 - [ ] Excel/CSV export formats
 - [ ] Colorblind-friendly HTML themes
+
+### Future Enhancements
 - [ ] OR conditions in file extension filters
 - [ ] GitLab/Bitbucket CI examples
+- [ ] Sankey diagram integration with cross-reference tables
 
 ---
 
