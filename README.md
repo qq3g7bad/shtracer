@@ -17,21 +17,25 @@ Traditional requirements traceability tools are **heavy, proprietary, and hard t
 ### ✨ Key Benefits
 
 **🔗 CI/CD Native**
+
 - **Structured JSON output** (`--json`) for seamless pipeline integration
 - Parse, validate, and enforce traceability in your CI checks
 - No databases, no servers—just pipe JSON to any tool you want
 
 **📦 Zero Dependencies**
+
 - Pure POSIX shell—works on Linux, macOS, Windows (Git Bash/WSL)
 - No Python, Node.js, or runtime environments required
 - Clone and run: `./shtracer ./sample/config.md`
 
 **📝 Developer-Friendly**
+
 - Write requirements in **plain Markdown**—no proprietary formats
 - Simple `@TAG@` syntax in comments: `<!-- @REQ-001@ -->`
 - Version control friendly: diffs are readable, merges are clean
 
 **🔄 Automated Maintenance**
+
 - **Change mode**: Rename tags across entire codebase in one command
 - **Verify mode**: Detect orphaned or duplicate tags automatically
 - Keep your traceability matrix accurate as requirements evolve
@@ -63,6 +67,7 @@ chmod +x ./shtracer
 ### 1. Tag your documents and code
 
 **requirements.md**
+
 ```markdown
 <!-- @REQ-001@ -->
 ## User Authentication
@@ -70,6 +75,7 @@ Users must be able to log in with email and password.
 ```
 
 **architecture.md**
+
 ```markdown
 <!-- @REQ-001@ @ARCH-101@ -->
 ## Authentication Service
@@ -77,6 +83,7 @@ Implements OAuth 2.0 with JWT tokens.
 ```
 
 **auth.sh**
+
 ```bash
 # @ARCH-101@ @IMPL-201@
 function authenticate_user() {
@@ -85,6 +92,7 @@ function authenticate_user() {
 ```
 
 **auth_test.sh**
+
 ```bash
 # @IMPL-201@ @TEST-301@
 test_authenticate_user() {
@@ -99,6 +107,7 @@ test_authenticate_user() {
 ```
 
 **Output (JSON snippet)**:
+
 ```json
 {
   "metadata": {
@@ -146,11 +155,29 @@ test_authenticate_user() {
 
 ![full](./docs/img/full.png)
 
-#### Sortable matrix
+#### Sortable matrix with interactive tabs
 
 ![matrix](./docs/img/matrix.png)
 
 *Visualize requirement flows from requirements to tests. Click badges to jump to source files.*
+
+**New: Interactive Tab UI for Cross-Reference Tables**
+
+The HTML viewer now includes a tab-based interface to explore traceability relationships at different levels:
+
+- **All** - Complete traceability matrix (requirements → architecture → implementation → tests)
+- **REQ↔ARC** - Requirements vs Architecture cross-reference
+- **ARC↔IMP** - Architecture vs Implementation cross-reference
+- **IMP↔UT** - Implementation vs Unit Tests cross-reference
+- **UT↔IT** - Unit Tests vs Integration Tests cross-reference
+
+**Features:**
+
+- 🎯 **Tab persistence** - Your selected tab is remembered using localStorage
+- 🎨 **Theme support** - Light and dark modes with color-coded tag badges
+- 🔗 **Clickable tags** - All tags link to source files (opens on right side)
+- 📊 **Sparse matrices** - "x" markers show direct traceability links between adjacent levels
+- 🔄 **Dynamic generation** - Tabs automatically adapt to your config.md structure
 
 ### Text Output (CI-friendly)
 
@@ -230,6 +257,7 @@ The `config.md` file defines which files to trace and how to organize traceabili
 ```
 
 **Key Points:**
+
 - Each section header (`## Requirement`, `## Architecture`, etc.) defines a traceability level
 - `**PATH**`: File or directory path (relative to config file location)
 - `**TAG FORMAT**`: ERE (Extended Regular Expression) pattern for tags, enclosed in backticks
@@ -246,6 +274,7 @@ For a complete example, see [`./sample/config.md`](./sample/config.md).
 **Automatically generated for every traceability run** (when using normal mode), cross-reference tables show the relationships between adjacent traceability levels in an easy-to-read matrix format.
 
 **Generated tables** (based on your `config.md` structure):
+
 - `output/cross_reference/01_REQ_ARC.md` - Requirements vs Architecture
 - `output/cross_reference/02_ARC_IMP.md` - Architecture vs Implementation
 - `output/cross_reference/03_IMP_UT.md` - Implementation vs Unit Tests
@@ -279,12 +308,14 @@ For a complete example, see [`./sample/config.md`](./sample/config.md).
 ```
 
 **Key features:**
+
 - **Clickable hyperlinks**: Each tag ID links directly to the source file and line number (GitHub/GitLab compatible)
 - **Coverage statistics**: See at a glance which requirements are fully traced and which are orphaned
 - **Sparse matrix**: Empty cells indicate no direct traceability link
 - **Dynamic generation**: Tables adapt automatically to your `config.md` structure
 
 **Use cases:**
+
 - Quick visual verification of traceability coverage
 - Gap analysis for requirements without downstream implementation
 - Documentation for compliance audits
@@ -383,6 +414,7 @@ jobs:
 ```
 
 **Available Exit Codes for CI/CD:**
+
 - `0` - Success
 - `1` - Invalid usage or arguments
 - `2` - Config file not found
@@ -414,6 +446,7 @@ Safely rename requirements across your entire project:
 ```
 
 **Use cases:**
+
 - Renaming requirements during refactoring
 - Swapping test case identifiers
 - Reorganizing architecture tags
@@ -510,6 +543,7 @@ Perfect for CI/CD and custom tooling:
 ```
 
 **Schema Fields:**
+
 - `metadata`: Version, generation timestamp, and config file path
 - `nodes`: Array of all tags with their metadata (id, label, description, file location, trace target, git version)
 - `chains`: Array of traceability chains showing complete paths from requirements to tests
@@ -522,10 +556,12 @@ Perfect for CI/CD and custom tooling:
 ### System Requirements
 
 **POSIX-Compliant Shell** (bash, dash, zsh, etc.)
+
 - ✅ Linux/macOS: Built-in by default
 - ✅ Windows: Git Bash, WSL, MinGW, or Cygwin
 
 **Optional Dependencies**
+
 - [shUnit2](https://github.com/kward/shunit2) - Unit testing framework
 - [shellcheck](https://www.shellcheck.net/) - Shell script linter
 - [shfmt](https://github.com/mvdan/sh) - Shell script formatter
@@ -546,14 +582,6 @@ shellcheck ./shtracer ./scripts/main/*.sh
 shfmt -w -i 2 -ci -bn ./shtracer ./scripts/main/*.sh
 ```
 
-**Test Coverage:**
-- ✅ Tag extraction and chain building
-- ✅ JSON/HTML generation
-- ✅ Change mode (tag renaming)
-- ✅ Verify mode (duplicate/orphan detection)
-- ✅ Refactoring helpers (POSIX compliance)
-- ✅ CI/CD integration workflows
-
 ### Git Hooks (Optional)
 
 Pre-commit hooks for code quality are available (optional for local development, enforced in CI):
@@ -570,46 +598,10 @@ See [`.git-hooks/README.md`](.git-hooks/README.md) for details.
 
 ---
 
-## 📚 Documentation
-
-- **[Requirements](./docs/01_requirements.md)** - Detailed feature specifications
-- **[Architecture](./docs/02_architecture.md)** - System design and components
-- **[Sample Configuration](./sample/config.md)** - Example traceability setup
-
----
-
-## 🤝 Contributing
-
-We welcome contributions from **all domains**—not just software! Requirements traceability is valuable in:
-- 🏗️ Engineering & manufacturing
-- 🏥 Healthcare & medical devices
-- ✈️ Aerospace & defense
-- 📜 Regulatory compliance
-
-### Contribution Guidelines
-
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for clear commit messages
-- Run `./shtracer -t` before submitting PRs
-- Update documentation for new features
-
----
-
 ## 🗺️ Roadmap
 
-### Completed ✅
-- [x] Cross-reference table generation (Markdown format with clickable hyperlinks)
-- [x] Markdown export format
-- [x] Enhanced JSON schema with metadata
-
-### Current Focus
-- [ ] HTML cross-reference tables with interactive features
-- [ ] Excel/CSV export formats
-- [ ] Colorblind-friendly HTML themes
-
-### Future Enhancements
-- [ ] OR conditions in file extension filters
-- [ ] GitLab/Bitbucket CI examples
-- [ ] Sankey diagram integration with cross-reference tables
+- [ ] Markdown export format
+- [ ] Explain how to docx file to shtracer
 
 ---
 
