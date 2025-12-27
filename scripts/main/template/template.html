@@ -26,9 +26,7 @@
       <div id="sankey-legend-full" class="sankey-legend"></div>
       <div id="sankey-diagram-full" style="width: 100%;"></div>
       <h2>Requirement traceability matrix</h2>
-      <table id="tag-table">
-        <!-- INSERT TABLE -->
-      </table>
+      <!-- INSERT TABLE -->
       <div id="tooltip" class="tooltip"></div>
     </div>
 
@@ -74,6 +72,44 @@
       const savedTheme = localStorage.getItem('theme') || 'light';
       document.body.setAttribute('data-theme', savedTheme);
       updateThemeButton(savedTheme);
+    })();
+
+    // Cross-reference matrix tab switching functionality
+    function switchMatrixTab(event, tabId) {
+      event.preventDefault();
+
+      // Remove active from all tabs and tables
+      document.querySelectorAll('.matrix-tab').forEach(tab =>
+        tab.classList.remove('active')
+      );
+      document.querySelectorAll('.matrix-table').forEach(table =>
+        table.classList.remove('active')
+      );
+
+      // Activate selected tab and table
+      const selectedTab = document.querySelector(`.matrix-tab[data-matrix="${tabId}"]`);
+      const selectedTable = document.getElementById(`tag-table-${tabId}`);
+
+      if (selectedTab) selectedTab.classList.add('active');
+      if (selectedTable) selectedTable.classList.add('active');
+
+      // Persist to localStorage
+      localStorage.setItem('selectedMatrixTab', tabId);
+
+      // Re-apply badge colors for newly visible badges
+      if (typeof annotateMatrixBadges === 'function') {
+        setTimeout(annotateMatrixBadges, 0);
+      }
+    }
+
+    // Initialize selected matrix tab from localStorage
+    (function() {
+      const savedTab = localStorage.getItem('selectedMatrixTab');
+      if (savedTab && document.querySelector(`.matrix-tab[data-matrix="${savedTab}"]`)) {
+        document.addEventListener('DOMContentLoaded', function() {
+          switchMatrixTab({ preventDefault: function() {} }, savedTab);
+        });
+      }
     })();
   </script>
 </body>

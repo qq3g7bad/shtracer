@@ -22,7 +22,7 @@ cd "${TEST_ROOT}" || exit 1
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : $0"
+	echo " UNIT TEST (Core Functions) : $0"
 	echo "----------------------------------------"
 }
 
@@ -34,8 +34,8 @@ setUp() {
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	export NODATA_STRING="NONE"
-	export OUTPUT_DIR="${TEST_ROOT%/}/output/"
-	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	export OUTPUT_DIR="${TEST_ROOT%/}/shtracer_output/"
+	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 	cd "${TEST_ROOT}" || exit 1
 }
@@ -56,7 +56,7 @@ test_check_configfile() {
 
 		# Act -------------
 
-		_RETURN_VALUE="$(check_configfile "./testdata/unit_test/config_minimal_single_file.md")"
+		_RETURN_VALUE="$(check_configfile "./unit_test/testdata/config_minimal_single_file.md")"
 
 		# Assert ----------
 
@@ -70,7 +70,7 @@ test_check_configfile() {
 		assertEquals "01_config_table" "${_RETURN_VALUE##*/}"
 
 		# config table
-		_ANSWER="$(cat ./testdata/answer/unit_test/config/config_table)"
+		_ANSWER="$(cat ./unit_test/testdata/expected/config/config_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/config/01_config_table")"
 		assertEquals "$_ANSWER" "$_TEST_DATA"
 	)
@@ -107,11 +107,11 @@ test_extract_tags() {
 	(
 		# Arrange ---------
 		# shellcheck disable=SC2030  # Intentional subshell modification for test isolation
-		export CONFIG_DIR="${TEST_ROOT%/}/testdata/unit_test/"
+		export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 
 		# Act -------------
 
-		_RETURN_VALUE="$(extract_tags "./testdata/answer/unit_test/config/config_table")"
+		_RETURN_VALUE="$(extract_tags "./unit_test/testdata/expected/config/config_table")"
 
 		# Assert ----------
 
@@ -126,7 +126,7 @@ test_extract_tags() {
 
 		# Level1
 		# Compare only first 7 fields (exclude git version info which is environment-dependent)
-		_ANSWER="$(awk <"./testdata/answer/unit_test/tags/tags" -F"$SHTRACER_SEPARATOR" '
+		_ANSWER="$(awk <"./unit_test/testdata/expected/tags/tags" -F"$SHTRACER_SEPARATOR" '
 			BEGIN{OFS="'"$SHTRACER_SEPARATOR"'"}
 			{
 				cmd	=	"basename	\""$5"\"";	cmd	|	getline	filename_result;	close(cmd)
@@ -253,12 +253,12 @@ test_make_tag_table() {
 	(
 		# Arrange ---------
 		# Act -------------
-		make_tag_table "./testdata/answer/unit_test/tags/tags" >/dev/null
+		make_tag_table "./unit_test/testdata/expected/tags/tags" >/dev/null
 
 		# Assert ----------
 		assertEquals 0 "$?"
 
-		_ANSWER="$(cat ./testdata/answer/unit_test/tags/tag_table)"
+		_ANSWER="$(cat ./unit_test/testdata/expected/tags/tag_table)"
 		_TEST_DATA="$(cat "${OUTPUT_DIR%/}/tags/04_tag_table")"
 	)
 }
@@ -284,7 +284,7 @@ test_make_tag_table_with_empty_file() {
 	(
 		# Arrange ---------
 		# Act -------------
-		(make_tag_table "./testdata/unit_test/empty" >/dev/null 2>&1)
+		(make_tag_table "./unit_test/testdata/empty" >/dev/null 2>&1)
 
 		# Assert ----------
 		assertEquals 1 "$?"

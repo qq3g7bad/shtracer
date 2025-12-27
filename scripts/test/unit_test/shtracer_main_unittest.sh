@@ -1,40 +1,36 @@
 #!/bin/sh
 
 # Ensure paths resolve regardless of caller CWD
-TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
-if [ -z "$TEST_DIR" ]; then
-	TEST_DIR=$(CDPATH='' cd -- "$(dirname -- "$(basename -- "$0")")" 2>/dev/null && pwd -P)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$SCRIPT_DIR" ]; then
+	echo "[ERROR] Failed to determine script directory" >&2
+	exit 1
 fi
-cd "${TEST_DIR}" || exit 1
+
+TEST_ROOT=$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)
+SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)
+
+cd "${TEST_ROOT}" || exit 1
 
 # Ensure shunit2 can find this script after we cd
-SELF_PATH="${TEST_DIR%/}/$(basename -- "$0")"
+SELF_PATH="${SCRIPT_DIR%/}/$(basename -- "$0")"
 
-# Let ../../shtracer resolve its own SCRIPT_DIR even when sourced
-SHTRACER_ROOT_DIR=$(CDPATH='' cd -- "${TEST_DIR%/}/../.." 2>/dev/null && pwd -P)
-SCRIPT_DIR="$SHTRACER_ROOT_DIR"
-
-TEST_ROOT="$TEST_DIR"
 export TEST_ROOT
 export SHTRACER_ROOT_DIR
 
 # Source test targets
+SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 # shellcheck source=/dev/null
-. "${SCRIPT_DIR%/}/shtracer"
-# shellcheck source=../main/shtracer_util.sh
-. "../main/shtracer_util.sh"
-
-sh -c "./unit/shtracer_func_unittest.sh"
-sh -c "./unit/shtracer_viewer_unittest.sh"
-sh -c "./unit/shtracer_json_unittest.sh"
-sh -c "./integration/shtracer_integration_test.sh"
+. "${SHTRACER_ROOT_DIR%/}/shtracer"
+# shellcheck source=../../main/shtracer_util.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " UNIT TEST : $0"
+	echo " UNIT TEST (Main Routine) : $0"
 	echo "----------------------------------------"
 }
 
@@ -147,7 +143,7 @@ test_error_exit() {
 		)"
 		# Assert ----------
 		assertEquals 2 "$?"
-		assertEquals "[shtracer_unittest.sh][error][function_name]: test_error" "$_RETURN_VALUE"
+		assertEquals "[shtracer_main_unittest.sh][error][function_name]: test_error" "$_RETURN_VALUE"
 	)
 }
 
@@ -197,7 +193,7 @@ test_parse_arguments_version3() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_main_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -278,7 +274,7 @@ test_parse_arguments_undefined_option() {
 		)"
 
 		# Assert ----------
-		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
+		assertEquals "[shtracer_main_unittest.sh][error][parse_arguments]: Invalid argument" "$_RETURN_VALUE"
 	)
 }
 
@@ -350,7 +346,7 @@ test_parse_arguments_with_non_existent_config_file() {
 			parse_arguments "non_existent_file" 2>&1
 		)"
 		# Assert ----------
-		assertEquals "[shtracer_unittest.sh][error][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
+		assertEquals "[shtracer_main_unittest.sh][error][parse_arguments]: non_existent_file does not exist" "$_RETURN_VALUE"
 	)
 }
 
@@ -528,7 +524,7 @@ test_main_routine() {
 		set -u
 
 		# Act -------------
-		main_routine "./testdata/unit_test/config_minimal_single_file.md" >/dev/null 2>&1
+		main_routine "./unit_test/testdata/config_minimal_single_file.md" >/dev/null 2>&1
 		IFS_HEX=$(printf "%s" "$IFS" | od -An -tx1 | tr -d ' \n')
 		IFS=' '
 
@@ -562,11 +558,11 @@ test_main_routine_multiple_directories() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
+		_RETURN="$(main_routine "./unit_test/testdata/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')" "[shtracer_unittest.sh]" # Error occur
+		assertEquals "$(echo "$_RETURN" | grep -o -E "\[[^]]*\]" | sed -n '1p')" "[shtracer_main_unittest.sh]" # Error occur
 
 	)
 }
@@ -580,11 +576,11 @@ test_main_routine_output_isolated() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_tag_format.md" 2>&1)"
+		_RETURN="$(main_routine "./unit_test/testdata/config_invalid_tag_format.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "[shtracer_unittest.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_main_unittest.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
@@ -598,7 +594,7 @@ test_main_routine_invalid_config_paths() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./testdata/unit_test/config_invalid_paths.md" 2>&1)"
+		_RETURN="$(main_routine "./unit_test/testdata/config_invalid_paths.md" 2>&1)"
 		IFS=' '
 
 		# Assert ----------

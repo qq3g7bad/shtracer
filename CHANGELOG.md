@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cross-Reference Table Generation** (@REQ3.3.2@) ([369b448](https://github.com/qq3g7bad/shtracer/commit/369b448))
+  - Automatically generates Markdown cross-reference tables for adjacent traceability levels
+  - Creates matrices showing relationships between REQ↔ARC, ARC↔IMP, IMP↔UT, and IMP↔IT
+  - Clickable hyperlinks with line numbers (GitHub/GitLab compatible)
+  - Coverage statistics showing traced and orphaned tags
+  - Dynamically adapts to config.md structure (no hardcoded layer pairs)
+  - Output location: `output/cross_reference/*.md`
 - **Section Sequence Swapping** ([2d052f3](https://github.com/qq3g7bad/shtracer/commit/2d052f3))
   - New feature to swap the order of sections in the output
   - Improves flexibility in organizing traceability documentation

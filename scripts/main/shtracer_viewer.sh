@@ -1872,6 +1872,250 @@ _html_convert_tag_table() {
 }
 
 ##
+# @brief   Generate HTML cross-reference table from intermediate matrix file
+# @param   $1 : Cross-reference matrix file path (e.g., 06_cross_ref_matrix_REQ_ARC)
+# @param   $2 : HTML table ID (e.g., "tag-table-req-arc")
+# @param   $3 : TAG_INFO_TABLE file path (for tag type mapping)
+# @return  Complete HTML table with clickable badges
+_html_generate_cross_ref_table() {
+	_xref_file="$1"
+	_table_id="$2"
+	_tag_info_table="$3"
+	_sep="$SHTRACER_SEPARATOR"
+	_nodata="$NODATA_STRING"
+
+	# Error handling: file not readable
+	if [ ! -r "$_xref_file" ]; then
+		printf '<table id="%s" class="matrix-table"><tbody><tr><td>Error: Cross-reference file not found</td></tr></tbody></table>\n' "$_table_id"
+		return 1
+	fi
+
+	# Parse TAG_INFO_TABLE and intermediate file, then generate HTML table
+	{
+		# TAG_INFO_TABLE is a string containing the data, not a file path
+		printf '%s\n' "$_tag_info_table"
+		printf '%s\n' "__SHTRACER_TAG_INFO_END__"
+		cat "$_xref_file"
+	} | awk -v sep="$_sep" -v nodata="$_nodata" -v table_id="$_table_id" '
+		BEGIN {
+			mode = "tag_info"
+			row_count = 0
+			col_count = 0
+			row_prefix = ""
+			col_prefix = ""
+		}
+		function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+		function get_last_segment(s,   n, parts) {
+			n = split(s, parts, ":")
+			return n > 0 ? parts[n] : s
+		}
+		function type_from_trace_target(tt,   n, p, t) {
+			if (tt == "") return "Unknown"
+			n = split(tt, p, ":")
+			t = trim(p[n])
+			return t == "" ? "Unknown" : t
+		}
+		function field1(s, delim,   p1) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return s
+			return substr(s, 1, p1 - 1)
+		}
+		function field2(s, delim,   rest, p1, p2) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return rest
+			return substr(rest, 1, p2 - 1)
+		}
+		function field3(s, delim,   rest, p1, p2, p3) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return rest
+			return substr(rest, 1, p3 - 1)
+		}
+		function field4(s, delim,   rest, p1, p2, p3, p4) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return ""
+			rest = substr(rest, p3 + length(delim))
+			p4 = index(rest, delim)
+			if (p4 <= 0) return rest
+			return substr(rest, 1, p4 - 1)
+		}
+		function escape_html(s,   t) {
+			t = s
+			gsub(/&/, "&amp;", t)
+			gsub(/</, "&lt;", t)
+			gsub(/>/, "&gt;", t)
+			gsub(/"/, "&quot;", t)
+			return t
+		}
+		function basename(path,   t) {
+			t = path
+			gsub(/.*\//, "", t)
+			return t
+		}
+		function ext_from_basename(base) {
+			if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
+			return "sh"
+		}
+		function fileid_from_basename(base,   t) {
+			t = base
+			gsub(/\./, "_", t)
+			return "Target_" t
+		}
+		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
+			safeTyp = escape_html(typ)
+			safeTag = escape_html(tag)
+			safeId = escape_html(fileId)
+			safeExt = escape_html(ext)
+			return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
+				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
+				"onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
+		}
+
+		# Read TAG_INFO_TABLE to build tag type mapping
+		$0 == "__SHTRACER_TAG_INFO_END__" {
+			mode = "xref_file"
+			next
+		}
+		mode == "tag_info" {
+			if ($0 == "") next
+			tag = trim(field1($0, sep))
+			if (tag == "") next
+			trace_target = trim(field4($0, sep))
+			typ = type_from_trace_target(trace_target)
+			tagType[tag] = typ
+			next
+		}
+
+		# Section markers in cross-reference file
+		/^\[METADATA\]/ { mode = "metadata"; next }
+		/^\[ROW_TAGS\]/ { mode = "row_tags"; next }
+		/^\[COL_TAGS\]/ { mode = "col_tags"; next }
+		/^\[MATRIX\]/ { mode = "matrix"; next }
+
+		# Parse metadata: row_prefix<sep>col_prefix<sep>timestamp
+		mode == "metadata" {
+			if ($0 == "") next
+			row_prefix = trim(field1($0, sep))
+			col_prefix = trim(field2($0, sep))
+			next
+		}
+
+		# Parse row tags: @TAG@<sep>/path/to/file<sep>line_num
+		mode == "row_tags" {
+			if ($0 == "") next
+			tag = trim(field1($0, sep))
+			file = trim(field2($0, sep))
+			line = trim(field3($0, sep))
+			if (tag == "") next
+			if (line == "" || line + 0 < 1) line = 1
+			typ = (tag in tagType) ? tagType[tag] : "Unknown"
+			row_tags[row_count] = tag
+			row_files[tag] = file
+			row_lines[tag] = line
+			row_types[tag] = typ
+			base = basename(file)
+			row_exts[tag] = ext_from_basename(base)
+			row_fileids[tag] = fileid_from_basename(base)
+			row_count++
+			next
+		}
+
+		# Parse col tags: same format as row tags
+		mode == "col_tags" {
+			if ($0 == "") next
+			tag = trim(field1($0, sep))
+			file = trim(field2($0, sep))
+			line = trim(field3($0, sep))
+			if (tag == "") next
+			if (line == "" || line + 0 < 1) line = 1
+			typ = (tag in tagType) ? tagType[tag] : "Unknown"
+			col_tags[col_count] = tag
+			col_files[tag] = file
+			col_lines[tag] = line
+			col_types[tag] = typ
+			base = basename(file)
+			col_exts[tag] = ext_from_basename(base)
+			col_fileids[tag] = fileid_from_basename(base)
+			col_count++
+			next
+		}
+
+		# Parse matrix: @ROW_TAG@<sep>@COL_TAG@
+		mode == "matrix" {
+			if ($0 == "") next
+			row_tag = trim(field1($0, sep))
+			col_tag = trim(field2($0, sep))
+			if (row_tag == "" || col_tag == "") next
+			matrix[row_tag "," col_tag] = 1
+			next
+		}
+
+		END {
+			# Generate HTML table
+			printf "<table id=\"%s\" class=\"matrix-table\">\n", table_id
+			printf "<thead>\n  <tr>\n"
+
+			# Header: first cell is empty (corner cell)
+			printf "    <th>.</th>\n"
+
+			# Column headers with badges
+			for (c = 0; c < col_count; c++) {
+				tag = col_tags[c]
+				typ = col_types[tag]
+				line = col_lines[tag]
+				fileid = col_fileids[tag]
+				ext = col_exts[tag]
+				badge_html = badge(tag, typ, line, fileid, ext)
+				printf "    <th>%s</th>\n", badge_html
+			}
+			printf "  </tr>\n</thead>\n"
+
+			# Table body
+			printf "<tbody>\n"
+			for (r = 0; r < row_count; r++) {
+				row_tag = row_tags[r]
+				row_typ = row_types[row_tag]
+				row_line = row_lines[row_tag]
+				row_fileid = row_fileids[row_tag]
+				row_ext = row_exts[row_tag]
+				row_badge = badge(row_tag, row_typ, row_line, row_fileid, row_ext)
+
+				printf "  <tr>\n"
+				printf "    <td>%s</td>\n", row_badge
+
+				# Data cells: "x" if link exists, empty otherwise
+				for (c = 0; c < col_count; c++) {
+					col_tag = col_tags[c]
+					key = row_tag "," col_tag
+					if (key in matrix) {
+						printf "    <td class=\"xref-link\">x</td>\n"
+					} else {
+						printf "    <td class=\"xref-empty\"></td>\n"
+					}
+				}
+				printf "  </tr>\n"
+			}
+			printf "</tbody>\n"
+			printf "</table>\n"
+		}
+	'
+}
+
+##
 # @brief   Insert file information into HTML with proper indentation
 # @param   $1 : HTML_CONTENT (template HTML to modify)
 # @param   $2 : INFORMATION (file list HTML)
@@ -1966,6 +2210,62 @@ convert_template_html() {
 		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
 		profile_end "convert_template_html_build_table"
 
+		# Generate cross-reference tables for tab UI
+		profile_start "convert_template_html_build_xref_tables"
+		_XREF_DIR="${OUTPUT_DIR%/}/tags/"
+		_XREF_FILES=""
+		if [ -d "$_XREF_DIR" ]; then
+			for _f in "$_XREF_DIR"[0-9][0-9]_cross_ref_matrix_*; do
+				[ -f "$_f" ] || continue
+				_XREF_FILES="$_XREF_FILES$(basename "$_f")
+"
+			done
+		fi
+
+		# Generate tab structure
+		_TABS_HTML=""
+		_TABLES_HTML=""
+
+		# First tab: "All" (existing RTM)
+		_TABS_HTML='<button class="matrix-tab active" data-matrix="all" onclick="switchMatrixTab(event, '"'all'"')">All</button>'
+		_TABLES_HTML='<table id="tag-table-all" class="matrix-table active">'
+		_TABLES_HTML="$_TABLES_HTML$_TABLE_HTML"
+		_TABLES_HTML="$_TABLES_HTML</table>"
+
+		# Generate tabs for each cross-reference file
+		if [ -n "$_XREF_FILES" ]; then
+			for _xref_file in $_XREF_FILES; do
+				# Extract prefixes from filename: 06_cross_ref_matrix_REQ_ARC
+				_base_name="${_xref_file#*_cross_ref_matrix_}"
+				_row_prefix=$(printf '%s' "$_base_name" | cut -d'_' -f1)
+				_col_prefix=$(printf '%s' "$_base_name" | cut -d'_' -f2)
+
+				# Generate tab ID: "req-arc"
+				_tab_id=$(printf '%s-%s' "$_row_prefix" "$_col_prefix" | tr '[:upper:]' '[:lower:]')
+				_tab_label="$_row_prefix↔$_col_prefix"
+
+				# Append tab button
+				_TABS_HTML="$_TABS_HTML<button class=\"matrix-tab\" data-matrix=\"$_tab_id\" onclick=\"switchMatrixTab(event, '$_tab_id')\">$_tab_label</button>"
+
+				# Generate table
+				_table_html=$(_html_generate_cross_ref_table "${_XREF_DIR}${_xref_file}" "tag-table-$_tab_id" "$_TAG_INFO_TABLE")
+				_TABLES_HTML="$_TABLES_HTML$_table_html"
+			done
+		fi
+
+		# Combine into final structure
+		if [ -n "$_XREF_FILES" ]; then
+			# Tab UI mode: wrap in container
+			_MATRIX_CONTAINER_HTML="<div class=\"matrix-tabs-container\">"
+			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML<div class=\"matrix-tabs\" id=\"matrix-tab-buttons\">$_TABS_HTML</div>"
+			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML<div class=\"matrix-content\">$_TABLES_HTML</div>"
+			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML</div>"
+		else
+			# Backward compatibility: no cross-ref files, use old behavior
+			_MATRIX_CONTAINER_HTML="<table id=\"tag-table\">$_TABLE_HTML</table>"
+		fi
+		profile_end "convert_template_html_build_xref_tables"
+
 		# Extract trace target order from TAG_INFO_TABLE (same as table headers)
 		profile_start "convert_template_html_extract_order"
 		_TRACE_TARGET_ORDER="$(
@@ -2005,7 +2305,7 @@ convert_template_html() {
 		_tmp_table_html_file="$(shtracer_tmpfile)" || {
 			error_exit 1 "convert_template_html" "Failed to create temporary file"
 		}
-		printf '%s' "$_TABLE_HTML" >"$_tmp_table_html_file"
+		printf '%s' "$_MATRIX_CONTAINER_HTML" >"$_tmp_table_html_file"
 		_tmp_trace_order_file="$(shtracer_tmpfile)" || {
 			error_exit 1 "convert_template_html" "Failed to create temporary file for trace order"
 		}

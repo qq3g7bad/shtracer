@@ -26,7 +26,7 @@ SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : $0"
+	echo " UNIT TEST (HTML Viewer) : $0"
 	echo "----------------------------------------"
 }
 
@@ -37,8 +37,8 @@ setUp() {
 	set +u
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	export NODATA_STRING="NONE"
-	export OUTPUT_DIR="${TEST_ROOT%/}/output/"
-	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	export OUTPUT_DIR="${TEST_ROOT%/}/shtracer_output/"
+	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
 	cd "${TEST_ROOT}" || exit 1
@@ -114,11 +114,11 @@ test_make_html_with_valid_inputs() {
 	(
 		# Arrange ---------
 		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		export CONFIG_PATH="./testdata/unit_test/config_minimal_single_file.md"
+		export CONFIG_PATH="./unit_test/testdata/config_minimal_single_file.md"
 		mkdir -p "$OUTPUT_DIR/tags"
 		mkdir -p "$OUTPUT_DIR/uml"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
-		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./testdata/unit_test/requirements_minimal.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
+		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./unit_test/testdata/requirements_minimal.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
 		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 
 		# Act -------------

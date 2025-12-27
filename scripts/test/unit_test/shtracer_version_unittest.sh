@@ -27,7 +27,7 @@ cd "${TEST_ROOT}" || exit 1
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : File Version Information"
+	echo " UNIT TEST (File Version Information) : $0"
 	echo "----------------------------------------"
 }
 
