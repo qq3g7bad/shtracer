@@ -1068,8 +1068,10 @@ swap_tags() {
 ##
 # @brief   Extract traceability layer hierarchy from config table
 # @param   $1 : 01_config_table file path
-# @return  Echoes unique tag prefixes in config.md order (space-separated)
-# @example _extract_layer_hierarchy "01_config_table" returns "REQ ARC IMP UT IT"
+# @return  Echoes unique layer info (one per line: "identifier<tab>tag_format")
+# @example _extract_layer_hierarchy "01_config_table" returns:
+#          Requirement	@REQ[0-9\.]+@
+#          Architecture	@ARC[0-9\.]+@
 # @tag     @IMP3.3.2.3@ (FROM: @ARC3.3.2@)
 _extract_layer_hierarchy() {
 	_config_table="$1"
@@ -1078,25 +1080,39 @@ _extract_layer_hierarchy() {
 		return 1
 	fi
 
-	# Extract tag prefixes from field 6 (TAG FORMAT) in config.md order
-	# Field 6 format: `@REQ[0-9\.]+@` or `SR-[0-9-]+` or `^SF-[0-9-]+` etc.
+	# Extract layer identifiers and TAG FORMAT from config table
+	# Field 1: Section header (e.g., ":Requirement" or ":Main scripts:Implementation")
+	# Field 6: TAG FORMAT (e.g., `@REQ[0-9\.]+@`)
 	awk -F "$SHTRACER_SEPARATOR" '
 	NF >= 6 {
+		section_header = $1
 		tag_format = $6
-		# Remove surrounding backticks and quotes
+
+		# Skip if TAG FORMAT is empty
+		if (tag_format == "") next
+
+		# Remove surrounding backticks and quotes from tag_format
 		gsub(/^`|`$|^"|"$/, "", tag_format)
 
-		# Extract first uppercase letter sequence from tag format
-		if (match(tag_format, /[A-Z]+/)) {
-			prefix = substr(tag_format, RSTART, RLENGTH)
-			if (!seen[prefix]++) {
-				if (count > 0) printf " "
-				printf "%s", prefix
-				count++
+		# Extract layer identifier from section header
+		# Remove leading colon and use last segment for identifier
+		gsub(/^:/, "", section_header)
+
+		# Split by ":" and use the last non-empty segment
+		n = split(section_header, segments, ":")
+		identifier = ""
+		for (i = n; i >= 1; i--) {
+			if (segments[i] != "") {
+				identifier = segments[i]
+				break
 			}
 		}
+
+		# Create unique key from tag_format to avoid duplicates
+		if (identifier != "" && !seen[tag_format]++) {
+			printf "%s\t%s\n", identifier, tag_format
+		}
 	}
-	END { if (count > 0) printf "\n" }
 	' "$_config_table"
 }
 
@@ -1104,16 +1120,16 @@ _extract_layer_hierarchy() {
 # @brief   Generate a single cross-reference matrix intermediate file
 # @param   $1 : 01_tags file path
 # @param   $2 : 02_tag_pairs file path
-# @param   $3 : Row tag prefix (e.g., "REQ")
-# @param   $4 : Column tag prefix (e.g., "ARC")
+# @param   $3 : Row tag pattern (TAG FORMAT regex, e.g., "@REQ[0-9\.]+@")
+# @param   $4 : Column tag pattern (TAG FORMAT regex, e.g., "@ARC[0-9\.]+@")
 # @param   $5 : Output file path
 # @return  0 on success, 1 on error
 # @tag     @IMP3.3.2.2@ (FROM: @ARC3.3.2@)
 _generate_cross_reference_matrix() {
 	_tags_file="$1"
 	_tag_pairs_file="$2"
-	_row_prefix="$3"
-	_col_prefix="$4"
+	_row_pattern="$3"
+	_col_pattern="$4"
 	_output_file="$5"
 
 	if [ ! -r "$_tags_file" ] || [ ! -r "$_tag_pairs_file" ]; then
@@ -1124,7 +1140,7 @@ _generate_cross_reference_matrix() {
 	_timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
 
 	# Use AWK to process both files and generate intermediate format
-	awk -v row_prefix="$_row_prefix" -v col_prefix="$_col_prefix" \
+	awk -v row_pattern="$_row_pattern" -v col_pattern="$_col_pattern" \
 		-v timestamp="$_timestamp" -v sep="$SHTRACER_SEPARATOR" \
 		-v tags_sep="$SHTRACER_SEPARATOR" '
 	BEGIN {
@@ -1147,14 +1163,13 @@ _generate_cross_reference_matrix() {
 			tag_file[tag_id] = file_path
 			tag_line[tag_id] = line_num
 
-			# Collect row and column tags based on prefix match
-			# Check if tag_id starts with row_prefix or col_prefix
-			if (index(tag_id, row_prefix) == 1) {
+			# Collect row and column tags based on TAG FORMAT regex match
+			if (tag_id ~ row_pattern) {
 				if (!row_seen[tag_id]++) {
 					rows[row_count++] = tag_id
 				}
 			}
-			if (index(tag_id, col_prefix) == 1) {
+			if (tag_id ~ col_pattern) {
 				if (!col_seen[tag_id]++) {
 					cols[col_count++] = tag_id
 				}
@@ -1169,17 +1184,17 @@ _generate_cross_reference_matrix() {
 		parent_tag = $1
 		child_tag = $2
 
-		# Check if this pair matches our row/col prefixes
+		# Check if this pair matches our row/col patterns using regex
 		parent_is_row = 0
 		child_is_col = 0
 
-		# Check if parent_tag starts with row_prefix
-		if (index(parent_tag, row_prefix) == 1) {
+		# Check if parent_tag matches row_pattern
+		if (parent_tag ~ row_pattern) {
 			parent_is_row = 1
 		}
 
-		# Check if child_tag starts with col_prefix
-		if (index(child_tag, col_prefix) == 1) {
+		# Check if child_tag matches col_pattern
+		if (child_tag ~ col_pattern) {
 			child_is_col = 1
 		}
 
@@ -1197,7 +1212,7 @@ _generate_cross_reference_matrix() {
 
 		# [METADATA]
 		print "[METADATA]"
-		print row_prefix sep col_prefix sep timestamp
+		print row_pattern sep col_pattern sep timestamp
 
 		# [ROW_TAGS]
 		print ""
@@ -1263,32 +1278,26 @@ make_cross_reference_tables() {
 		return 0
 	fi
 
-	# Convert space-separated hierarchy to positional parameters
-	# Save current IFS and temporarily set to space for word splitting
-	_old_IFS="$IFS"
-	IFS=' '
-	# shellcheck disable=SC2086
-	set -- $_layer_hierarchy
-	IFS="$_old_IFS"
-	_layer_count=$#
-
 	# Generate intermediate files for each adjacent level pair
 	_file_num=6 # Start from 06 (after 01-05 are used for other files)
-	_prev_layer=""
+	_prev_identifier=""
+	_prev_format=""
 
-	for _current_layer in "$@"; do
-		if [ -n "$_prev_layer" ]; then
+	# Process each layer (identifier<tab>tag_format)
+	echo "$_layer_hierarchy" | while IFS="$(printf '\t')" read -r _current_identifier _current_format; do
+		if [ -n "$_prev_identifier" ] && [ -n "$_prev_format" ]; then
 			# Generate matrix for adjacent pair: prev_layer → current_layer
-			_output_file="${_xref_output_dir}$(printf '%02d' $_file_num)_cross_ref_matrix_${_prev_layer}_${_current_layer}"
+			_output_file="${_xref_output_dir}$(printf '%02d' $_file_num)_cross_ref_matrix_${_prev_identifier}_${_current_identifier}"
 
 			if ! _generate_cross_reference_matrix "$_tags_file" "$_tag_pairs_file" \
-				"$_prev_layer" "$_current_layer" "$_output_file"; then
-				echo "[shtracer][warning]: Failed to generate $_prev_layer vs $_current_layer matrix" >&2
+				"$_prev_format" "$_current_format" "$_output_file"; then
+				echo "[shtracer][warning]: Failed to generate $_prev_identifier vs $_current_identifier matrix" >&2
 			fi
 
 			_file_num=$((_file_num + 1))
 		fi
-		_prev_layer="$_current_layer"
+		_prev_identifier="$_current_identifier"
+		_prev_format="$_current_format"
 	done
 
 	echo "$_xref_output_dir"
