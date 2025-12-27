@@ -98,19 +98,23 @@ test_authenticate_user() {
 ./shtracer --json ./sample/config.md
 ```
 
-**Output (JSON)**:
+**Output (JSON snippet)**:
 ```json
 {
-  "traces": [
-    {
-      "chain": ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@"],
-      "files": [
-        "requirements.md",
-        "architecture.md",
-        "auth.sh",
-        "auth_test.sh"
-      ]
-    }
+  "metadata": {
+    "version": "0.1.2",
+    "generated": "2025-12-27T03:57:27Z",
+    "config_path": "/path/to/config.md"
+  },
+  "nodes": [
+    {"id": "@REQ-001@", "file": "requirements.md", "line": 15, ...},
+    {"id": "@ARCH-101@", "file": "architecture.md", "line": 42, ...}
+  ],
+  "chains": [
+    ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@", "NONE"]
+  ],
+  "links": [
+    {"source": "@REQ-001@", "target": "@ARCH-101@", "value": 1}
   ]
 }
 ```
@@ -121,8 +125,8 @@ test_authenticate_user() {
 # .github/workflows/traceability.yml
 - name: Validate traceability
   run: |
-    ./shtracer --json config.md | jq '.traces[] | select(.chain | length < 4)' > orphaned.json
-    if [ -s orphaned.json ]; then
+    ./shtracer --json config.md | jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")]' > incomplete.json
+    if [ "$(cat incomplete.json)" != "[]" ]; then
       echo "❌ Found incomplete traceability chains"
       exit 1
     fi
@@ -184,35 +188,56 @@ test_authenticate_user() {
 
 ### Configuration File Format
 
-The `config.md` file defines which files to trace and how to organize traceability links. It uses markdown format with specific section headers that correspond to traceability levels (Requirements → Architecture → Implementation → Tests).
+The `config.md` file defines which files to trace and how to organize traceability links. It uses markdown format with structured properties for each traceability target.
 
 **Example `config.md`:**
 
 ```markdown
-# Traceability Configuration
+# config.md
 
-## Requirements
-- ./docs/requirements.md
-- ./docs/use_cases/*.md
+## Requirement
+
+* **PATH**: "./docs/01_requirements.md"
+  * **BRIEF**: "Describes requirements as specifications."
+  * **TAG FORMAT**: `@REQ[0-9\.]+@`
+  * **TAG LINE FORMAT**: `<!--.*-->`
+  * **TAG-TITLE OFFSET**: 1
 
 ## Architecture
-- ./docs/architecture.md
-- ./docs/design/*.md
+
+* **PATH**: "./docs/02_architecture.md"
+  * **BRIEF**: "Describes the structure of this project."
+  * **TAG FORMAT**: `@ARC[0-9\.]+@`
+  * **TAG LINE FORMAT**: `<!--.*-->`
+  * **TAG-TITLE OFFSET**: 1
 
 ## Implementation
-- ./src/**/*.sh
-- ./src/**/*.py
 
-## Tests
-- ./tests/**/*_test.sh
-- ./tests/integration/**/*.sh
+* **PATH**: "./src/"
+  * **EXTENSION FILTER**: "*.sh"
+  * **TAG FORMAT**: `@IMP[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
+  * **BRIEF**: "Implementation files"
+
+## Unit test
+
+* **PATH**: "./tests/"
+  * **EXTENSION FILTER**: "*.sh"
+  * **IGNORE FILTER**: "integration*"
+  * **TAG FORMAT**: `@UT[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
+  * **BRIEF**: "Unit test files"
 ```
 
 **Key Points:**
-- Section headers (`## Requirements`, `## Architecture`, etc.) define traceability levels
-- Supports glob patterns (`**/*.sh`) for matching multiple files
-- Supports multiple files per section
-- Paths are relative to the config file location
+- Each section header (`## Requirement`, `## Architecture`, etc.) defines a traceability level
+- `**PATH**`: File or directory path (relative to config file location)
+- `**TAG FORMAT**`: ERE (Extended Regular Expression) pattern for tags, enclosed in backticks
+- `**TAG LINE FORMAT**`: ERE pattern for lines containing tags (e.g., `#.*` for shell comments, `<!--.*-->` for markdown)
+- `**EXTENSION FILTER**`: Optional file extension filter (e.g., `*.sh`)
+- `**IGNORE FILTER**`: Optional ignore pattern using `|` for multiple conditions
+- `**TAG-TITLE OFFSET**`: Optional offset between tag and title (default: 1)
+- `**BRIEF**`: Optional description of the traceability target
 
 For a complete example, see [`./sample/config.md`](./sample/config.md).
 
@@ -237,7 +262,7 @@ Examples:
   ./shtracer ./sample/config.md
 
   # CI/CD pipeline integration
-  ./shtracer --json ./sample/config.md | jq '.traces'
+  ./shtracer --json ./sample/config.md | jq '.chains'
 
   # Create HTML report
   ./shtracer --html ./sample/config.md > report.html
@@ -301,9 +326,9 @@ jobs:
           ./shtracer --json config.md > trace.json
 
           # Ensure all requirements are traced to tests
-          orphaned=$(jq '[.traces[] | select(.chain | length < 4)] | length' trace.json)
-          if [ "$orphaned" -gt 0 ]; then
-            echo "❌ Found $orphaned incomplete trace chains"
+          incomplete=$(jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")] | length' trace.json)
+          if [ "$incomplete" -gt 0 ]; then
+            echo "❌ Found $incomplete incomplete trace chains"
             exit 1
           fi
 ```
@@ -391,29 +416,55 @@ Perfect for CI/CD and custom tooling:
 
 ```json
 {
-  "config_path": "config.md",
+  "metadata": {
+    "version": "0.1.2",
+    "generated": "2025-12-27T03:57:27Z",
+    "config_path": "/path/to/config.md"
+  },
   "nodes": [
     {
       "id": "@REQ-001@",
+      "label": "@REQ-001@",
+      "description": "User Authentication",
       "file": "docs/requirements.md",
       "line": 15,
-      "trace_target": "Requirements"
+      "trace_target": ":Requirement",
+      "file_version": "git:abc1234"
     },
     {
       "id": "@ARCH-101@",
+      "label": "@ARCH-101@",
+      "description": "Authentication Service",
       "file": "docs/architecture.md",
       "line": 42,
-      "trace_target": "Architecture"
+      "trace_target": ":Architecture",
+      "file_version": "git:abc1234"
     }
   ],
   "chains": [
+    ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@", "NONE"],
+    ["@REQ-002@", "NONE", "NONE", "NONE", "NONE"]
+  ],
+  "links": [
     {
-      "upstream": "@REQ-001@",
-      "downstream": "@ARCH-101@"
+      "source": "@REQ-001@",
+      "target": "@ARCH-101@",
+      "value": 1
+    },
+    {
+      "source": "@ARCH-101@",
+      "target": "@IMPL-201@",
+      "value": 1
     }
   ]
 }
 ```
+
+**Schema Fields:**
+- `metadata`: Version, generation timestamp, and config file path
+- `nodes`: Array of all tags with their metadata (id, label, description, file location, trace target, git version)
+- `chains`: Array of traceability chains showing complete paths from requirements to tests
+- `links`: Array of direct connections between tags (useful for graph visualization)
 
 ---
 
