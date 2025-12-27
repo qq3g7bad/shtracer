@@ -20,9 +20,8 @@ git submodule update --init
 # Change mode
 
 chmod +x ./shtracer
-chmod +x ./scripts/test/shtracer_unittest.sh
-chmod +x ./scripts/test/unit/*.sh
-chmod +x ./scripts/test/integration/*.sh
+chmod +x ./scripts/test/unit_test/*.sh
+chmod +x ./scripts/test/integration_test/*.sh
 
 # Start unit tests
 
@@ -32,10 +31,13 @@ chmod +x ./scripts/test/integration/*.sh
 
 ## Test scripts
 
-filename                     | test target
----------------------------- | ---------------
-shtracer_unittest.sh                    | `../../shtracer`
-unit/shtracer_func_unittest.sh          | `../main/shtracer_func.sh`
-unit/shtracer_viewer_unittest.sh        | `../main/shtracer_viewer.sh`
-unit/shtracer_json_unittest.sh          | `../main/shtracer_func.sh` (JSON export)
-integration/shtracer_integration_test.sh| End-to-end integration tests
+filename                                      | test target
+--------------------------------------------- | ---------------
+run_all_tests.sh                              | Test runner - executes all unit and integration tests
+unit_test/shtracer_main_unittest.sh           | Main routine (`../../shtracer`)
+unit_test/shtracer_func_unittest.sh           | Core functions (`../main/shtracer_func.sh`)
+unit_test/shtracer_viewer_unittest.sh         | HTML viewer (`../main/shtracer_viewer.sh`)
+unit_test/shtracer_json_unittest.sh           | JSON export (`../main/shtracer_func.sh`)
+unit_test/shtracer_version_unittest.sh        | File version information (`../main/shtracer_util.sh`)
+unit_test/shtracer_util_unittest.sh           | Utility functions (`../main/shtracer_util.sh`)
+integration_test/shtracer_integration_test.sh | End-to-end integration tests

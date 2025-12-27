@@ -9,8 +9,8 @@ SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 
 
 SHTRACER_BIN="${SHTRACER_ROOT_DIR%/}/shtracer"
 SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_viewer.sh"
-TEST_DATA_DIR="${TEST_ROOT%/}/testdata/integration"
-ANSWER_DIR="${TEST_ROOT%/}/testdata/answer/integration"
+TEST_DATA_DIR="${SCRIPT_DIR%/}/testdata"
+ANSWER_DIR="${SCRIPT_DIR%/}/testdata/expected"
 
 ##
 # @brief

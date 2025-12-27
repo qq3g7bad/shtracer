@@ -26,7 +26,7 @@ cd "${TEST_ROOT}" || exit 1
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : $0"
+	echo " UNIT TEST (JSON Export) : $0"
 	echo "----------------------------------------"
 }
 
@@ -40,7 +40,7 @@ setUp() {
 	export NODATA_STRING="NONE"
 	export OUTPUT_DIR="${SHUNIT_TMPDIR}/output/"
 	mkdir -p "$OUTPUT_DIR"
-	export CONFIG_DIR="${TEST_ROOT%/}/testdata/"
+	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	cd "${TEST_ROOT}" || exit 1
 }
 

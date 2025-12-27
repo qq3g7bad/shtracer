@@ -1,6 +1,6 @@
 #!/bin/sh
-# Unit tests for refactoring helper functions
-# Tests POSIX compliance and exact behavioral equivalence with original awk/sed patterns
+# Unit tests for utility functions
+# Tests POSIX-compliant helper functions in shtracer_util.sh
 
 # Source test target
 SCRIPT_DIR=$(
@@ -27,7 +27,7 @@ cd "${TEST_ROOT}" || exit 1
 #
 oneTimeSetUp() {
 	echo "----------------------------------------"
-	echo " TEST : Refactoring Helper Functions"
+	echo " UNIT TEST (Utility Functions) : $0"
 	echo "----------------------------------------"
 }
 
