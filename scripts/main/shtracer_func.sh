@@ -1079,16 +1079,16 @@ _extract_layer_hierarchy() {
 	fi
 
 	# Extract tag prefixes from field 6 (TAG FORMAT) in config.md order
-	# Field 6 format: `@REQ[0-9\.]+@` or empty
+	# Field 6 format: `@REQ[0-9\.]+@` or `SR-[0-9-]+` or `^SF-[0-9-]+` etc.
 	awk -F "$SHTRACER_SEPARATOR" '
 	NF >= 6 {
 		tag_format = $6
 		# Remove surrounding backticks and quotes
 		gsub(/^`|`$|^"|"$/, "", tag_format)
 
-		# Extract prefix from tag format: @ABC[0-9\.]+ -> ABC
-		if (match(tag_format, /@([A-Z]+)\[/, arr)) {
-			prefix = substr(tag_format, RSTART+1, RLENGTH-2)
+		# Extract first uppercase letter sequence from tag format
+		if (match(tag_format, /[A-Z]+/)) {
+			prefix = substr(tag_format, RSTART, RLENGTH)
 			if (!seen[prefix]++) {
 				if (count > 0) printf " "
 				printf "%s", prefix
@@ -1143,25 +1143,20 @@ _generate_cross_reference_matrix() {
 			file_path = fields[5]
 			line_num = fields[6]
 
-			# Extract tag prefix
-			if (match(tag_id, /@([A-Z]+)[0-9\.]+@/)) {
-				prefix = substr(tag_id, RSTART+1)
-				gsub(/[0-9\.@]+/, "", prefix)
+			# Store tag metadata
+			tag_file[tag_id] = file_path
+			tag_line[tag_id] = line_num
 
-				# Store tag metadata
-				tag_file[tag_id] = file_path
-				tag_line[tag_id] = line_num
-
-				# Collect row and column tags
-				if (prefix == row_prefix) {
-					if (!row_seen[tag_id]++) {
-						rows[row_count++] = tag_id
-					}
+			# Collect row and column tags based on prefix match
+			# Check if tag_id starts with row_prefix or col_prefix
+			if (index(tag_id, row_prefix) == 1) {
+				if (!row_seen[tag_id]++) {
+					rows[row_count++] = tag_id
 				}
-				if (prefix == col_prefix) {
-					if (!col_seen[tag_id]++) {
-						cols[col_count++] = tag_id
-					}
+			}
+			if (index(tag_id, col_prefix) == 1) {
+				if (!col_seen[tag_id]++) {
+					cols[col_count++] = tag_id
 				}
 			}
 		}
@@ -1178,16 +1173,14 @@ _generate_cross_reference_matrix() {
 		parent_is_row = 0
 		child_is_col = 0
 
-		if (match(parent_tag, /@([A-Z]+)[0-9\.]+@/)) {
-			parent_prefix = substr(parent_tag, RSTART+1)
-			gsub(/[0-9\.@]+/, "", parent_prefix)
-			if (parent_prefix == row_prefix) parent_is_row = 1
+		# Check if parent_tag starts with row_prefix
+		if (index(parent_tag, row_prefix) == 1) {
+			parent_is_row = 1
 		}
 
-		if (match(child_tag, /@([A-Z]+)[0-9\.]+@/)) {
-			child_prefix = substr(child_tag, RSTART+1)
-			gsub(/[0-9\.@]+/, "", child_prefix)
-			if (child_prefix == col_prefix) child_is_col = 1
+		# Check if child_tag starts with col_prefix
+		if (index(child_tag, col_prefix) == 1) {
+			child_is_col = 1
 		}
 
 		# Store matrix entry if both match
