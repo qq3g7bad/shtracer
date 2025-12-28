@@ -161,16 +161,6 @@ test_authenticate_user() {
 
 *Visualize requirement flows from requirements to tests. Click badges to jump to source files.*
 
-**New: Interactive Tab UI for Cross-Reference Tables**
-
-The HTML viewer now includes a tab-based interface to explore traceability relationships at different levels:
-
-- **All** - Complete traceability matrix (requirements → architecture → implementation → tests)
-- **REQ↔ARC** - Requirements vs Architecture cross-reference
-- **ARC↔IMP** - Architecture vs Implementation cross-reference
-- **IMP↔UT** - Implementation vs Unit Tests cross-reference
-- **UT↔IT** - Unit Tests vs Integration Tests cross-reference
-
 **Features:**
 
 - 🎯 **Tab persistence** - Your selected tab is remembered using localStorage
@@ -268,44 +258,6 @@ The `config.md` file defines which files to trace and how to organize traceabili
 - `**BRIEF**`: Optional description of the traceability target
 
 For a complete example, see [`./sample/config.md`](./sample/config.md).
-
-### Cross-Reference Tables
-
-**Automatically generated for every traceability run** (when using normal mode), cross-reference tables show the relationships between adjacent traceability levels in an easy-to-read matrix format.
-
-**Generated tables** (based on your `config.md` structure):
-
-- `output/cross_reference/01_REQ_ARC.md` - Requirements vs Architecture
-- `output/cross_reference/02_ARC_IMP.md` - Architecture vs Implementation
-- `output/cross_reference/03_IMP_UT.md` - Implementation vs Unit Tests
-- `output/cross_reference/04_IMP_IT.md` - Implementation vs Integration Tests
-
-**Example output:**
-
-```markdown
-# Cross-Reference Table: REQ vs ARC
-
-**Legend**:
-- Row headers: REQ tags
-- Column headers: ARC tags
-- `x` indicates a traceability link exists
-- Click tag IDs to navigate to source location
-
-. | [@ARC1.1@](../docs/02_architecture.md#L64) | [@ARC2.1@](../docs/02_architecture.md#L122) |
---- | --- | --- |
-[@REQ1.1@](../docs/01_requirements.md#L6) |   | x |
-[@REQ1.2@](../docs/01_requirements.md#L14) |   | x |
-[@REQ2.1@](../docs/01_requirements.md#L77) |   | x |
-
----
-
-**Statistics**:
-- Total REQ tags: 24
-- Total ARC tags: 10
-- Total links: 28
-- Coverage: 100.0% (10/10 ARC tags have upstream links)
-- Orphaned REQ tags: 2 (no links)
-```
 
 **Key features:**
 
