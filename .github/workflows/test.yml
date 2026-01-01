@@ -30,14 +30,27 @@ jobs:
       fail-fast: false
       matrix:
         # List of operating systems to test on
-        os: [ubuntu-latest, macos-latest]
-        # Note: Windows support can be added later if needed
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: windows-latest
+            shell: msys2 {0}
 
     # Specify the runner environment
     runs-on: ${{ matrix.os }}
 
     # Steps to execute in this job
     steps:
+      # Step 0: Setup MSYS2 for Windows
+      - name: Setup MSYS2 (Windows only)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            git
+
       # Step 1: Check out the repository code
       # actions/checkout@v4 is an official GitHub action
       - name: Checkout repository
@@ -49,16 +62,19 @@ jobs:
       # Step 2: Grant execute permission to shtracer
       - name: Make shtracer executable
         run: chmod +x ./shtracer
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 3: Run unit tests
       - name: Run unit tests
         run: ./shtracer -t
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 4: Run sample config (verify normal operation)
       - name: Run sample config
         run: |
           rm -rf ./sample/shtracer_output
           ./shtracer --debug ./sample/config.md
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 5: Verify that output files were generated
       - name: Verify output files
@@ -68,6 +84,7 @@ jobs:
           test -f ./sample/shtracer_output/output.json || exit 1
           test ! -f ./sample/shtracer_output/output.html || exit 1
           echo "Normal mode outputs verified."
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 6: Generate single HTML via viewer path
       - name: Generate HTML via --html
@@ -77,6 +94,7 @@ jobs:
           grep -q "<!DOCTYPE html>" ./sample/shtracer_output/output.html || exit 1
           grep -q "traceabilityData" ./sample/shtracer_output/output.html || exit 1
           echo "HTML generation verified."
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 7: Upload logs if tests fail
       - name: Upload test logs on failure
