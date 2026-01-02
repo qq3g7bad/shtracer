@@ -2699,10 +2699,10 @@ print_usage() {
 		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
 
 		  # Explicit tag-table path
-		          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
+		    ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
 
 		  # JSON file input
-		          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
+		    ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
 	USAGE
 	exit 1
 }
