@@ -106,7 +106,7 @@ test_authenticate_user() {
 ./shtracer --json ./sample/config.md
 ```
 
-**Output (JSON snippet)**:
+**Output (JSON)**:
 
 ```json
 {
@@ -256,6 +256,10 @@ The `config.md` file defines which files to trace and how to organize traceabili
 - `**IGNORE FILTER**`: Optional ignore pattern using `|` for multiple conditions
 - `**TAG-TITLE OFFSET**`: Optional offset between tag and title (default: 1)
 - `**BRIEF**`: Optional description of the traceability target
+- Section headers (`## Requirements`, `## Architecture`, etc.) define traceability levels
+- Supports glob patterns (`**/*.sh`) for matching multiple files
+- Supports multiple files per section
+- Paths are relative to the config file location
 
 For a complete example, see [`./sample/config.md`](./sample/config.md).
 
