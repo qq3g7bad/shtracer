@@ -31,18 +31,20 @@ jobs:
       matrix:
         # List of operating systems to test on
         os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: windows-latest
-            shell: msys2 {0}
 
     # Specify the runner environment
     runs-on: ${{ matrix.os }}
+
+    # Default shell for all steps (can be overridden per step)
+    defaults:
+      run:
+        shell: bash
 
     # Steps to execute in this job
     steps:
       # Step 0: Setup MSYS2 for Windows
       - name: Setup MSYS2 (Windows only)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -62,19 +64,16 @@ jobs:
       # Step 2: Grant execute permission to shtracer
       - name: Make shtracer executable
         run: chmod +x ./shtracer
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 3: Run unit tests
       - name: Run unit tests
         run: ./shtracer -t
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 4: Run sample config (verify normal operation)
       - name: Run sample config
         run: |
           rm -rf ./sample/shtracer_output
           ./shtracer --debug ./sample/config.md
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 5: Verify that output files were generated
       - name: Verify output files
@@ -84,7 +83,6 @@ jobs:
           test -f ./sample/shtracer_output/output.json || exit 1
           test ! -f ./sample/shtracer_output/output.html || exit 1
           echo "Normal mode outputs verified."
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 6: Generate single HTML via viewer path
       - name: Generate HTML via --html
@@ -94,7 +92,6 @@ jobs:
           grep -q "<!DOCTYPE html>" ./sample/shtracer_output/output.html || exit 1
           grep -q "traceabilityData" ./sample/shtracer_output/output.html || exit 1
           echo "HTML generation verified."
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
       # Step 7: Upload logs if tests fail
       - name: Upload test logs on failure
@@ -126,7 +123,7 @@ jobs:
 
           # Install shfmt
           SHFMT_VERSION="3.8.0"
-          wget -qO- "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" -O /tmp/shfmt
+          wget -qO /tmp/shfmt "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
           sudo install /tmp/shfmt /usr/local/bin/shfmt
           rm /tmp/shfmt
 
