@@ -1799,12 +1799,12 @@ _html_convert_tag_table() {
             return t
         }
         function ext_from_basename(base) {
-            if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
+            if (match(base, /[.][^.]+$/)) return substr(base, RSTART + 1)
             return "sh"
         }
         function fileid_from_basename(base,   t) {
             t = base
-            gsub(/\./, "_", t)
+            gsub(/[.]/, "_", t)
             return "Target_" t
         }
         function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
@@ -2624,11 +2624,11 @@ convert_template_js() {
                         n = split($0, parts, "/")
                         raw_filename = parts[n]
                         filename = raw_filename
-                        extension_pos = match(raw_filename, /\.[^\.]+$/)
+                        extension_pos = match(raw_filename, /[.][^.]+$/)
                         if (extension_pos) extension = substr(raw_filename, extension_pos + 1)
                         else extension = "txt"
 
-                        gsub(/\./, "_", filename)
+                        gsub(/[.]/, "_", filename)
                         gsub(/^/, "Target_", filename)
 
                         contents = file_to_js_string(path)
@@ -2699,10 +2699,10 @@ print_usage() {
 		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
 
 		  # Explicit tag-table path
-		          ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
+		    ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
 
 		  # JSON file input
-		          ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
+		    ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
 	USAGE
 	exit 1
 }

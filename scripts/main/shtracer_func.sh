@@ -612,7 +612,7 @@ print_summary_direct_links() {
 			if (p > 0 && p < 0.5) { return "<1%" }
 			if (p >= 10) { s = sprintf("%.0f", p) }
 			else { s = sprintf("%.1f", p) }
-			sub(/\.0$/, "", s)
+			sub(/[.]0$/, "", s)
 			return s "%"
 		}
 		BEGIN {
@@ -1138,6 +1138,11 @@ _generate_cross_reference_matrix() {
 
 	# Generate timestamp
 	_timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+
+	# Convert \. to . in patterns to avoid awk warnings on Windows
+	# Inside character classes like [0-9\.], the dot is not a metacharacter
+	_row_pattern=$(printf '%s' "$_row_pattern" | sed 's/\\[.]/./g')
+	_col_pattern=$(printf '%s' "$_col_pattern" | sed 's/\\[.]/./g')
 
 	# Use AWK to process both files and generate intermediate format
 	awk -v row_pattern="$_row_pattern" -v col_pattern="$_col_pattern" \

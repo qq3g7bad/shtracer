@@ -8,6 +8,7 @@ sample/*output/
 *~
 .vscode/
 .idea/
+CLAUDE.md
 
 # Backup files
 *.bak
