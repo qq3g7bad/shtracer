@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>shtracer output</title>
+  <title>Traceability Report</title>
   <link rel="stylesheet" href="./assets/template.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -15,11 +15,13 @@
   </button>
   <div class="container">
     <div class="left">
-      <h1>shtracer output</h1>
+      <h1>Traceability Report</h1>
         <!-- INSERT INFORMATION -->
-      <h2>Summary</h2>
+      <h2>Executive Summary</h2>
       <div id="trace-summary"></div>
-      <h2>Traceability Flow (Type)</h2>
+      <h2>Traceability Health</h2>
+      <div id="traceability-health"></div>
+      <h2>Traceability Flow (layer)</h2>
       <div id="sankey-legend-type" class="sankey-legend"></div>
       <div id="sankey-diagram-type" style="width: 100%;"></div>
       <h2>Traceability Flow (Full)</h2>
@@ -114,3 +116,8 @@
   </script>
 </body>
 </html>
+
+EOF
+}
+
+##

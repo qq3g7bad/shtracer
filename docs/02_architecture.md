@@ -93,22 +93,26 @@ The `shtracer` file includes utility functions.
 Exit codes are defined as constants for CI/CD integration:
 
 **Usage Errors (1-9)**
+
 * `EXIT_USAGE=1` - Invalid arguments or usage
 * `EXIT_CONFIG_NOT_FOUND=2` - Config file not found
 * `EXIT_CONFIG_INVALID=3` - Config file format invalid
 
 **Processing Errors (10-19)**
+
 * `EXIT_EXTRACT_TAGS_FAILED=10` - Failed to extract tags
 * `EXIT_MAKE_TABLE_FAILED=11` - Failed to create tag table
 * `EXIT_MAKE_JSON_FAILED=12` - Failed to generate JSON
 * `EXIT_VIEWER_FAILED=13` - Viewer script execution failed
 
 **Verification Errors (20-29)**
+
 * `EXIT_ISOLATED_TAGS=20` - Found isolated tags
 * `EXIT_DUPLICATE_TAGS=21` - Found duplicate tags
 * `EXIT_BOTH_ISSUES=22` - Found both isolated and duplicate tags
 
 **System Errors (30-39)**
+
 * `EXIT_INTERNAL_ERROR=30` - Internal error
 * `EXIT_VIEWER_NOT_FOUND=31` - Viewer script not found
 
@@ -217,6 +221,7 @@ The following cases are invalid.
 * [ ] Duplicated tags.
 
 Returns specific exit codes:
+
 * Return `1` if only isolated tags found
 * Return `2` if only duplicate tags found
 * Return `3` if both isolated and duplicate tags found
@@ -228,15 +233,36 @@ Returns specific exit codes:
 * Export traceability data in structured JSON format.
 * JSON schema includes:
   * `metadata`: version, timestamp, config_path
-  * `traces`: array of trace chains with file references
-  * `nodes`: tag information (id, title, file, line)
+  * `health`: coverage statistics and isolated tag list
+    * `total_tags`, `tags_with_links`, `isolated_tags`
+    * `isolated_tag_list`: array of isolated tag metadata (id, file_id, line)
+    * `coverage.layers`: per-layer statistics with mass-based coverage
+  * `files`: top-level array of file metadata (layer, file basename, coverage statistics, version)
+  * `nodes`: tag information (id, description, line, file_id referencing files array)
   * `links`: relationships between tags (source, target)
-  * `summary`: statistics (total_traces, complete_traces, orphaned_tags)
+  * `chains`: complete trace paths from requirements to tests
+  * `cross_references`: optional layer-to-layer traceability matrices
 * Output to designated file in OUTPUT_DIR.
 * Enable integration with CI/CD pipelines and custom tools.
 
+<!-- @ARC2.7@ (FROM: @REQ3.3.2@) -->
+#### Generate Cross-Reference Matrices
+
+* Create layer-to-layer traceability matrices for visualization
+* Matrix format includes:
+  * Metadata: row_layer, col_layer, timestamp
+  * Row/column tags with file paths and line numbers
+  * Relationship links between row and column tags
+* Output to `shtracer_output/tags/06_cross_ref_matrix_*` files
+* Support both text-based and JSON-embedded matrix formats
+* Helper functions for:
+  * Layer hierarchy extraction from config
+  * Matrix generation between adjacent layers
+  * Markdown table formatting with hyperlinks
+  * Relative path computation for cross-references
+
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2@, @REQ3.4.2@) -->
-### 📄 `shtracer_viewer.sh`
+### 📄 `shtracer_html_viewer.sh`
 
 * Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
 * Read JSON from stdin or file argument.
@@ -246,10 +272,53 @@ Returns specific exit codes:
 * Support syntax highlighting for code references.
 
 The viewer renders the diagrams and summary directly from the JSON payload (nodes/links/chains).
+
+<!-- @ARC3.2@ (FROM: @REQ3.2@) -->
+#### HTML Template Customization
+
+* Support external template files for HTML viewer customization
+* Template resolution priority:
+  1. `$SHTRACER_TEMPLATE_DIR/template.html` (environment variable)
+  2. `$HOME/.shtracer/template.html` (user-level customization)
+  3. Embedded heredoc (default fallback)
+* Separate functions for HTML and CSS template retrieval
+* No validation of external templates (user responsibility)
+
+<!-- @ARC4@ (FROM: @REQ3.3.2@, @REQ3.4.2@) -->
+### 📄 Advanced Viewer Features
+
+* Cross-reference matrix visualization in HTML viewer
+* Markdown-based traceability reports
+* Tag index generation for documentation
+
+Implementation split into:
+- HTML viewer: Interactive cross-reference matrix tabs
+- Markdown viewer: Print-friendly reports with tag indices
+
+<!-- @ARC4.1@ (FROM: @REQ3.2@, @REQ4.4@) -->
+#### Markdown Report Generation
+
+* Generate standalone markdown reports from JSON output
+* Report structure:
+  1. Header with metadata
+  2. Table of contents
+  3. Summary statistics
+  4. Health report (coverage, isolated tags)
+  5. Traceability chains
+  6. Cross-reference matrices (layer-to-layer)
+  7. Tag index (grouped by layer)
+  8. Footer with metadata
+* JSON parsing helpers for extracting:
+  - Metadata, files, layers
+  - Tags (trace_tags), links, chains
+  - Health statistics and coverage data
+* Print-friendly format for documentation and audits
+
 subgraph "Optional scripts"
 id3_2_1 --> id3_2_2
 end
 id3_1_2 --> id4
 id3_2_2 --> id4
 id4 --> stop
+
 ```

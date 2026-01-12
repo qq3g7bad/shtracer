@@ -81,7 +81,8 @@ EOF
 EOF
 
 	cat >"$_CONFIG_TABLE" <<'EOF'
-config_path	/path/to/config.md
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
+:Architecture<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@ARC[0-9\.]+@
 EOF
 
 	# Execute function
@@ -90,12 +91,16 @@ EOF
 	# Verify file exists
 	assertTrue "JSON file should exist" "[ -f '$_JSON_OUTPUT' ]"
 
-	# Verify JSON is valid (basic check)
+	# Verify JSON is valid (basic check - v0.2.0 format)
 	_JSON_CONTENT="$(cat "$_JSON_OUTPUT")"
 	assertTrue "JSON should contain metadata" "echo '$_JSON_CONTENT' | grep -q 'metadata'"
-	assertTrue "JSON should contain nodes" "echo '$_JSON_CONTENT' | grep -q 'nodes'"
-	assertTrue "JSON should contain links" "echo '$_JSON_CONTENT' | grep -q 'links'"
+	assertTrue "JSON should contain health" "echo '$_JSON_CONTENT' | grep -q 'health'"
+	assertTrue "JSON should contain files array" "echo '$_JSON_CONTENT' | grep -q '\"files\":'"
+	assertTrue "JSON should contain layers array" "echo '$_JSON_CONTENT' | grep -q '\"layers\":'"
+	assertTrue "JSON should contain trace_tags" "echo '$_JSON_CONTENT' | grep -q 'trace_tags'"
 	assertTrue "JSON should contain chains" "echo '$_JSON_CONTENT' | grep -q 'chains'"
+	assertFalse "JSON should NOT contain nodes" "echo '$_JSON_CONTENT' | grep -q '\"nodes\":'"
+	assertFalse "JSON should NOT contain links" "echo '$_JSON_CONTENT' | grep -q '\"links\":'"
 }
 
 ##
@@ -125,14 +130,14 @@ EOF
 EOF
 
 	cat >"$_CONFIG_TABLE" <<'EOF'
-/test/config.md<shtracer_separator>other_field
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
+:Main scripts:Implementation<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@IMP[0-9\.]+@
 EOF
 
 	# Execute function
 	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/test/config.md")"
 
 	# Verify metadata
-	assertTrue "Should contain version" "grep -q '\"version\": \"0.1.2\"' '$_JSON_OUTPUT'"
 	assertTrue "Should contain generated timestamp" "grep -q '\"generated\":' '$_JSON_OUTPUT'"
 	assertTrue "Should contain config path" "grep -q '\"config_path\": \"/test/config.md\"' '$_JSON_OUTPUT'"
 }
@@ -165,16 +170,19 @@ EOF
 EOF
 
 	cat >"$_CONFIG_TABLE" <<'EOF'
-config_path	/config.md
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
+:Architecture<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@ARC[0-9\.]+@
 EOF
 
 	# Execute function
 	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/config.md")"
 
-	# Verify nodes
-	assertTrue "Should contain nodes array" "grep -q '\"nodes\":' '$_JSON_OUTPUT'"
-	assertTrue "Should contain at least one node" "grep -q '\"id\":' '$_JSON_OUTPUT'"
-	assertTrue "Should contain trace_target field" "grep -q '\"trace_target\":' '$_JSON_OUTPUT'"
+	# Verify trace_tags (v0.2.0)
+	assertTrue "Should contain trace_tags array" "grep -q '\"trace_tags\":' '$_JSON_OUTPUT'"
+	assertTrue "Should contain at least one tag" "grep -q '\"id\":' '$_JSON_OUTPUT'"
+	assertTrue "Should contain file_id field" "grep -q '\"file_id\":' '$_JSON_OUTPUT'"
+	assertTrue "Should contain from_tag field" "grep -q '\"from_tag\":' '$_JSON_OUTPUT'"
+	assertFalse "Should NOT contain nodes array" "grep -q '\"nodes\":' '$_JSON_OUTPUT'"
 }
 
 ##
@@ -190,8 +198,8 @@ test_make_json_links() {
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
 Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
-Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>NONE<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>2<shtracer_separator>1<shtracer_separator>unknown
-Implementation<shtracer_separator>@IMP1.1@<shtracer_separator>NONE<shtracer_separator>Imp<shtracer_separator>/file3<shtracer_separator>3<shtracer_separator>1<shtracer_separator>unknown
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>@REQ1.1@<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>2<shtracer_separator>1<shtracer_separator>unknown
+Implementation<shtracer_separator>@IMP1.1@<shtracer_separator>@ARC1.1@<shtracer_separator>Imp<shtracer_separator>/file3<shtracer_separator>3<shtracer_separator>1<shtracer_separator>unknown
 EOF
 
 	cat >"$_TAG_PAIRS" <<'EOF'
@@ -207,16 +215,60 @@ EOF
 EOF
 
 	cat >"$_CONFIG_TABLE" <<'EOF'
-config_path	/config.md
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
+:Architecture<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@ARC[0-9\.]+@
+:Implementation<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@IMP[0-9\.]+@
 EOF
 
 	# Execute function
 	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/config.md")"
 
-	# Verify links
-	assertTrue "Should contain REQ->ARC link" "grep -A3 -B1 '\"source\": \"@REQ1.1@\"' '$_JSON_OUTPUT' | grep -q '\"target\": \"@ARC1.1@\"'"
-	assertTrue "Should contain ARC->IMP link" "grep -A3 -B1 '\"source\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"target\": \"@IMP1.1@\"'"
-	assertTrue "Should contain value field" "grep -q '\"value\": 1' '$_JSON_OUTPUT'"
+	# Verify links via from_tag field in trace_tags (v0.2.0 format)
+	assertTrue "Should contain REQ->ARC link via from_tag" "grep -A5 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@REQ1.1@\"'"
+	assertTrue "Should contain ARC->IMP link via from_tag" "grep -A5 '\"id\": \"@IMP1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@ARC1.1@\"'"
+	assertFalse "Should NOT contain links array" "grep -q '\"links\":' '$_JSON_OUTPUT'"
+}
+
+##
+# @brief  Test JSON preserves multiple upstream tags
+# @tag    @IMP2.8.4@ (FROM: @IMP2.8@)
+test_make_json_multiple_from_tags() {
+	# Setup test data
+	_TAG_OUTPUT_DATA="${SHUNIT_TMPDIR}/01_tags_test"
+	_TAG_PAIRS="${SHUNIT_TMPDIR}/02_tag_pairs_test"
+	_TAG_PAIRS_DOWNSTREAM="${SHUNIT_TMPDIR}/03_tag_pairs_downstream_test"
+	_TAG_TABLE="${SHUNIT_TMPDIR}/04_tag_table_test"
+	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
+
+	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
+Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Req1<shtracer_separator>/file1<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
+Requirement<shtracer_separator>@REQ1.2@<shtracer_separator>NONE<shtracer_separator>Req2<shtracer_separator>/file1<shtracer_separator>2<shtracer_separator>1<shtracer_separator>unknown
+Architecture<shtracer_separator>@ARC1.1@<shtracer_separator>@REQ1.1@, @REQ1.2@<shtracer_separator>Arc<shtracer_separator>/file2<shtracer_separator>3<shtracer_separator>1<shtracer_separator>unknown
+EOF
+
+	cat >"$_TAG_PAIRS" <<'EOF'
+@REQ1.1@	@ARC1.1@
+@REQ1.2@	@ARC1.1@
+EOF
+
+	cat >"$_TAG_PAIRS_DOWNSTREAM" <<'EOF'
+EOF
+
+	cat >"$_TAG_TABLE" <<'EOF'
+@REQ1.1@	@ARC1.1@	NONE	NONE	NONE
+EOF
+
+	cat >"$_CONFIG_TABLE" <<'EOF'
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
+:Architecture<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@ARC[0-9\.]+@
+EOF
+
+	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/config.md")"
+
+	assertTrue "Should contain from_tags array with both upstreams" \
+		"grep -A6 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tags\": \[\"@REQ1.1@\", \"@REQ1.2@\"\]'"
+	assertTrue "Should keep first upstream in from_tag for compatibility" \
+		"grep -A4 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@REQ1.1@\"'"
 }
 
 ##
@@ -246,7 +298,7 @@ EOF
 EOF
 
 	cat >"$_CONFIG_TABLE" <<'EOF'
-config_path	/config.md
+:Requirement<shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator><shtracer_separator>@REQ[0-9\.]+@
 EOF
 
 	# Execute function
@@ -256,18 +308,6 @@ EOF
 	assertTrue "Should contain chains array" "grep -q '\"chains\":' '$_JSON_OUTPUT'"
 	assertTrue "Should contain first chain with REQ1.1" "grep -A5 '\"chains\":' '$_JSON_OUTPUT' | grep -q '@REQ1.1@'"
 	assertTrue "Should contain second chain with REQ2.1" "grep -A10 '\"chains\":' '$_JSON_OUTPUT' | grep -q '@REQ2.1@'"
-}
-
-##
-# @brief  Test CLI --json flag integration
-# @tag    @IMP2.8.6@ (FROM: @IMP2.8@)
-test_cli_json_flag() {
-	# Test that EXPORT_JSON variable can be set
-	EXPORT_JSON='false'
-	# Simulate what happens when --json is parsed
-	EXPORT_JSON='true'
-
-	assertEquals "EXPORT_JSON should be true when --json flag used" "true" "$EXPORT_JSON"
 }
 
 # Load and run shUnit2

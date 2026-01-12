@@ -365,7 +365,7 @@ _prepare_upstream_table() {
 	# Extract tags that have NODATA_STRING as parent (starting points)
 	# Pipeline: grep for NONE tags → sort → remove NONE field → trim → remove empty lines
 	grep "^$NODATA_STRING" "$1" \
-		| sort \
+		| sort -u \
 		| awk '{$1=""; print $0}' \
 		| sed 's/^[[:space:]]*//' \
 		| sed '/^$/d' >"$2"
@@ -380,7 +380,7 @@ _prepare_downstream_table() {
 	# Extract tags that have actual parents (not NONE)
 	# Pipeline: grep -v to exclude NONE tags → sort → remove empty lines
 	grep -v "^$NODATA_STRING" "$1" \
-		| sort \
+		| sort -u \
 		| sed '/^$/d' >"$2"
 }
 
@@ -487,7 +487,8 @@ make_tag_table() {
 				for (i=1; i<=length(parent); i++){
 					print(parent[i], $2);
 				}
-		}' >"$_TAG_PAIRS"
+		}' \
+			| awk '!seen[$0]++' >"$_TAG_PAIRS"
 
 		# Prepare upstream and downstream tables
 
@@ -755,7 +756,7 @@ print_summary_direct_links() {
 						# Get version info
 						key = trace_target SEP file_path
 						version_raw = file_versions[key]
-						
+
 						# Format version for display
 						if (version_raw ~ /^git:/) {
 							version_display = substr(version_raw, 5)  # Remove "git:" prefix
@@ -768,7 +769,7 @@ print_summary_direct_links() {
 						} else {
 							version_display = version_raw
 						}
-						
+
 						printf "    - %s (%s)\n", file_name, version_display
 					}
 				}
@@ -820,12 +821,12 @@ print_verification_result() {
 	_has_duplicated="0"
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
-		printf "1) Following tags are isolated.\n" 1>&2
+		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 		_has_isolated="1"
 	fi
 	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
-		printf "2) Following tags are duplicated.\n" 1>&2
+		printf "[shtracer][error][print_verification_result]: Following tags are duplicated\n" 1>&2
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
 		_has_duplicated="1"
 	fi
@@ -854,6 +855,7 @@ print_verification_result() {
 # @param  $4 : TAG_TABLE (04_tag_table file path)
 # @param  $5 : CONFIG_TABLE (01_config_table file path)
 # @param  $6 : CONFIG_PATH (config file path)
+# @param  $7 : XREF_DIR (cross-reference directory path, optional)
 # @return JSON_OUTPUT_FILENAME
 make_json() {
 	_TAG_OUTPUT_DATA="$1"
@@ -862,6 +864,7 @@ make_json() {
 	_TAG_TABLE="$4"
 	_CONFIG_TABLE="$5"
 	_CONFIG_PATH="$6"
+	_XREF_DIR="${7:-}"
 
 	_JSON_OUTPUT_FILENAME="${OUTPUT_DIR%/}/output.json"
 
@@ -872,81 +875,508 @@ make_json() {
 	{
 		printf '{\n'
 		printf '  "metadata": {\n'
-		printf '    "version": "0.1.2",\n'
+		printf '    "version": "0.1.3",\n'
 		printf '    "generated": "%s",\n' "$_TIMESTAMP"
 		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
 		printf '  },\n'
 
-		# Generate nodes array from 01_tags
-		printf '  "nodes": [\n'
-		awk -F"$SHTRACER_SEPARATOR" '
-		BEGIN { first=1 }
-		NF >= 8 {
-			if (!first) printf ",\n"
-			first=0
-			# Escape quotes and backslashes in description
-			desc = $4
-			# First escape backslashes, then other special characters
-			gsub(/\\/, "\\\\", desc)
-			gsub(/"/, "\\\"", desc)
-			# Use octal notation for control characters
-			gsub(/\015/, "\\r", desc)  # \r (CR)
-			gsub(/\012/, "\\n", desc)  # \n (LF)
-			gsub(/\011/, "\\t", desc)  # \t (TAB)
-			printf "    {\n"
-			printf "      \"id\": \"%s\",\n", $2
-			printf "      \"label\": \"%s\",\n", $2
-			printf "      \"description\": \"%s\",\n", desc
-			printf "      \"file\": \"%s\",\n", $5
-			printf "      \"line\": %d,\n", $6
-			printf "      \"trace_target\": \"%s\",\n", $1
-			printf "      \"file_version\": \"%s\"\n", $8
-			printf "    }"
-		}
-		END { printf "\n" }
-		' "$_TAG_OUTPUT_DATA"
-		printf '  ],\n'
+		# NEW: Generate files array and layers array first, then collect stats
+		# This requires reading all data upfront in one AWK pass
 
-		# Generate links array from tag pairs (exclude NONE and validate nodes exist)
-		printf '  "links": [\n'
-		# Create temporary file with node list
-		_NODE_TEMP_FILE="${OUTPUT_DIR%/}/nodes.tmp"
-		awk -F'<shtracer_separator>' '
-		NF >= 6 {
-			print $2
-		}
-		' "$_TAG_OUTPUT_DATA" >"$_NODE_TEMP_FILE"
+		# Calculate all data (files, layers, trace_tags, health) in one AWK pass
+		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
+			-v tag_pairs="$_TAG_PAIRS" \
+			-v tag_pairs_downstream="$_TAG_PAIRS_DOWNSTREAM" \
+			-v config_table="$_CONFIG_TABLE" \
+			-v sep="$SHTRACER_SEPARATOR" \
+			-v output_dir="${OUTPUT_DIR%/}" '
+	# JSON escape function (defined outside BEGIN for use throughout)
+	function json_escape(s,   result) {
+		result = s
+		gsub(/\\/, "\\\\", result)
+		gsub(/"/, "\\\"", result)
+		gsub(/\n/, "\\n", result)
+		gsub(/\r/, "\\r", result)
+		gsub(/\t/, "\\t", result)
+		return result
+	}
+	
+BEGIN {
+	# STEP 1: Read layer order AND patterns from config table
+	n_layers = 0
+	while ((getline line < config_table) > 0) {
+		split(line, fields, sep)
+		if (length(fields) >= 6 && fields[1] != "") {
+			# Extract layer name: last component after last colon
+			layer = fields[1]
+			sub(/^:/, "", layer)
+			sub(/.*:/, "", layer)
 
-		# Generate links using node validation
-		awk '
-		BEGIN { first=1 }
-		# Read nodes into array
-		ARGIND == 1 {
-			nodes[$1] = 1
-			next
+			# Extract TAG FORMAT pattern (field 6)
+			tag_pattern = fields[6]
+			gsub(/^`|`$|^"|"$/, "", tag_pattern)  # Remove backticks/quotes
+
+			# Record layer order and pattern (skip duplicates)
+			if (layer != "" && tag_pattern != "" && !(layer in layer_order)) {
+				layer_order[layer] = n_layers
+				layer_pattern[layer] = tag_pattern
+				ordered_layers[n_layers] = layer
+				n_layers++
+			}
 		}
-		# Process tag pairs
-		ARGIND >= 2 && $1 != "NONE" && $2 != "NONE" {
-			if ($1 in nodes && $2 in nodes) {
-				key = $1 "," $2
-				if (!seen[key]++) {
-					if (!first) printf ",\n"
-					first=0
-					printf "    {\n"
-					printf "      \"source\": \"%s\",\n", $1
-					printf "      \"target\": \"%s\",\n", $2
-					printf "      \"value\": 1\n"
-					printf "    }"
+	}
+	close(config_table)
+
+		# STEP 2: Read all tags AND build global file mapping
+		global_file_id = 0
+		while ((getline line < tag_output_data) > 0) {
+			split(line, fields, sep)
+			if (length(fields) >= 8) {
+				tag_id = fields[2]
+				all_tags[tag_id] = 1
+				tag_from[tag_id] = fields[3]  # NEW: Store from_tag
+				tag_desc[tag_id] = fields[4]
+				tag_file[tag_id] = fields[5]
+				tag_line[tag_id] = fields[6]
+				tag_target[tag_id] = fields[1]
+				tag_version[tag_id] = fields[8]
+				total_tags++
+
+				# Build global file mapping (use full path to avoid basename collisions)
+				file_path = fields[5]
+				n_slash = split(file_path, path_parts, "/")
+				basename = path_parts[n_slash]
+
+				if (!(file_path in file_mapping)) {
+					file_mapping[file_path] = global_file_id
+					file_id_to_path[global_file_id] = file_path
+					file_id_to_version[global_file_id] = fields[8]
+					global_file_id++
 				}
 			}
 		}
-		' "$_NODE_TEMP_FILE" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
+		close(tag_output_data)
 
-		# Clean up temp file
-		rm -f "$_NODE_TEMP_FILE"
-		printf '\n  ],\n'
+			# STEP 3: Build layer-to-files relationship
+			for (tag in all_tags) {
+				target = tag_target[tag]
+				# Extract layer from target (remove leading ":", take last segment)
+				layer = target
+				sub(/^:/, "", layer)
+				sub(/.*:/, "", layer)
 
-		# Generate chains array from tag table
+				file_path = tag_file[tag]
+				file_id = file_mapping[file_path]
+
+				# Add to layer_files mapping (unique)
+				key = layer SUBSEP file_id
+				if (!(key in layer_has_file)) {
+					layer_has_file[key] = 1
+					if (layer_files[layer] == "") {
+						layer_files[layer] = file_id
+					} else {
+						layer_files[layer] = layer_files[layer] "," file_id
+					}
+				}
+			}
+
+			# Read tags with links (source tags from pairs)
+			while ((getline line < tag_pairs) > 0) {
+				split(line, fields, " ")
+				if (fields[1] != "NONE" && fields[2] != "NONE") {
+					tags_with_links[fields[1]] = 1
+				}
+			}
+			close(tag_pairs)
+
+			while ((getline line < tag_pairs_downstream) > 0) {
+				split(line, fields, " ")
+				if (fields[1] != "NONE" && fields[2] != "NONE") {
+					tags_with_links[fields[1]] = 1
+				}
+			}
+			close(tag_pairs_downstream)
+
+			# Count tags with links
+			tags_with_links_count = 0
+			for (tag in tags_with_links) {
+				tags_with_links_count++
+			}
+
+			# Calculate isolated tags
+			isolated_count = 0
+			for (tag in all_tags) {
+				if (!(tag in tags_with_links)) {
+					isolated_tags[isolated_count++] = tag
+				}
+			}
+
+			# Build tag-to-layer mapping
+			for (tag in all_tags) {
+				trace_target = tag_target[tag]
+				# Extract layer name (last component after colon)
+				layer = trace_target
+				sub(/^:/, "", layer)
+				sub(/.*:/, "", layer)
+				tag_to_layer[tag] = layer
+
+				# Track full file path (needed for unique IDs)
+				file_path = tag_file[tag]
+				tag_to_file[tag] = file_path
+			}
+
+			# Build directed reference tracking
+			# Tag pair format: "src tgt" means "tgt references src" (tgt has FROM: src)
+			# references[tag] = tags this tag references (outgoing: this tag -> other tags)
+			# referenced_by[tag] = tags that reference this tag (incoming: other tags -> this tag)
+
+			while ((getline line < tag_pairs) > 0) {
+				split(line, fields, " ")
+				src = fields[1]
+				tgt = fields[2]
+				if (src != "NONE" && tgt != "NONE" && src in all_tags && tgt in all_tags) {
+					# tgt references src (tgt has FROM: src)
+					# So: tgt -> src (outgoing from tgt)
+					#     src <- tgt (incoming to src)
+
+					# Add to tgt references list (tgt references src)
+					if (references[tgt] == "") {
+						references[tgt] = src
+					} else {
+						if (index(references[tgt], src) == 0) {
+							references[tgt] = references[tgt] ";" src
+						}
+					}
+
+					# Add to src referenced_by list (src is referenced by tgt)
+					if (referenced_by[src] == "") {
+						referenced_by[src] = tgt
+					} else {
+						if (index(referenced_by[src], tgt) == 0) {
+							referenced_by[src] = referenced_by[src] ";" tgt
+						}
+					}
+				}
+			}
+			close(tag_pairs)
+
+			while ((getline line < tag_pairs_downstream) > 0) {
+				split(line, fields, " ")
+				src = fields[1]
+				tgt = fields[2]
+				if (src != "NONE" && tgt != "NONE" && src in all_tags && tgt in all_tags) {
+					# tgt references src (same semantics as above)
+
+					# Add to tgt references list (avoid duplicates)
+					if (references[tgt] == "") {
+						references[tgt] = src
+					} else {
+						if (index(references[tgt], src) == 0) {
+							references[tgt] = references[tgt] ";" src
+						}
+					}
+
+					# Add to src referenced_by list (avoid duplicates)
+					if (referenced_by[src] == "") {
+						referenced_by[src] = tgt
+					} else {
+						if (index(referenced_by[src], tgt) == 0) {
+							referenced_by[src] = referenced_by[src] ";" tgt
+						}
+					}
+				}
+			}
+			close(tag_pairs_downstream)
+
+			# Calculate coverage for each tag
+			for (tag in all_tags) {
+				layer = tag_to_layer[tag]
+				file_path = tag_to_file[tag]
+				n_slash = split(file_path, path_parts, "/")
+				file_basename = path_parts[n_slash]
+
+				# Skip if layer not in order or if config.md
+				if (!(layer in layer_order) || file_basename == "config.md") continue
+
+				my_order = layer_order[layer]
+
+				# Count nodes per layer
+				layer_total[layer]++
+
+				# Count nodes per file (use full path as key to avoid collisions)
+				file_key = layer "|" file_path
+				file_total[file_key]++
+
+				# Store version on first encounter
+				if (file_version[file_key] == "") {
+					file_version[file_key] = tag_version[tag]
+				}
+
+				# Find connected layers for this tag
+				up_layers_str = ""
+				down_layers_str = ""
+				has_up = 0
+				has_down = 0
+
+				# Upstream coverage: tags in earlier layers that I reference
+				# (I have FROM: pointing to them)
+				if (references[tag] != "") {
+					n_refs = split(references[tag], ref_arr, ";")
+					for (j = 1; j <= n_refs; j++) {
+						ref_tag = ref_arr[j]
+						ref_layer = tag_to_layer[ref_tag]
+
+						if (ref_layer == "" || ref_layer == layer) continue
+						if (!(ref_layer in layer_order)) continue
+
+						ref_order = layer_order[ref_layer]
+
+						# Only count if reference is to an earlier layer
+						if (ref_order < my_order) {
+							has_up = 1
+							if (index(up_layers_str, ref_layer) == 0) {
+								up_layers_str = up_layers_str (up_layers_str ? "," : "") ref_layer
+							}
+						}
+					}
+				}
+
+				# Downstream coverage: tags in later layers that reference me
+				# (later tags have FROM: pointing to me)
+				if (referenced_by[tag] != "") {
+					n_refby = split(referenced_by[tag], refby_arr, ";")
+					for (j = 1; j <= n_refby; j++) {
+						refby_tag = refby_arr[j]
+						refby_layer = tag_to_layer[refby_tag]
+
+						if (refby_layer == "" || refby_layer == layer) continue
+						if (!(refby_layer in layer_order)) continue
+
+						refby_order = layer_order[refby_layer]
+
+						# Only count if referencer is in a later layer
+						if (refby_order > my_order) {
+							has_down = 1
+							if (index(down_layers_str, refby_layer) == 0) {
+								down_layers_str = down_layers_str (down_layers_str ? "," : "") refby_layer
+							}
+						}
+					}
+				}
+
+				# Track upstream/downstream connections for layers
+				if (up_layers_str != "") {
+					n_up = split(up_layers_str, up_arr, ",")
+					layer_up_count[layer]++
+					
+					# Track connected target layers
+					for (k = 1; k <= n_up; k++) {
+						target_layer = up_arr[k]
+						key = layer SUBSEP target_layer
+						if (!(key in layer_up_targets)) {
+							layer_up_targets[key] = 1
+						}
+					}
+				}
+
+				if (down_layers_str != "") {
+					n_down = split(down_layers_str, down_arr, ",")
+					layer_down_count[layer]++
+
+					# Track connected target layers
+					for (k = 1; k <= n_down; k++) {
+						target_layer = down_arr[k]
+						key = layer SUBSEP target_layer
+						if (!(key in layer_down_targets)) {
+							layer_down_targets[key] = 1
+						}
+					}
+				}
+
+				# Count files with upstream/downstream connections
+				if (has_up) file_up[file_key] = (file_up[file_key] + 0) + 1
+				if (has_down) file_down[file_key] = (file_down[file_key] + 0) + 1
+		}
+
+		# STEP 4: Output files array (top-level, globally unique file_id)
+		printf "  \"files\": [\n"
+		for (fid = 0; fid < global_file_id; fid++) {
+			if (fid > 0) printf ",\n"
+			printf "    {\n"
+			printf "      \"file_id\": %d,\n", fid
+			printf "      \"file\": \"%s\",\n", json_escape(file_id_to_path[fid])
+			printf "      \"version\": \"%s\"\n", json_escape(file_id_to_version[fid])
+			printf "    }"
+		}
+		printf "\n  ],\n"
+
+		# STEP 5: Output layers array
+		printf "  \"layers\": [\n"
+		layer_id = 0
+		layer_printed = 0
+		for (layer_idx = 0; layer_idx < n_layers; layer_idx++) {
+			layer = ordered_layers[layer_idx]
+			if (!(layer in layer_total)) continue
+
+			total = layer_total[layer]
+
+			# Build upstream_layers array
+			up_layers_arr = ""
+			for (j = 0; j < n_layers; j++) {
+				target = ordered_layers[j]
+				key = layer SUBSEP target
+				if (key in layer_up_targets) {
+					if (up_layers_arr != "") up_layers_arr = up_layers_arr ", "
+					up_layers_arr = up_layers_arr "\"" target "\""
+				}
+			}
+
+			# Build downstream_layers array
+			down_layers_arr = ""
+			for (j = 0; j < n_layers; j++) {
+				target = ordered_layers[j]
+				key = layer SUBSEP target
+				if (key in layer_down_targets) {
+					if (down_layers_arr != "") down_layers_arr = down_layers_arr ", "
+					down_layers_arr = down_layers_arr "\"" target "\""
+				}
+			}
+
+			if (layer_printed) printf ",\n"
+			layer_printed = 1
+
+			printf "    {\n"
+			printf "      \"layer_id\": %d,\n", layer_id
+			printf "      \"name\": \"%s\",\n", json_escape(layer)
+			printf "      \"pattern\": \"%s\",\n", json_escape(layer_pattern[layer])
+
+			# Output file_ids array
+			printf "      \"file_ids\": ["
+			if (layer_files[layer] != "") {
+				n_fids = split(layer_files[layer], fids, ",")
+				for (fid_idx = 1; fid_idx <= n_fids; fid_idx++) {
+					if (fid_idx > 1) printf ", "
+					printf "%d", fids[fid_idx]
+				}
+			}
+			printf "],\n"
+
+			printf "      \"total_tags\": %d,\n", total
+			printf "      \"upstream_layers\": [%s],\n", up_layers_arr
+			printf "      \"downstream_layers\": [%s]\n", down_layers_arr
+			printf "    }"
+
+			layer_id++
+		}
+		printf "\n  ],\n"
+
+		# Write file mapping to temp file for trace_tags generation
+		mapping_file = output_dir "/file_mapping.tmp"
+		for (file_path in file_mapping) {
+			print file_path "|" file_mapping[file_path] > mapping_file
+		}
+		close(mapping_file)
+
+		# Also write layer_order mapping for trace_tags
+		layer_mapping_file = output_dir "/layer_mapping.tmp"
+		for (layer in layer_order) {
+			print layer "|" layer_order[layer] > layer_mapping_file
+		}
+		close(layer_mapping_file)
+}'
+
+		# STEP 6: Generate trace_tags array (renamed from nodes, with from_tag field)
+		_FILE_MAPPING_TEMP="${OUTPUT_DIR%/}/file_mapping.tmp"
+		_LAYER_MAPPING_TEMP="${OUTPUT_DIR%/}/layer_mapping.tmp"
+		printf '  "trace_tags": [\n'
+		awk -F"$SHTRACER_SEPARATOR" -v file_mapping="$_FILE_MAPPING_TEMP" -v layer_mapping="$_LAYER_MAPPING_TEMP" '
+BEGIN {
+	first=1
+	# Load file path to global file_id mapping
+	while ((getline line < file_mapping) > 0) {
+		split(line, parts, "|")
+		# parts[1] = file path, parts[2] = global file_id
+		file_to_id[parts[1]] = parts[2]
+	}
+	close(file_mapping)
+
+	# Load layer to layer_id mapping
+	while ((getline line < layer_mapping) > 0) {
+		split(line, parts, "|")
+		# parts[1] = layer name, parts[2] = layer_id
+		layer_to_id[parts[1]] = parts[2]
+	}
+	close(layer_mapping)
+}
+NF >= 8 {
+	# Look up global file_id from mapping using full path
+	file_path = $5
+	file_id = file_to_id[file_path]
+	if (file_id == "") file_id = -1
+
+	# Extract layer from trace_target (field 1)
+	target = $1
+	sub(/^:/, "", target)
+	sub(/.*:/, "", target)
+	layer_id = layer_to_id[target]
+	if (layer_id == "") layer_id = -1
+
+	# Normalize upstream tags into an array (handles comma/semicolon/space separated lists)
+	raw_from = $3
+	gsub(/^ +| +$/, "", raw_from)
+	gsub(/[;,]/, " ", raw_from)
+	from_tags_json = "[]"
+	from_tag_first = "NONE"
+
+	if (raw_from != "" && raw_from != "NONE" && raw_from != "null") {
+		n_from = split(raw_from, from_arr, /[ \t]+/)
+		from_tags_json = "["
+		sep = ""
+		for (i = 1; i <= n_from; i++) {
+			tag = from_arr[i]
+			if (tag == "" || tag == "NONE" || tag == "null") continue
+			if (from_tag_first == "NONE") from_tag_first = tag
+			from_tags_json = from_tags_json sep "\"" tag "\""
+			sep = ", "
+		}
+		from_tags_json = from_tags_json "]"
+		if (from_tag_first == "NONE") {
+			from_tags_json = "[]"
+		}
+	}
+
+	# Escape quotes and backslashes in description
+	desc = $4
+	gsub(/\\/, "\\\\", desc)
+	gsub(/"/, "\\\"", desc)
+	gsub(/\015/, "\\r", desc)  # \r (CR)
+	gsub(/\012/, "\\n", desc)  # \n (LF)
+	gsub(/\011/, "\\t", desc)  # \t (TAB)
+
+	if (!first) printf ",\n"
+	first=0
+
+	printf "    {\n"
+	printf "      \"id\": \"%s\",\n", $2
+	printf "      \"from_tag\": \"%s\",\n", from_tag_first  # NEW: Add from_tag
+	printf "      \"from_tags\": %s,\n", from_tags_json
+	printf "      \"description\": \"%s\",\n", desc
+	printf "      \"file_id\": %d,\n", file_id  # Global file_id
+	printf "      \"line\": %d,\n", $6
+	printf "      \"layer_id\": %d\n", layer_id
+	printf "    }"
+}
+END { printf "\n" }
+' "$_TAG_OUTPUT_DATA"
+
+		# Clean up layer mapping (file mapping still needed for health section)
+		rm -f "$_LAYER_MAPPING_TEMP"
+
+		printf '  ],\n'
+
+		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tag)
+
+		# Generate chains array from tag table (unchanged)
 		printf '  "chains": [\n'
 		awk '
 		BEGIN { first=1 }
@@ -961,12 +1391,539 @@ make_json() {
 			printf "]"
 		}
 		' "$_TAG_TABLE"
-		printf '\n  ]\n'
+		printf '\n  ],\n'
+
+		# STEP 8: Generate cross-reference matrix files for backward compatibility
+		# Note: Cross_references removed from JSON schema, but matrix files still
+		#       needed by HTML/Markdown viewers for cross-reference tables
+
+		# STEP 9: Generate health section with restructured coverage
+		_FILE_MAPPING_TEMP2="${OUTPUT_DIR%/}/file_mapping.tmp"
+		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
+			-v tag_pairs="$_TAG_PAIRS" \
+			-v tag_pairs_downstream="$_TAG_PAIRS_DOWNSTREAM" \
+			-v config_table="$_CONFIG_TABLE" \
+			-v file_mapping="$_FILE_MAPPING_TEMP2" \
+			-v sep="$SHTRACER_SEPARATOR" '
+	# JSON escape function (defined outside BEGIN)
+	function json_escape(s,   result) {
+		result = s
+		gsub(/\\/, "\\\\", result)
+		gsub(/"/, "\\\"", result)
+		gsub(/\n/, "\\n", result)
+		gsub(/\r/, "\\r", result)
+		gsub(/\t/, "\\t", result)
+		return result
+	}
+
+		# Selection sort to keep isolated tags and their metadata aligned alphabetically
+		function sort_isolated(n, tags, files, lines,    i, j, min, tmpTag, tmpFile, tmpLine) {
+			if (n <= 1) return
+			for (i = 0; i < n - 1; i++) {
+				min = i
+				for (j = i + 1; j < n; j++) {
+					if (tags[j] < tags[min]) {
+						min = j
+					}
+				}
+				if (min != i) {
+					tmpTag = tags[i]; tags[i] = tags[min]; tags[min] = tmpTag
+					tmpFile = files[i]; files[i] = files[min]; files[min] = tmpFile
+					tmpLine = lines[i]; lines[i] = lines[min]; lines[min] = tmpLine
+				}
+			}
+		}
+	
+	BEGIN {
+		# Load global file_id mapping (full path -> file_id) generated earlier
+		while ((getline line < file_mapping) > 0) {
+			split(line, parts, "|")
+			if (length(parts) >= 2) {
+				file_global_id[parts[1]] = parts[2]
+			}
+		}
+		close(file_mapping)
+
+			n_layers = 0
+			while ((getline line < config_table) > 0) {
+				split(line, fields, sep)
+				if (length(fields) >= 1 && fields[1] != "") {
+					layer = fields[1]
+					sub(/^:/, "", layer)
+					sub(/.*:/, "", layer)
+					if (layer != "" && !(layer in layer_order)) {
+						layer_order[layer] = n_layers
+						ordered_layers[n_layers] = layer
+						n_layers++
+					}
+				}
+			}
+			close(config_table)
+
+			# Read all tags
+			while ((getline line < tag_output_data) > 0) {
+				split(line, fields, sep)
+				if (length(fields) >= 8) {
+					tag_id = fields[2]
+					all_tags[tag_id] = 1
+					tag_target[tag_id] = fields[1]
+					tag_file[tag_id] = fields[5]
+					tag_line[tag_id] = fields[6]
+					tag_version[tag_id] = fields[8]
+					total_tags++
+				}
+			}
+			close(tag_output_data)
+
+			# Read tags with links
+			while ((getline line < tag_pairs) > 0) {
+				split(line, fields, " ")
+				if (fields[1] != "NONE" && fields[2] != "NONE") {
+					tags_with_links[fields[1]] = 1
+				}
+			}
+			close(tag_pairs)
+
+			while ((getline line < tag_pairs_downstream) > 0) {
+				split(line, fields, " ")
+				if (fields[1] != "NONE" && fields[2] != "NONE") {
+					tags_with_links[fields[1]] = 1
+				}
+			}
+			close(tag_pairs_downstream)
+
+			tags_with_links_count = 0
+			for (tag in tags_with_links) {
+				tags_with_links_count++
+			}
+
+			isolated_count = 0
+			for (tag in all_tags) {
+				if (!(tag in tags_with_links)) {
+					isolated_tags[isolated_count] = tag
+					file_path = tag_file[tag]
+					isolated_file_id[isolated_count] = file_global_id[file_path]
+					isolated_line[isolated_count] = tag_line[tag]
+					isolated_count++
+				}
+			}
+
+			# Sort isolated tags alphabetically for deterministic output
+			sort_isolated(isolated_count, isolated_tags, isolated_file_id, isolated_line)
+
+			# Build tag-to-layer mapping
+			for (tag in all_tags) {
+				target = tag_target[tag]
+				layer = target
+				sub(/^:/, "", layer)
+				sub(/.*:/, "", layer)
+				tag_to_layer[tag] = layer
+
+				file_path = tag_file[tag]
+				tag_to_file[tag] = file_path
+			}
+
+			# Build adjacency list (same as before)
+			while ((getline line < tag_pairs) > 0) {
+				split(line, fields, " ")
+				src = fields[1]
+				tgt = fields[2]
+				if (src != "NONE" && tgt != "NONE" && src in all_tags && tgt in all_tags) {
+					if (adj_list[src] == "") {
+						adj_list[src] = tgt
+					} else {
+						adj_list[src] = adj_list[src] ";" tgt
+					}
+					if (adj_list[tgt] == "") {
+						adj_list[tgt] = src
+					} else {
+						adj_list[tgt] = adj_list[tgt] ";" src
+					}
+				}
+			}
+			close(tag_pairs)
+
+			while ((getline line < tag_pairs_downstream) > 0) {
+				split(line, fields, " ")
+				src = fields[1]
+				tgt = fields[2]
+				if (src != "NONE" && tgt != "NONE" && src in all_tags && tgt in all_tags) {
+					if (index(adj_list[src], tgt) == 0) {
+						if (adj_list[src] == "") {
+							adj_list[src] = tgt
+						} else {
+							adj_list[src] = adj_list[src] ";" tgt
+						}
+					}
+					if (index(adj_list[tgt], src) == 0) {
+						if (adj_list[tgt] == "") {
+							adj_list[tgt] = src
+						} else {
+							adj_list[tgt] = adj_list[tgt] ";" src
+						}
+					}
+				}
+			}
+			close(tag_pairs_downstream)
+
+			# Calculate coverage (same logic as before)
+			for (tag in all_tags) {
+				layer = tag_to_layer[tag]
+				file_path = tag_to_file[tag]
+				n_slash = split(file_path, path_parts, "/")
+				file_basename = path_parts[n_slash]
+
+				if (!(layer in layer_order) || file_basename == "config.md") continue
+
+				my_order = layer_order[layer]
+				layer_total[layer]++
+
+				file_key = layer "|" file_path
+				file_total[file_key]++
+
+				if (file_version[file_key] == "") {
+					file_version[file_key] = tag_version[tag]
+				}
+
+				up_layers_str = ""
+				down_layers_str = ""
+				has_up = 0
+				has_down = 0
+
+				if (adj_list[tag] != "") {
+					n_neighbors = split(adj_list[tag], neighbor_arr, ";")
+					for (j = 1; j <= n_neighbors; j++) {
+						neighbor = neighbor_arr[j]
+						neighbor_layer = tag_to_layer[neighbor]
+
+						if (neighbor_layer == "" || neighbor_layer == layer) continue
+						if (!(neighbor_layer in layer_order)) continue
+
+						neighbor_order = layer_order[neighbor_layer]
+
+						if (neighbor_order < my_order) {
+							has_up = 1
+							if (index(up_layers_str, neighbor_layer) == 0) {
+								up_layers_str = up_layers_str (up_layers_str ? "," : "") neighbor_layer
+							}
+						}
+						else if (neighbor_order > my_order) {
+							has_down = 1
+							if (index(down_layers_str, neighbor_layer) == 0) {
+								down_layers_str = down_layers_str (down_layers_str ? "," : "") neighbor_layer
+							}
+						}
+					}
+				}
+
+				if (up_layers_str != "") {
+					n_up = split(up_layers_str, up_arr, ",")
+					layer_up_count[layer]++
+					for (k = 1; k <= n_up; k++) {
+						target_layer = up_arr[k]
+						key = layer SUBSEP target_layer
+						if (!(key in layer_up_targets)) {
+							layer_up_targets[key] = 1
+						}
+					}
+				}
+
+				if (down_layers_str != "") {
+					n_down = split(down_layers_str, down_arr, ",")
+					layer_down_count[layer]++
+					for (k = 1; k <= n_down; k++) {
+						target_layer = down_arr[k]
+						key = layer SUBSEP target_layer
+						if (!(key in layer_down_targets)) {
+							layer_down_targets[key] = 1
+						}
+					}
+				}
+
+				if (has_up) file_up[file_key] = (file_up[file_key] + 0) + 1
+				if (has_down) file_down[file_key] = (file_down[file_key] + 0) + 1
+			}
+
+			# Output health section
+			printf "  \"health\": {\n"
+			printf "    \"total_tags\": %d,\n", total_tags
+			printf "    \"tags_with_links\": %d,\n", tags_with_links_count
+			printf "    \"isolated_tags\": %d,\n", isolated_count
+			printf "    \"isolated_tag_list\": [\n"
+			for (i = 0; i < isolated_count; i++) {
+				if (i > 0) printf ",\n"
+				tag_id = json_escape(isolated_tags[i])
+				fid = isolated_file_id[i]
+				line_num = isolated_line[i]
+				if (fid == "") fid = -1
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag_id, fid, line_num
+			}
+			printf "\n    ],\n"
+
+			printf "    \"coverage\": {\n"
+			printf "      \"layers\": [\n"
+
+			# Output coverage layers with NEW nested upstream/downstream structure
+			layer_id = 0
+			layer_printed = 0
+			for (i = 0; i < n_layers; i++) {
+				layer = ordered_layers[i]
+				if (!(layer in layer_total)) continue
+
+				total = layer_total[layer]
+				up_count = layer_up_count[layer] + 0
+				down_count = layer_down_count[layer] + 0
+				# NEW: Float percentages with 1 decimal
+				up_pct = (total > 0) ? (up_count * 100.0 / total) : 0.0
+				down_pct = (total > 0) ? (down_count * 100.0 / total) : 0.0
+
+				if (layer_printed) printf ",\n"
+				layer_printed = 1
+
+				printf "        {\n"
+				printf "          \"layer_id\": %d,\n", layer_id
+				printf "          \"name\": \"%s\",\n", layer
+				printf "          \"total\": %d,\n", total
+
+				# NEW: Nested upstream object
+				printf "          \"upstream\": {\n"
+				printf "            \"count\": %d,\n", up_count
+				printf "            \"percent\": %.1f\n", up_pct
+				printf "          },\n"
+
+				# NEW: Nested downstream object
+				printf "          \"downstream\": {\n"
+				printf "            \"count\": %d,\n", down_count
+				printf "            \"percent\": %.1f\n", down_pct
+				printf "          },\n"
+
+				# Output files with NEW structure
+				printf "          \"files\": [\n"
+				first_file = 1
+
+				# Need to map file path to global file_id
+				# We'\''ll reuse the file_mapping we created earlier
+				for (file_key in file_total) {
+					split(file_key, parts, "|")
+					if (parts[1] != layer) continue
+
+					file_path = parts[2]
+					file_tag_total = file_total[file_key]
+					file_up_count = file_up[file_key] + 0
+					file_down_count = file_down[file_key] + 0
+
+					# NEW: Float percentages with 1 decimal
+					file_up_pct = (file_tag_total > 0) ? (file_up_count * 100.0 / file_tag_total) : 0.0
+					file_down_pct = (file_tag_total > 0) ? (file_down_count * 100.0 / file_tag_total) : 0.0
+
+					# Get global file_id from mapping
+					fid = file_global_id[file_path]
+					if (fid == "") fid = -1
+
+					# Get version from file_version
+					file_ver = file_version[file_key]
+					if (file_ver == "") file_ver = "unknown"
+
+					if (!first_file) printf ",\n"
+					first_file = 0
+
+					printf "            {\n"
+					printf "              \"file_id\": %d,\n", fid
+					printf "              \"total\": %d,\n", file_tag_total
+
+					# NEW: Nested upstream object
+					printf "              \"upstream\": {\n"
+					printf "                \"count\": %d,\n", file_up_count
+					printf "                \"percent\": %.1f\n", file_up_pct
+					printf "              },\n"
+
+					# NEW: Nested downstream object
+					printf "              \"downstream\": {\n"
+					printf "                \"count\": %d,\n", file_down_count
+					printf "                \"percent\": %.1f\n", file_down_pct
+					printf "              },\n"
+
+					# Escape version string for JSON
+					printf "              \"version\": \"%s\"\n", json_escape(file_ver)
+					printf "            }"
+				}
+				printf "\n          ]\n"
+				printf "        }"
+				layer_id++
+			}
+
+			printf "\n      ]\n"
+			printf "    }\n"
+			printf "  }\n"
+		}'
 
 		printf '}\n'
 	} >"$_JSON_OUTPUT_FILENAME"
 
+	# Clean up temp file
+	rm -f "${OUTPUT_DIR%/}/file_mapping.tmp"
+
+	# Generate cross-reference matrix files for backward compatibility with viewers
+	_generate_cross_reference_matrix_files "$_JSON_OUTPUT_FILENAME" "$OUTPUT_DIR"
+
 	echo "$_JSON_OUTPUT_FILENAME"
+}
+
+##
+# @brief Generate cross-reference matrix files from JSON trace_tags
+# @details Creates 06_cross_ref_matrix_* files in OUTPUT_DIR/tags/ directory
+#          by parsing trace_tags[].from_tag field for backward compatibility
+#          with HTML and Markdown viewers
+# @param $1 : JSON file path
+# @param $2 : OUTPUT_DIR
+# @return 0 on success, 1 on failure
+# @tag @IMP2.8@ (FROM: @ARC2.4@)
+_generate_cross_reference_matrix_files() {
+	_json_file="$1"
+	_output_dir="${2%/}"
+	_tags_dir="${_output_dir}/tags"
+
+	[ -f "$_json_file" ] || return 1
+	[ -d "$_tags_dir" ] || mkdir -p "$_tags_dir"
+
+	# Remove stale matrices to avoid duplicate tabs
+	rm -f "${_tags_dir}"/[0-9][0-9]_cross_ref_matrix_* 2>/dev/null || true
+
+	# Parse files, layers, and trace_tags arrays from JSON, then emit adjacent-layer matrices
+	printf '%s\n' "$(cat "$_json_file")" | awk -v tags_dir="$_tags_dir" '
+		function safe_path(p) { return (p == "") ? "/unknown" : p }
+		function safe_line(l) { return (l == "" || l + 0 < 1) ? 1 : l }
+		BEGIN {
+			in_files=0; in_file_obj=0;
+			in_layers=0; in_layer_obj=0;
+			in_trace_tags=0; in_tag_obj=0;
+			layer_count=0; link_count=0;
+		}
+
+		/"files": \[/ { in_files=1; next }
+		in_files && /^  \],?$/ { in_files=0; next }
+		in_files && /^    \{/ { in_file_obj=1; file_id=""; file=""; next }
+		in_files && in_file_obj && /^    \},?$/ { if (file_id != "") file_map[file_id]=file; in_file_obj=0; next }
+		in_file_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
+		in_file_obj && /"file":/ { match($0, /"file": "([^"]+)"/, arr); file = arr[1] }
+
+		/"layers": \[/ { in_layers=1; next }
+		in_layers && /^  \],?$/ { in_layers=0; next }
+		in_layers && /^    \{/ { in_layer_obj=1; layer_id=""; name=""; pattern=""; next }
+		in_layers && in_layer_obj && /^    \},?$/ {
+			if (layer_id != "") {
+				layer_ids[++layer_count] = layer_id
+				layer_map[layer_id] = name
+				pattern_map[layer_id] = pattern
+			}
+			in_layer_obj=0; next
+		}
+		in_layer_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
+		in_layer_obj && /"name":/ { match($0, /"name": "([^"]+)"/, arr); name = arr[1] }
+		in_layer_obj && /"pattern":/ { match($0, /"pattern": "([^"]+)"/, arr); pattern = arr[1] }
+
+		/"trace_tags": \[/ { in_trace_tags=1; next }
+		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
+		in_trace_tags && /^    \{/ { in_tag_obj=1; tag_id=""; from_tag=""; layer_id=""; file_id=""; line=""; from_tags_count=0; delete from_tags; next }
+		in_trace_tags && in_tag_obj && /^    \},?$/ {
+			if (tag_id != "" && layer_id != "" && file_id != "") {
+				tag_layer[tag_id] = layer_id
+				tag_file[tag_id] = file_map[file_id]
+				tag_line[tag_id] = safe_line(line)
+				tags_in_layer_count[layer_id]++
+				tags_in_layer[layer_id, tags_in_layer_count[layer_id]] = tag_id
+
+				# Choose upstream sources from from_tags (array) first, then fallback to from_tag
+				n_up = 0
+				if (from_tags_count > 0) {
+					for (u = 1; u <= from_tags_count; u++) upstream[u] = from_tags[u]
+					n_up = from_tags_count
+				} else if (from_tag != "" && from_tag != "null" && from_tag != "NONE") {
+					n_up = 1
+					upstream[1] = from_tag
+				}
+
+				for (u = 1; u <= n_up; u++) {
+					src_tag = upstream[u]
+					if (src_tag == "" || src_tag == "null" || src_tag == "NONE") continue
+					key = src_tag SUBSEP tag_id
+					if (!link_seen[key]++) {
+						links[link_count,0] = src_tag
+						links[link_count,1] = tag_id
+						link_count++
+					}
+				}
+			}
+			in_tag_obj=0; next
+		}
+		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
+		in_tag_obj && /"from_tag":/ { match($0, /"from_tag": "([^"]+)"/, arr); from_tag = arr[1] }
+		in_tag_obj && /"from_tags":/ {
+			from_tags_count = 0
+			delete from_tags
+			if (match($0, /\[(.*)\]/, arr)) {
+				raw = arr[1]
+				n_ft = split(raw, ft_arr, ",")
+				for (k = 1; k <= n_ft; k++) {
+					t = ft_arr[k]
+					gsub(/^[ \t"]+|[ \t"]+$/, "", t)
+					if (t != "" && t != "NONE" && t != "null") {
+						from_tags[++from_tags_count] = t
+					}
+				}
+			}
+		}
+		in_tag_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
+		in_tag_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
+		in_tag_obj && /"line":/ { match($0, /"line": ([0-9]+)/, arr); line = arr[1] }
+
+		END {
+			if (layer_count < 2) exit
+			file_num = 6
+			for (i = 1; i < layer_count; i++) {
+				src_id = layer_ids[i]
+				tgt_id = layer_ids[i+1]
+				src_name = layer_map[src_id]
+				tgt_name = layer_map[tgt_id]
+				src_pattern = pattern_map[src_id]
+				tgt_pattern = pattern_map[tgt_id]
+				src_safe = src_name; tgt_safe = tgt_name
+				gsub(/ /, "_", src_safe); gsub(/ /, "_", tgt_safe)
+				filename = sprintf("%s/%02d_cross_ref_matrix_%s_%s", tags_dir, file_num, src_safe, tgt_safe)
+				file_num++
+
+				print "[METADATA]" > filename
+				print src_pattern "<shtracer_separator>" tgt_pattern >> filename
+				print "[ROW_TAGS]" >> filename
+				row_n = tags_in_layer_count[src_id]
+				for (r = 1; r <= row_n; r++) {
+					tag = tags_in_layer[src_id, r]
+					print tag "<shtracer_separator>" safe_path(tag_file[tag]) "<shtracer_separator>" safe_line(tag_line[tag]) >> filename
+				}
+
+				print "[COL_TAGS]" >> filename
+				col_n = tags_in_layer_count[tgt_id]
+				for (c = 1; c <= col_n; c++) {
+					tag = tags_in_layer[tgt_id, c]
+					print tag "<shtracer_separator>" safe_path(tag_file[tag]) "<shtracer_separator>" safe_line(tag_line[tag]) >> filename
+				}
+
+				print "[MATRIX]" >> filename
+				for (l = 0; l < link_count; l++) {
+					src_tag = links[l,0]
+					tgt_tag = links[l,1]
+					if (tag_layer[src_tag] == src_id && tag_layer[tgt_tag] == tgt_id) {
+						mkey = src_tag "<shtracer_separator>" tgt_tag
+						if (!matrix_seen[mkey]++) print mkey >> filename
+					}
+				}
+				close(filename)
+			}
+		}
+	'
+
+	return 0
 }
 
 ##
@@ -1072,7 +2029,7 @@ swap_tags() {
 # @example _extract_layer_hierarchy "01_config_table" returns:
 #          Requirement	@REQ[0-9\.]+@
 #          Architecture	@ARC[0-9\.]+@
-# @tag     @IMP3.3.2.3@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.3@ (FROM: @ARC2.7@)
 _extract_layer_hierarchy() {
 	_config_table="$1"
 
@@ -1124,7 +2081,7 @@ _extract_layer_hierarchy() {
 # @param   $4 : Column tag pattern (TAG FORMAT regex, e.g., "@ARC[0-9\.]+@")
 # @param   $5 : Output file path
 # @return  0 on success, 1 on error
-# @tag     @IMP3.3.2.2@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.2@ (FROM: @ARC2.7@)
 _generate_cross_reference_matrix() {
 	_tags_file="$1"
 	_tag_pairs_file="$2"
@@ -1261,7 +2218,7 @@ _generate_cross_reference_matrix() {
 # @param   $2 : 01_tags file path
 # @param   $3 : 02_tag_pairs file path
 # @return  Echoes cross-reference output directory
-# @tag     @IMP3.3.2.1@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.1@ (FROM: @ARC2.7@)
 make_cross_reference_tables() {
 	_config_table="$1"
 	_tags_file="$2"
@@ -1278,7 +2235,7 @@ make_cross_reference_tables() {
 	_layer_hierarchy=$(_extract_layer_hierarchy "$_config_table")
 
 	if [ -z "$_layer_hierarchy" ]; then
-		echo "[shtracer][warning]: No traceability layers found in tags" >&2
+		echo "[shtracer][warn]: No traceability layers found in tags" >&2
 		echo "$_xref_output_dir"
 		return 0
 	fi
@@ -1289,21 +2246,31 @@ make_cross_reference_tables() {
 	_prev_format=""
 
 	# Process each layer (identifier<tab>tag_format)
-	echo "$_layer_hierarchy" | while IFS="$(printf '\t')" read -r _current_identifier _current_format; do
+	# Use temporary file to avoid subshell and preserve variable updates
+	_layer_tmp="${OUTPUT_DIR%/}/layer_hierarchy.tmp"
+	printf '%s\n' "$_layer_hierarchy" >"$_layer_tmp"
+
+	while IFS="$(printf '\t')" read -r _current_identifier _current_format; do
 		if [ -n "$_prev_identifier" ] && [ -n "$_prev_format" ]; then
+			# Convert layer identifiers to filename-safe format (spaces to underscores)
+			_prev_id_safe=$(printf '%s' "$_prev_identifier" | tr ' ' '_')
+			_current_id_safe=$(printf '%s' "$_current_identifier" | tr ' ' '_')
+
 			# Generate matrix for adjacent pair: prev_layer → current_layer
-			_output_file="${_xref_output_dir}$(printf '%02d' $_file_num)_cross_ref_matrix_${_prev_identifier}_${_current_identifier}"
+			_output_file="${_xref_output_dir}$(printf '%02d' $_file_num)_cross_ref_matrix_${_prev_id_safe}_${_current_id_safe}"
 
 			if ! _generate_cross_reference_matrix "$_tags_file" "$_tag_pairs_file" \
 				"$_prev_format" "$_current_format" "$_output_file"; then
-				echo "[shtracer][warning]: Failed to generate $_prev_identifier vs $_current_identifier matrix" >&2
+				echo "[shtracer][warn]: Failed to generate $_prev_identifier vs $_current_identifier matrix" >&2
 			fi
 
 			_file_num=$((_file_num + 1))
 		fi
 		_prev_identifier="$_current_identifier"
 		_prev_format="$_current_format"
-	done
+	done <"$_layer_tmp"
+
+	rm -f "$_layer_tmp"
 
 	echo "$_xref_output_dir"
 	return 0
@@ -1315,7 +2282,7 @@ make_cross_reference_tables() {
 # @param   $2 : Config file path (for relative path calculation)
 # @param   $3 : Output markdown file path
 # @return  0 on success, 1 on error
-# @tag     @IMP3.3.2.5@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.5@ (FROM: @ARC2.7@)
 _generate_markdown_table() {
 	_matrix_file="$1"
 	_config_file="$2"
@@ -1335,11 +2302,11 @@ _generate_markdown_table() {
 		# Normalize paths
 		gsub(/\/$/, "", from_dir)
 		gsub(/\/$/, "", to_file)
-		
+
 		# Split paths into parts
 		from_count = split(from_dir, from_parts, "/")
 		to_count = split(to_file, to_parts, "/")
-		
+
 		# Find common prefix
 		common = 0
 		for (i = 1; i <= from_count && i <= to_count; i++) {
@@ -1349,22 +2316,22 @@ _generate_markdown_table() {
 				break
 			}
 		}
-		
+
 		# Count how many levels to go up
 		up_count = from_count - common
-		
+
 		# Build relative path
 		result = ""
 		for (i = 0; i < up_count; i++) {
 			result = result "../"
 		}
-		
+
 		# Add remaining path from to_file
 		for (i = common + 1; i <= to_count; i++) {
 			if (i > common + 1) result = result "/"
 			result = result to_parts[i]
 		}
-		
+
 		return result
 	}
 
@@ -1399,7 +2366,7 @@ _generate_markdown_table() {
 		rows[row_count] = tag
 		row_file[tag] = file
 		row_line[tag] = line
-		
+
 		# Compute relative path
 		if (file != "unknown") {
 			row_rel_path[tag] = compute_relative_path(output_dir, file)
@@ -1417,7 +2384,7 @@ _generate_markdown_table() {
 		cols[col_count] = tag
 		col_file[tag] = file
 		col_line[tag] = line
-		
+
 		# Compute relative path
 		if (file != "unknown") {
 			col_rel_path[tag] = compute_relative_path(output_dir, file)
@@ -1437,7 +2404,7 @@ _generate_markdown_table() {
 
 	END {
 		# Generate Markdown output
-		
+
 		# Title
 		printf "# Cross-Reference Table: %s vs %s\n\n", row_label, col_label
 
@@ -1473,18 +2440,18 @@ _generate_markdown_table() {
 		printf "\n"
 
 		# Data rows
-		orphaned_count = 0
+		isolated_count = 0
 		for (i = 0; i < row_count; i++) {
 			row = rows[i]
 			has_link = 0
-			
+
 			# Row header with hyperlink
 			if (row_rel_path[row] != "unknown") {
 				printf "[%s](%s#L%s)", row, row_rel_path[row], row_line[row]
 			} else {
 				printf "%s", row
 			}
-			
+
 			# Cells
 			for (j = 0; j < col_count; j++) {
 				col = cols[j]
@@ -1496,8 +2463,8 @@ _generate_markdown_table() {
 				}
 			}
 			printf "\n"
-			
-			if (!has_link) orphaned_count++
+
+			if (!has_link) isolated_count++
 		}
 
 		# Statistics footer
@@ -1508,7 +2475,7 @@ _generate_markdown_table() {
 		printf "- Total %s tags: %d\n", row_label, row_count
 		printf "- Total %s tags: %d\n", col_label, col_count
 		printf "- Total links: %d\n", matrix_count
-		
+
 		# Calculate coverage (% of column tags that have at least one link)
 		col_with_links = 0
 		for (j = 0; j < col_count; j++) {
@@ -1526,9 +2493,9 @@ _generate_markdown_table() {
 			printf "- Coverage: %.1f%% (%d/%d %s tags have upstream links)\n", \
 				coverage, col_with_links, col_count, col_label
 		}
-		
-		if (orphaned_count > 0) {
-			printf "- Orphaned %s tags: %d (no links)\n", row_label, orphaned_count
+
+		if (isolated_count > 0) {
+			printf "- Isolated %s tags: %d (no links)\n", row_label, isolated_count
 		}
 	}
 	' "$_matrix_file" >"$_output_md"
@@ -1541,7 +2508,7 @@ _generate_markdown_table() {
 # @param   $1 : Tags output directory (contains *_cross_ref_matrix_* files)
 # @param   $2 : Config file path (for relative path calculation)
 # @return  Echoes markdown output directory
-# @tag     @IMP3.3.2.4@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.4@ (FROM: @ARC2.7@)
 markdown_cross_reference() {
 	_tags_dir="$1"
 	_config_path="$2"
@@ -1561,7 +2528,7 @@ markdown_cross_reference() {
 	_matrix_files=$(find "$_tags_dir" -maxdepth 1 -type f -name '*_cross_ref_matrix_*' 2>/dev/null | sort)
 
 	if [ -z "$_matrix_files" ]; then
-		echo "[shtracer][warning]: No cross-reference matrix files found" >&2
+		echo "[shtracer][warn]: No cross-reference matrix files found" >&2
 		echo "$_md_output_dir"
 		return 0
 	fi
@@ -1579,7 +2546,7 @@ markdown_cross_reference() {
 
 		# Generate markdown table
 		if ! _generate_markdown_table "$_matrix_file" "$_config_path" "$_output_md"; then
-			echo "[shtracer][warning]: Failed to generate markdown for $_layer_pair" >&2
+			echo "[shtracer][warn]: Failed to generate markdown for $_layer_pair" >&2
 		fi
 
 		_file_num=$((_file_num + 1))
