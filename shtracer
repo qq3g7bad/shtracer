@@ -41,9 +41,9 @@ CONFIG_PATH=''
 SHTRACER_MODE='NORMAL'
 BEFORE_TAG=''
 AFTER_TAG=''
-EXPORT_JSON='false'
 EXPORT_SUMMARY='false'
 EXPORT_HTML='false'
+EXPORT_MARKDOWN='false'
 SHTRACER_DEBUG='false'
 OUTPUT_DIR_DEFAULT_NAME='shtracer_output'
 SHTRACER_SEPARATOR="<shtracer_separator>"
@@ -82,20 +82,21 @@ print_usage() {
 		  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
 		  -v                               Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
-		  --json                           Export traceability data in JSON format
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
+		  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
 		  --summary                        Print traceability summary to stdout (direct links only)
-		  --debug                          Keep ${OUTPUT_DIR} (do not auto-delete)
+		  --debug                          Keep ${OUTPUT_DIR} and output tag table to stderr
 		  -h, --help                       Show this help message
 
 		Examples:
-		  1. Normal mode
+		  1. Normal mode (JSON output)
 		     $ ./shtracer ./sample/config.md
+		     $ ./shtracer ./sample/config.md > output.json
 
-		  2. Change mode (swap or rename tags).
+		  2. Change mode (swap or rename tags)
 		     $ ./shtracer -c old_tag new_tag ./sample/config.md
 
-		  3. Verify mode (check for duplicate or isolated tags).
+		  3. Verify mode (check for duplicate or isolated tags)
 		     $ ./shtracer -v ./sample/config.md
 
 		  4. Test mode
@@ -105,14 +106,20 @@ print_usage() {
 		     $ ./shtracer --summary ./sample/config.md
 
 		  6. HTML mode
-		     $ ./shtracer --debug --html ./sample/config.md > ./sample/output.html
+		     $ ./shtracer --html ./sample/config.md > output.html
+
+		  7. Markdown mode
+		     $ ./shtracer --markdown ./sample/config.md > report.md
+
+		  8. Debug mode (JSON + tag table to stderr)
+		     $ ./shtracer --debug ./sample/config.md > output.json
 
 		Note:
 		  - Arguments can be specified in any order.
 		  - Only one option can be used at a time.
 
 		Version:
-		  - 0.1.2
+		  - 0.1.3
 
 		Exit Codes:
 		  0   - Success
@@ -149,7 +156,7 @@ parse_arguments() {
 				SHTRACER_MODE='TEST'
 				return
 				;;
-			--json | --html | --summary)
+			--html | --markdown | --summary)
 				# These options require a config file
 				error_exit "$EXIT_CONFIG_NOT_FOUND" "parse_arguments" "Config file required"
 				;;
@@ -203,6 +210,11 @@ parse_arguments() {
 					_export_flag="--html"
 					shift
 					;;
+				--markdown)
+					_found_option=$((_found_option + 1))
+					_export_flag="--markdown"
+					shift
+					;;
 				--summary)
 					_found_option=$((_found_option + 1))
 					_export_flag="--summary"
@@ -233,7 +245,7 @@ parse_arguments() {
 
 		# Validation: reject multiple simultaneous options
 		if [ "$_found_option" -gt 1 ]; then
-			error_exit "$EXIT_USAGE" "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --json, --html, --summary)"
+			error_exit "$EXIT_USAGE" "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --html, --markdown, --summary)"
 		fi
 
 		# Validation: mode flags and export flags are mutually exclusive
@@ -250,11 +262,11 @@ parse_arguments() {
 
 		# Set export flags
 		case "$_export_flag" in
-			--json)
-				EXPORT_JSON='true'
-				;;
 			--html)
 				EXPORT_HTML='true'
+				;;
+			--markdown)
+				EXPORT_MARKDOWN='true'
 				;;
 			--summary)
 				EXPORT_SUMMARY='true'
@@ -373,7 +385,6 @@ main_routine() {
 
 	# Export mode for use in sub-functions
 	export SHTRACER_MODE
-	export EXPORT_JSON
 	export EXPORT_SUMMARY
 	export EXPORT_HTML
 	export SHTRACER_DEBUG
@@ -439,25 +450,34 @@ main_routine() {
 			"${_TAG_OUTPUT_DIR%/}/03_tag_pairs_downstream" \
 			"$_TAG_TABLE_FILENAME" \
 			"${_CONFIG_OUTPUT_DIR%/}/01_config_table" \
-			"$CONFIG_PATH"); then
+			"$CONFIG_PATH" \
+			"${_XREF_DIR:-}"); then
 			error_exit "$EXIT_MAKE_JSON_FAILED" "main_routine" "Error in make_json"
-		fi
-
-		# If --json flag is specified, output JSON to stdout and exit
-		if [ "$EXPORT_JSON" = 'true' ]; then
-			cat "$_JSON_OUTPUT_FILE"
-			_cleanup_output_dir
-			return 0
 		fi
 
 		# If --html flag is specified, generate HTML to stdout via viewer and exit
 		if [ "$EXPORT_HTML" = 'true' ]; then
-			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" ]; then
-				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh"
+			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh" ]; then
+				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 			fi
-			if ! sh "${SCRIPT_DIR%/}/scripts/main/shtracer_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
+			# Pass OUTPUT_DIR to viewer so it can access intermediate files (cross-reference matrices)
+			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
 				_cleanup_output_dir
 				error_exit "$EXIT_VIEWER_FAILED" "main_routine" "Viewer script execution failed"
+			fi
+			_cleanup_output_dir
+			return 0
+		fi
+
+		# If --markdown flag is specified, generate Markdown to stdout via markdown viewer and exit
+		if [ "$EXPORT_MARKDOWN" = 'true' ]; then
+			if [ ! -r "${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh" ]; then
+				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Markdown viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
+			fi
+			# Pass OUTPUT_DIR to viewer for accessing intermediate files
+			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
+				_cleanup_output_dir
+				error_exit "$EXIT_VIEWER_FAILED" "main_routine" "Markdown viewer script execution failed"
 			fi
 			_cleanup_output_dir
 			return 0
@@ -470,7 +490,13 @@ main_routine() {
 			_cleanup_output_dir
 			return 0
 		else
-			cat "$_TAG_TABLE_FILENAME"
+			# Default output: JSON
+			cat "$_JSON_OUTPUT_FILE"
+			# Debug mode: also output tag table to stderr
+			if [ "$SHTRACER_DEBUG" = 'true' ]; then
+				echo "[shtracer][debug]: Tag table output:" >&2
+				cat "$_TAG_TABLE_FILENAME" >&2
+			fi
 			_cleanup_output_dir
 			return 0
 		fi
@@ -487,14 +513,14 @@ main_routine() {
 				*) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed with unknown error" ;;
 			esac
 		else
-			# In normal mode, still show the table but exit with error
-			cat "$_TAG_TABLE_FILENAME"
+			# In normal mode, suppress table output when verification errors exist
+			# Only show error messages (already printed to stderr by print_verification_result)
 			_cleanup_output_dir
 			case "$_verification_status" in
-				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Warning: found isolated tags" ;;
-				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Warning: found duplicate tags" ;;
-				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Warning: found both isolated and duplicate tags" ;;
-				*) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Warning: verification issues detected" ;;
+				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
+				2) warn_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "found duplicate tags" ;;
+				3) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "found both isolated and duplicate tags" ;;
+				*) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "verification issues detected" ;;
 			esac
 		fi
 	fi

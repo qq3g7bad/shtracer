@@ -19,6 +19,7 @@ on:
 
 # Job definitions
 jobs:
+  # @IT3.1@ (FROM: @UT1.18@) Test job - unit and integration tests
   # Job 1: Run tests on multiple operating systems
   test:
     # Display name for this job
@@ -104,6 +105,7 @@ jobs:
             ./scripts/test/output/
           retention-days: 7
 
+  # @IT3.2@ (FROM: @IMP1.4@) Code quality checks
   # Job 2: Code quality checks
   code-quality:
     name: Code quality checks
@@ -148,6 +150,7 @@ jobs:
             $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
+  # @IT3.3@ (FROM: @UT2.11@) Verification checks
   # Job 3: Run verification checks
   verify:
     name: Run verification checks

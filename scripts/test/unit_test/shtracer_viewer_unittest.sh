@@ -15,9 +15,10 @@ cd "${SCRIPT_DIR}" || exit 1
 
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
+export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
 
-# shellcheck source=../../main/shtracer_viewer.sh
-. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_viewer.sh"
+# shellcheck source=../../main/shtracer_html_viewer.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 
@@ -53,7 +54,7 @@ tearDown() {
 
 ##
 # @brief  Test for convert_template_html with valid inputs
-# @tag    @UT3.4@ (FROM: @IMP3.1@)
+# @tag    @UT3.4@ (FROM: @IMP3.1.1@)
 test_convert_template_html_with_valid_inputs() {
 	(
 		# Arrange ---------
@@ -61,10 +62,9 @@ test_convert_template_html_with_valid_inputs() {
 		mkdir -p "$OUTPUT_DIR/tags"
 		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
-		_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
 
 		# Act -------------
-		_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info" "$_TEMPLATE_DIR")"
+		_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info")"
 
 		# Assert ----------
 		assertEquals 0 "$?"
@@ -75,7 +75,7 @@ test_convert_template_html_with_valid_inputs() {
 
 ##
 # @brief  Test for convert_template_js with valid inputs
-# @tag    @UT3.5@ (FROM: @IMP3.1@)
+# @tag    @UT3.5@ (FROM: @IMP3.1.2@)
 test_convert_template_js_with_valid_inputs() {
 	(
 		# Arrange ---------
@@ -89,10 +89,9 @@ test_convert_template_js_with_valid_inputs() {
 			cd "$OUTPUT_DIR/test_dir" && pwd -P
 		)/test_file.md"
 		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
-		_TEMPLATE_ASSETS_DIR="${SCRIPT_DIR%/}/scripts/main/template/assets"
 
 		# Act -------------
-		_RESULT="$(convert_template_js "$OUTPUT_DIR/test_info" "$_TEMPLATE_ASSETS_DIR" 2>&1)"
+		_RESULT="$(convert_template_js "$OUTPUT_DIR/test_info" 2>&1)"
 
 		# Assert ----------
 		# Check if function completes (may have warnings but should produce output)
@@ -109,7 +108,7 @@ test_convert_template_js_with_valid_inputs() {
 
 ##
 # @brief  Test for make_html with valid inputs
-# @tag    @UT3.6@ (FROM: @IMP3.1@)
+# @tag    @UT3.6@ (FROM: @IMP3.1.3@)
 test_make_html_with_valid_inputs() {
 	(
 		# Arrange ---------
@@ -147,6 +146,15 @@ test_make_html_with_valid_inputs() {
 		grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
 		assertEquals "HTML should have DOCTYPE" 0 $?
 
+		grep -q "Traceability Report" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should have unified title" 0 $?
+
+		grep -q "Executive Summary" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should have Executive Summary section" 0 $?
+
+		grep -q "Traceability Health" "$OUTPUT_DIR/output.html"
+		assertEquals "HTML should have Traceability Health section" 0 $?
+
 		grep -q "<table" "$OUTPUT_DIR/output.html"
 		assertEquals "HTML should contain table" 0 $?
 
@@ -166,25 +174,31 @@ test_make_html_with_valid_inputs() {
 }
 
 ##
-# @brief  Test for shtracer_viewer.sh (stdin JSON -> stdout HTML)
+# @brief  Test for shtracer_html_viewer.sh (stdin JSON -> stdout HTML)
 test_shtracer_viewer_single_file_output() {
 	(
 		# Arrange ---------
-		SHTRACER_VIEWER="../main/shtracer_viewer.sh"
+		SHTRACER_VIEWER="../main/shtracer_html_viewer.sh"
 		SCRIPT_DIR="../../"
 		mkdir -p "$OUTPUT_DIR/test_dir"
 		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
 		cat >"$OUTPUT_DIR/output.json" <<EOF
 {
-  "metadata": {"version": "0.0.0", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
-  "nodes": [
-    {"id": "@TAG1@", "label": "@TAG1@", "index": 0, "description": "desc", "file": "$_TEST_FILE", "line": 1, "type": "Requirement", "trace_target": "x:Requirement"}
-  ],
-  "links": [],
-  "chains": [
-    ["@TAG1@", "NONE", "NONE", "NONE", "NONE"]
-  ]
+	"metadata": {"version": "0.1.3", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
+	"files": [
+		{"file_id": 0, "file": "$_TEST_FILE", "version": "unknown"}
+	],
+	"layers": [
+		{"layer_id": 0, "name": "Requirement", "pattern": "@TAG[0-9]+@", "file_ids": [0], "total_tags": 1, "upstream_layers": [], "downstream_layers": []}
+	],
+	"trace_tags": [
+		{"id": "@TAG1@", "from_tag": "NONE", "from_tags": [], "description": "desc", "file_id": 0, "line": 1, "layer_id": 0}
+	],
+	"chains": [
+		["@TAG1@", "NONE", "NONE", "NONE", "NONE"]
+	],
+	"health": {"total_tags": 1, "tags_with_links": 0, "isolated_tags": 1, "isolated_tag_list": [{"id": "@TAG1@", "file_id": 0, "line": 1}], "coverage": {"layers": []}}
 }
 EOF
 

@@ -369,22 +369,6 @@ test_parse_arguments_with_config_file() {
 }
 
 ##
-# @brief  Test for parse_arguments with --json before config (flexible order)
-# @tag    @UT1.24@ (FROM: @IMP1.3@)
-test_parse_arguments_json_before_config() {
-	(
-		# Arrange ---------
-		load_functions
-		EXPORT_JSON='false'
-		# Act -------------
-		parse_arguments "--json" "$SELF_PATH"
-		# Assert ----------
-		assertEquals "$SHTRACER_MODE" "NORMAL"
-		assertEquals "$EXPORT_JSON" "true"
-	)
-}
-
-##
 # @brief  Test for parse_arguments with --html before config (flexible order)
 # @tag    @UT1.25@ (FROM: @IMP1.3@)
 test_parse_arguments_html_before_config() {
@@ -454,7 +438,7 @@ test_parse_arguments_multiple_options() {
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			parse_arguments "--json" "--html" "$SELF_PATH" 2>&1
+			parse_arguments "--html" "--summary" "$SELF_PATH" 2>&1
 		)"
 		# Assert ----------
 		assertEquals 1 "$?"
@@ -471,7 +455,7 @@ test_parse_arguments_mode_with_export() {
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			parse_arguments "-v" "--json" "$SELF_PATH" 2>&1
+			parse_arguments "-v" "--html" "$SELF_PATH" 2>&1
 		)"
 		# Assert ----------
 		assertEquals 1 "$?"
@@ -481,14 +465,14 @@ test_parse_arguments_mode_with_export() {
 }
 
 ##
-# @brief  Test for parse_arguments with --json but no config file
+# @brief  Test for parse_arguments with --html but no config file
 # @tag    @UT1.31@ (FROM: @IMP1.3@)
-test_parse_arguments_json_without_config() {
+test_parse_arguments_html_without_config() {
 	(
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			parse_arguments "--json" 2>&1
+			parse_arguments "--html" 2>&1
 		)"
 		# Assert ----------
 		# Should exit with EXIT_CONFIG_NOT_FOUND=2 (not EXIT_USAGE=1)
@@ -606,6 +590,37 @@ test_main_routine_invalid_config_paths() {
 		echo "$_RETURN" | grep -q "No such file or directory"
 		assertEquals 0 "$?"
 
+	)
+}
+
+##
+# @brief  Test for main_routine with duplicate tags in normal mode
+# @tag    @UT1.23@ (FROM: @IMP4.1@)
+test_main_routine_normal_mode_with_duplicate_tags() {
+	(
+		# Arrange ---------
+		set -u
+
+		# Act -------------
+		_RETURN="$(main_routine "./unit_test/testdata/config_with_duplicate_tag.md" 2>&1)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		# Should exit with duplicate tags error code
+		assertEquals "Should exit with duplicate tags code" "$EXIT_DUPLICATE_TAGS" "$_EXIT_CODE"
+
+		# Should show duplicate tag warning message
+		echo "$_RETURN" | grep -q "\[shtracer\]\[error\]\[print_verification_result\]: Following tags are duplicated"
+		assertEquals "Should show duplicated tags message" 0 "$?"
+
+		# Should show the duplicate tag in error output
+		echo "$_RETURN" | grep -q "@REQ-DUP-1@"
+		assertEquals "Should show duplicate tag in error message" 0 "$?"
+
+		# Should NOT show the tag table in output (new behavior)
+		# Tag table would contain complete chains like "@REQ-DUP-1@ @REQ-DUP-2@"
+		echo "$_RETURN" | grep -q "@REQ-DUP-1@ @REQ-DUP-2@"
+		assertNotEquals "Should NOT output tag table when verification fails" 0 "$?"
 	)
 }
 

@@ -71,11 +71,24 @@ init_environment() {
 ##
 # @brief  Echo error message and exit
 # @param  $1 : Error code
-# @param  $2 : Error message
+# @param  $2 : Function name
+# @param  $3 : Error message
 # @tag    @IMP4.2@ (FROM: @ARC1.2@)
 error_exit() {
 	if [ $# -ge 3 ]; then
 		echo "[${0##*/}][error][$2]: $3" 1>&2
+	fi
+	exit "$1"
+}
+
+##
+# @brief  Echo warning message and exit
+# @param  $1 : Exit code
+# @param  $2 : Function name
+# @param  $3 : Warning message
+warn_exit() {
+	if [ $# -ge 3 ]; then
+		echo "[${0##*/}][warn][$2]: $3" 1>&2
 	fi
 	exit "$1"
 }
@@ -118,7 +131,7 @@ profile_end() {
 	END_TIME=$(date +%s.%N)
 	ELAPSED=$(awk -v end="$END_TIME" -v start="$START_TIME" 'BEGIN{printf "%.2f\n", end-start}')
 
-	echo "[shtracer][profile][$PROCESS_NAME]: ${ELAPSED} sec" >&2
+	echo "[${0##*/}][profile][$PROCESS_NAME]: ${ELAPSED} sec" >&2
 	eval "unset PROFILE_START_TIME_$PROCESS_NAME"
 }
 
@@ -501,7 +514,7 @@ format_version_info_short() {
 # @param   $2 : To file (absolute path)
 # @return  Relative path via stdout (e.g., "../../docs/file.md")
 # @example _compute_relative_path "/a/b/c/output" "/a/b/docs/file.md" returns "../../docs/file.md"
-# @tag     @IMP3.3.2.6@ (FROM: @ARC3.3.2@)
+# @tag     @IMP2.7.6@ (FROM: @ARC2.7@)
 _compute_relative_path() {
 	_from_dir="$1"
 	_to_file="$2"

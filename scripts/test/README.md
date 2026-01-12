@@ -36,7 +36,7 @@ filename                                      | test target
 run_all_tests.sh                              | Test runner - executes all unit and integration tests
 unit_test/shtracer_main_unittest.sh           | Main routine (`../../shtracer`)
 unit_test/shtracer_func_unittest.sh           | Core functions (`../main/shtracer_func.sh`)
-unit_test/shtracer_viewer_unittest.sh         | HTML viewer (`../main/shtracer_viewer.sh`)
+unit_test/shtracer_viewer_unittest.sh         | HTML viewer (`../main/shtracer_html_viewer.sh`)
 unit_test/shtracer_json_unittest.sh           | JSON export (`../main/shtracer_func.sh`)
 unit_test/shtracer_version_unittest.sh        | File version information (`../main/shtracer_util.sh`)
 unit_test/shtracer_util_unittest.sh           | Utility functions (`../main/shtracer_util.sh`)

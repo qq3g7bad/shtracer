@@ -73,3 +73,9 @@
   * **IGNORE FILTER**: "shunit2|testdata" <!-- Multiple conditions are acceptable by using "|". -->
   * **TAG FORMAT**: `@IT[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
+  * **BRIEF**: "Integration tests for end-to-end workflows."
+* **PATH**: "../.github/workflows/"
+  * **EXTENSION FILTER**: "*.yml"
+  * **TAG FORMAT**: `@IT[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
+  * **BRIEF**: "CI/CD workflow definitions."
