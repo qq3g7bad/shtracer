@@ -18,7 +18,7 @@ Traditional requirements traceability tools are **heavy, proprietary, and hard t
 
 **🔗 CI/CD Native**
 
-- **Structured JSON output** (`--json`) for seamless pipeline integration
+- **Structured JSON output** for seamless pipeline integration
 - Parse, validate, and enforce traceability in your CI checks
 - No databases, no servers—just pipe JSON to any tool you want
 
@@ -54,10 +54,13 @@ chmod +x ./shtracer
 ./shtracer ./sample/config.md
 
 # Output structured JSON for CI/CD
-./shtracer --json ./sample/config.md > traceability.json
+./shtracer ./sample/config.md > traceability.json
 
 # Generate interactive HTML report
 ./shtracer --html ./sample/config.md > report.html
+
+# Generate markdown report
+./shtracer --markdown ./sample/config.md > report.md
 ```
 
 ---
@@ -77,7 +80,7 @@ Users must be able to log in with email and password.
 **architecture.md**
 
 ```markdown
-<!-- @REQ-001@ @ARCH-101@ -->
+<!-- @ARCH-101@ (FROM: @REQ-001@) -->
 ## Authentication Service
 Implements OAuth 2.0 with JWT tokens.
 ```
@@ -85,7 +88,7 @@ Implements OAuth 2.0 with JWT tokens.
 **auth.sh**
 
 ```bash
-# @ARCH-101@ @IMPL-201@
+# @IMPL-201@ (FROM: @ARCH-101@)
 function authenticate_user() {
     # Implementation
 }
@@ -94,7 +97,7 @@ function authenticate_user() {
 **auth_test.sh**
 
 ```bash
-# @IMPL-201@ @TEST-301@
+# @TEST-301@ (FROM: @IMPL-201@)
 test_authenticate_user() {
     # Test implementation
 }
@@ -103,29 +106,7 @@ test_authenticate_user() {
 ### 2. Generate traceability matrix
 
 ```bash
-./shtracer --json ./sample/config.md
-```
-
-**Output (JSON snippet)**:
-
-```json
-{
-  "metadata": {
-    "version": "0.1.2",
-    "generated": "2025-12-27T03:57:27Z",
-    "config_path": "/path/to/config.md"
-  },
-  "nodes": [
-    {"id": "@REQ-001@", "file": "requirements.md", "line": 15, ...},
-    {"id": "@ARCH-101@", "file": "architecture.md", "line": 42, ...}
-  ],
-  "chains": [
-    ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@", "NONE"]
-  ],
-  "links": [
-    {"source": "@REQ-001@", "target": "@ARCH-101@", "value": 1}
-  ]
-}
+./shtracer ./sample/config.md
 ```
 
 ### 3. Integrate with CI/CD
@@ -134,7 +115,7 @@ test_authenticate_user() {
 # .github/workflows/traceability.yml
 - name: Validate traceability
   run: |
-    ./shtracer --json config.md | jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")]' > incomplete.json
+    ./shtracer config.md | jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")]' > incomplete.json
     if [ "$(cat incomplete.json)" != "[]" ]; then
       echo "❌ Found incomplete traceability chains"
       exit 1
@@ -178,14 +159,6 @@ The HTML viewer now includes a tab-based interface to explore traceability relat
 - 🔗 **Clickable tags** - All tags link to source files (opens on right side)
 - 📊 **Sparse matrices** - "x" markers show direct traceability links between adjacent levels
 - 🔄 **Dynamic generation** - Tabs automatically adapt to your config.md structure
-
-### Text Output (CI-friendly)
-
-```text
-@REQ1.2@ @ARC2.1@ @IMP2.1@ @UT1.1@ @IT1.1@
-@REQ1.2@ @ARC3.1@ @IMP3.1@ @UT1.2@ @IT1.1@
-@REQ1.4@ @ARC2.1@ @IMP2.1@ @UT2.1@ @IT1.1@
-```
 
 ---
 
@@ -329,29 +302,44 @@ For a complete example, see [`./sample/config.md`](./sample/config.md).
 Usage: shtracer <configfile> [options]
 
 Options:
-  --json                           Export traceability data as JSON to stdout (CI/CD ready)
-  --html                           Generate standalone HTML report to stdout
-  --summary                        Print traceability summary (direct links only)
-  -c <old_tag> <new_tag>           Rename/swap tags across all traced files
-  -v                               Verify mode: detect duplicate or orphaned tags
-  -t                               Run unit tests
+  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
+  -v                               Verify mode: detect duplicate or isolated tags
+  -t                               Test mode: execute unit tests
+  --html                           Export a single HTML document to stdout (JSON -> viewer)
+  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
+  --summary                        Print traceability summary to stdout (direct links only)
+  --debug                          Keep  and output tag table to stderr
   -h, --help                       Show this help message
 
 Examples:
-  # Generate traceability matrix
-  ./shtracer ./sample/config.md
+  1. Normal mode (JSON output)
+     $ ./shtracer ./sample/config.md
+     $ ./shtracer ./sample/config.md > output.json
 
-  # CI/CD pipeline integration
-  ./shtracer --json ./sample/config.md | jq '.chains'
+  2. Change mode (swap or rename tags)
+     $ ./shtracer -c old_tag new_tag ./sample/config.md
 
-  # Create HTML report
-  ./shtracer --html ./sample/config.md > report.html
+  3. Verify mode (check for duplicate or isolated tags)
+     $ ./shtracer -v ./sample/config.md
 
-  # Refactor: rename tags across entire project
-  ./shtracer -c @OLD-001@ @NEW-001@ ./sample/config.md
+  4. Test mode
+     $ ./shtracer -t
 
-  # Quality check: find broken traceability
-  ./shtracer -v ./sample/config.md
+  5. Summary mode
+     $ ./shtracer --summary ./sample/config.md
+
+  6. HTML mode
+     $ ./shtracer --html ./sample/config.md > output.html
+
+  7. Markdown mode
+     $ ./shtracer --markdown ./sample/config.md > report.md
+
+  8. Debug mode (JSON + tag table to stderr)
+     $ ./shtracer --debug ./sample/config.md > output.json
+
+Note:
+  - Arguments can be specified in any order.
+  - Only one option can be used at a time.
 ```
 
 ---
@@ -403,7 +391,7 @@ jobs:
 
       - name: Check JSON output for completeness
         run: |
-          ./shtracer --json config.md > trace.json
+          ./shtracer config.md > trace.json
 
           # Ensure all requirements are traced to tests
           incomplete=$(jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")] | length' trace.json)
@@ -492,65 +480,6 @@ Detect traceability issues before they become problems:
 
 ---
 
-## 🔧 JSON Output Schema
-
-Perfect for CI/CD and custom tooling:
-
-```json
-{
-  "metadata": {
-    "version": "0.1.2",
-    "generated": "2025-12-27T03:57:27Z",
-    "config_path": "/path/to/config.md"
-  },
-  "nodes": [
-    {
-      "id": "@REQ-001@",
-      "label": "@REQ-001@",
-      "description": "User Authentication",
-      "file": "docs/requirements.md",
-      "line": 15,
-      "trace_target": ":Requirement",
-      "file_version": "git:abc1234"
-    },
-    {
-      "id": "@ARCH-101@",
-      "label": "@ARCH-101@",
-      "description": "Authentication Service",
-      "file": "docs/architecture.md",
-      "line": 42,
-      "trace_target": ":Architecture",
-      "file_version": "git:abc1234"
-    }
-  ],
-  "chains": [
-    ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@", "NONE"],
-    ["@REQ-002@", "NONE", "NONE", "NONE", "NONE"]
-  ],
-  "links": [
-    {
-      "source": "@REQ-001@",
-      "target": "@ARCH-101@",
-      "value": 1
-    },
-    {
-      "source": "@ARCH-101@",
-      "target": "@IMPL-201@",
-      "value": 1
-    }
-  ]
-}
-```
-
-**Schema Fields:**
-
-- `metadata`: Version, generation timestamp, and config file path
-- `nodes`: Array of all tags with their metadata (id, label, description, file location, trace target, git version)
-- `chains`: Array of traceability chains showing complete paths from requirements to tests
-- `links`: Array of direct connections between tags (useful for graph visualization)
-
----
-
 ## 🛠️ Development & Testing
 
 ### System Requirements
@@ -582,37 +511,8 @@ shellcheck ./shtracer ./scripts/main/*.sh
 shfmt -w -i 2 -ci -bn ./shtracer ./scripts/main/*.sh
 ```
 
-### Git Hooks (Optional)
-
-Pre-commit hooks for code quality are available (optional for local development, enforced in CI):
-
-```bash
-# Enable git hooks
-./scripts/setup-hooks.sh  # If available
-
-# Or manually link
-ln -s ../../.git-hooks/pre-commit .git/hooks/pre-commit
-```
-
-See [`.git-hooks/README.md`](.git-hooks/README.md) for details.
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Markdown export format
-- [ ] Explain how to docx file to shtracer
-
 ---
 
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 🌐 Learn More
-
-- 📖 [Requirements Traceability Matrix (Wikipedia)](https://en.wikipedia.org/wiki/Traceability_matrix)
-- 🐚 [POSIX Shell Specification](https://pubs.opengroup.org/onlinepubs/9699919799/)
-- 🔗 [GitHub Repository](https://github.com/qq3g7bad/shtracer)
