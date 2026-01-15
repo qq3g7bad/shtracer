@@ -410,23 +410,27 @@ _get_layer_display_name() {
 	_json="$1"
 	_abbrev="$2"
 
-	# Extract layer name from JSON nodes' trace_target field
+	# Extract layer name from JSON layers array
 	# Returns first match or fallback to abbreviation
 	printf '%s\n' "$_json" | awk -v abbrev="$_abbrev" '
-		/"trace_target":/ {
-			match($0, /"trace_target": "([^"]*)"/, arr)
-			trace_target = arr[1]
-
-			# Extract last segment after colon
-			n = split(trace_target, parts, ":")
-			layer = parts[n]
-
-			# Check if this layer matches the abbreviation pattern
-			# Handles case-insensitive prefix match
-			if (tolower(layer) ~ "^" tolower(abbrev)) {
-				# Store first match
-				if (found == "") {
-					found = layer
+		BEGIN { in_layers = 0; in_layer_obj = 0 }
+		/"layers":/ && /\[/ { in_layers = 1; next }
+		in_layers && /^\s*\]/ { in_layers = 0; next }
+		in_layers && /^\s*\{/ { in_layer_obj = 1; layer_name = ""; next }
+		in_layer_obj && /"name":/ {
+			match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
+			layer_name = arr[1]
+		}
+		in_layer_obj && /^\s*\}/ {
+			in_layer_obj = 0
+			if (layer_name != "") {
+				# Check if this layer matches the abbreviation pattern
+				# Handles case-insensitive prefix match
+				if (tolower(layer_name) ~ "^" tolower(abbrev)) {
+					# Store first match
+					if (found == "") {
+						found = layer_name
+					}
 				}
 			}
 		}

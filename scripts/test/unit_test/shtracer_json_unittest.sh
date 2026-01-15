@@ -223,9 +223,9 @@ EOF
 	# Execute function
 	_JSON_OUTPUT="$(make_json "$_TAG_OUTPUT_DATA" "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM" "$_TAG_TABLE" "$_CONFIG_TABLE" "/config.md")"
 
-	# Verify links via from_tag field in trace_tags (v0.2.0 format)
-	assertTrue "Should contain REQ->ARC link via from_tag" "grep -A5 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@REQ1.1@\"'"
-	assertTrue "Should contain ARC->IMP link via from_tag" "grep -A5 '\"id\": \"@IMP1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@ARC1.1@\"'"
+	# Verify links via from_tags array in trace_tags (v0.2.0 format)
+	assertTrue "Should contain REQ->ARC link via from_tags" "grep -A5 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tags\": \[\"@REQ1.1@\"\]'"
+	assertTrue "Should contain ARC->IMP link via from_tags" "grep -A5 '\"id\": \"@IMP1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tags\": \[\"@ARC1.1@\"\]'"
 	assertFalse "Should NOT contain links array" "grep -q '\"links\":' '$_JSON_OUTPUT'"
 }
 
@@ -267,8 +267,6 @@ EOF
 
 	assertTrue "Should contain from_tags array with both upstreams" \
 		"grep -A6 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tags\": \[\"@REQ1.1@\", \"@REQ1.2@\"\]'"
-	assertTrue "Should keep first upstream in from_tag for compatibility" \
-		"grep -A4 '\"id\": \"@ARC1.1@\"' '$_JSON_OUTPUT' | grep -q '\"from_tag\": \"@REQ1.1@\"'"
 }
 
 ##

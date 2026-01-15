@@ -1326,7 +1326,6 @@ NF >= 8 {
 	gsub(/^ +| +$/, "", raw_from)
 	gsub(/[;,]/, " ", raw_from)
 	from_tags_json = "[]"
-	from_tag_first = "NONE"
 
 	if (raw_from != "" && raw_from != "NONE" && raw_from != "null") {
 		n_from = split(raw_from, from_arr, /[ \t]+/)
@@ -1335,14 +1334,10 @@ NF >= 8 {
 		for (i = 1; i <= n_from; i++) {
 			tag = from_arr[i]
 			if (tag == "" || tag == "NONE" || tag == "null") continue
-			if (from_tag_first == "NONE") from_tag_first = tag
 			from_tags_json = from_tags_json sep "\"" tag "\""
 			sep = ", "
 		}
 		from_tags_json = from_tags_json "]"
-		if (from_tag_first == "NONE") {
-			from_tags_json = "[]"
-		}
 	}
 
 	# Escape quotes and backslashes in description
@@ -1358,10 +1353,9 @@ NF >= 8 {
 
 	printf "    {\n"
 	printf "      \"id\": \"%s\",\n", $2
-	printf "      \"from_tag\": \"%s\",\n", from_tag_first  # NEW: Add from_tag
 	printf "      \"from_tags\": %s,\n", from_tags_json
 	printf "      \"description\": \"%s\",\n", desc
-	printf "      \"file_id\": %d,\n", file_id  # Global file_id
+	printf "      \"file_id\": %d,\n", file_id
 	printf "      \"line\": %d,\n", $6
 	printf "      \"layer_id\": %d\n", layer_id
 	printf "    }"
@@ -1374,7 +1368,7 @@ END { printf "\n" }
 
 		printf '  ],\n'
 
-		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tag)
+		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tags)
 
 		# Generate chains array from tag table (unchanged)
 		printf '  "chains": [\n'
@@ -1773,7 +1767,7 @@ END { printf "\n" }
 ##
 # @brief Generate cross-reference matrix files from JSON trace_tags
 # @details Creates 06_cross_ref_matrix_* files in OUTPUT_DIR/tags/ directory
-#          by parsing trace_tags[].from_tag field for backward compatibility
+#          by parsing trace_tags[].from_tags field for backward compatibility
 #          with HTML and Markdown viewers
 # @param $1 : JSON file path
 # @param $2 : OUTPUT_DIR
@@ -1825,7 +1819,7 @@ _generate_cross_reference_matrix_files() {
 
 		/"trace_tags": \[/ { in_trace_tags=1; next }
 		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
-		in_trace_tags && /^    \{/ { in_tag_obj=1; tag_id=""; from_tag=""; layer_id=""; file_id=""; line=""; from_tags_count=0; delete from_tags; next }
+		in_trace_tags && /^    \{/ { in_tag_obj=1; tag_id=""; layer_id=""; file_id=""; line=""; from_tags_count=0; delete from_tags; next }
 		in_trace_tags && in_tag_obj && /^    \},?$/ {
 			if (tag_id != "" && layer_id != "" && file_id != "") {
 				tag_layer[tag_id] = layer_id
@@ -1834,14 +1828,11 @@ _generate_cross_reference_matrix_files() {
 				tags_in_layer_count[layer_id]++
 				tags_in_layer[layer_id, tags_in_layer_count[layer_id]] = tag_id
 
-				# Choose upstream sources from from_tags (array) first, then fallback to from_tag
+				# Collect upstream sources from from_tags array
 				n_up = 0
 				if (from_tags_count > 0) {
 					for (u = 1; u <= from_tags_count; u++) upstream[u] = from_tags[u]
 					n_up = from_tags_count
-				} else if (from_tag != "" && from_tag != "null" && from_tag != "NONE") {
-					n_up = 1
-					upstream[1] = from_tag
 				}
 
 				for (u = 1; u <= n_up; u++) {
@@ -1858,7 +1849,6 @@ _generate_cross_reference_matrix_files() {
 			in_tag_obj=0; next
 		}
 		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
-		in_tag_obj && /"from_tag":/ { match($0, /"from_tag": "([^"]+)"/, arr); from_tag = arr[1] }
 		in_tag_obj && /"from_tags":/ {
 			from_tags_count = 0
 			delete from_tags

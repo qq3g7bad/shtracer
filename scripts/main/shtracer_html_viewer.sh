@@ -272,7 +272,8 @@ _html_convert_tag_table() {
         }
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
         function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
@@ -440,7 +441,8 @@ _html_generate_cross_ref_table() {
 		}
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
 		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
@@ -689,7 +691,8 @@ _html_generate_cross_ref_table_from_json() {
 		}
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
 		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
@@ -1661,9 +1664,12 @@ convert_template_js() {
 						close(path)
 						return out
 					}
-					function file_id_from_path(path,   t) {
-						t = path
-						gsub(/[^A-Za-z0-9]/, "_", t)
+					function file_id_from_path(path,   t, n, parts) {
+						# Extract basename only
+						n = split(path, parts, "/")
+						t = parts[n]
+						# Replace dots with underscores
+						gsub(/\./, "_", t)
 						return "Target_" t
 					}
 					{
