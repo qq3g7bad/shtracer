@@ -496,7 +496,7 @@ test_markdown_tag_index() {
 		mkdir -p shtracer_output
 
 		# Act -------------
-		"${SHTRACER_BIN}" --markdown ./config_integration.md >shtracer_output/output.md 2>&1
+		"${SHTRACER_BIN}" --debug --markdown ./config_integration.md >shtracer_output/output.md 2>&1
 		_EXIT_CODE=$?
 
 		# Assert ----------
@@ -507,7 +507,7 @@ test_markdown_tag_index() {
 		assertEquals "Markdown should have Tag Index section" 0 $?
 
 		# Verify that tag index has actual tag entries (not just "****")
-		_TAG_ENTRIES=$(grep -c "^- @" shtracer_output/output.md || echo "0")
+		_TAG_ENTRIES=$(grep -c "^- \*\*@" shtracer_output/output.md || echo "0")
 		assertTrue "Tag index should have actual tag entries" "[ ${_TAG_ENTRIES} -gt 0 ]"
 
 		# Verify tags are not showing "(unknown)" file paths
