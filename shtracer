@@ -22,9 +22,13 @@ EXIT_MAKE_JSON_FAILED=12    # Failed to generate JSON
 EXIT_VIEWER_FAILED=13       # Viewer script execution failed
 #
 # VERIFICATION ERRORS (20-29)
-EXIT_ISOLATED_TAGS=20  # Found isolated tags (no downstream references)
-EXIT_DUPLICATE_TAGS=21 # Found duplicate tags
-EXIT_BOTH_ISSUES=22    # Found both isolated and duplicate tags
+EXIT_ISOLATED_TAGS=20      # Found isolated tags (no downstream references)
+EXIT_DUPLICATE_TAGS=21     # Found duplicate tags
+EXIT_BOTH_ISSUES=22        # Found both isolated and duplicate tags
+EXIT_DANGLING_TAGS=23      # Found dangling FROM tag references
+EXIT_ISOLATED_DANGLING=24  # Found isolated tags and dangling references
+EXIT_DUPLICATE_DANGLING=25 # Found duplicate tags and dangling references
+EXIT_ALL_ISSUES=26         # Found all three issues (isolated, duplicate, and dangling)
 #
 # SYSTEM ERRORS (30-39)
 EXIT_INTERNAL_ERROR=30   # Internal error (directory change, etc.)
@@ -498,16 +502,21 @@ main_routine() {
 			return 0
 		fi
 	else
-		# Verification failed - capture the return code
+		# Verification failed - capture the return code (0-7 bitmask)
 		_verification_status=$?
 		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
 			_cleanup_output_dir
 			# Map verification result to specific exit codes
+			# Bitmask: 1=isolated, 2=duplicate, 4=dangling
 			case "$_verification_status" in
 				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Verification failed: found isolated tags" ;;
 				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Verification failed: found duplicate tags" ;;
 				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed: found both isolated and duplicate tags" ;;
-				*) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed with unknown error" ;;
+				4) error_exit "$EXIT_DANGLING_TAGS" "main_routine" "Verification failed: found dangling FROM tag references" ;;
+				5) error_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "Verification failed: found isolated tags and dangling references" ;;
+				6) error_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "Verification failed: found duplicate tags and dangling references" ;;
+				7) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found all issues (isolated, duplicate, and dangling)" ;;
+				*) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed with unknown error" ;;
 			esac
 		else
 			# In normal mode, suppress table output when verification errors exist
@@ -517,7 +526,11 @@ main_routine() {
 				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
 				2) warn_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "found duplicate tags" ;;
 				3) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "found both isolated and duplicate tags" ;;
-				*) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "verification issues detected" ;;
+				4) warn_exit "$EXIT_DANGLING_TAGS" "main_routine" "found dangling FROM tag references" ;;
+				5) warn_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "found isolated tags and dangling references" ;;
+				6) warn_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "found duplicate tags and dangling references" ;;
+				7) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found all issues (isolated, duplicate, and dangling)" ;;
+				*) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "verification issues detected" ;;
 			esac
 		fi
 	fi

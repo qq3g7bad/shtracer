@@ -664,9 +664,11 @@ function renderHealth(data) {
                 }
 
                 html += '<li>';
-                html += `<strong>${escapeHtml(tagId)}</strong> `;
-                html += `(<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
-                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}')" onmouseout="hideTooltip()">${escapeHtml(fileBaseName)}:${line}</a>)`;
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(tagId)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `<strong>${escapeHtml(tagId)}</strong>`;
+                html += `</a>`;
                 html += '</li>';
             } else {
                 html += `<li><strong>${escapeHtml(tagId)}</strong></li>`;

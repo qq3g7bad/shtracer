@@ -307,14 +307,36 @@ function sortTable(event, columnIndex) {
 }
 
 /**
- * @brief Show the tooltip
- * @param event          : [MoueseEvent]
- * @param fileName       : [str] filename used in files (different from the real filename).
+ * @brief Show the tooltip with rich tag information
+ * @param event          : [MouseEvent]
+ * @param fileName       : [str] filename used in files object
+ * @param tagId          : [str] optional - tag ID (e.g., @REQ-001@)
+ * @param line           : [num] optional - line number
+ * @param layerName      : [str] optional - layer/type name
+ * @param description    : [str] optional - tag description
  */
-function showTooltip(event, fileName) {
+function showTooltip(event, fileName, tagId, line, layerName, description) {
 		const tooltip = document.getElementById('tooltip');
 
-		tooltip.textContent = files[fileName].path;
+		// Build rich HTML content matching SVG tooltip style
+		if (tagId) {
+				// Rich tooltip with tag metadata
+				let html = `<strong>${escapeHtml(tagId)}</strong><br>`;
+				if (layerName) {
+						html += `Type: ${escapeHtml(layerName)}<br>`;
+				}
+				const filePath = files[fileName] ? files[fileName].path : 'unknown';
+				const lineNum = line || '?';
+				html += `File: ${filePath}:${lineNum}<br>`;
+				if (description) {
+						html += `<em>${escapeHtml(description)}</em>`;
+				}
+				tooltip.innerHTML = html;
+		} else {
+				// Fallback to simple file path (backward compatible)
+				tooltip.textContent = files[fileName] ? files[fileName].path : fileName;
+		}
+
 		tooltip.style.left = `${event.pageX + 10}px`;
 		tooltip.style.top = `${event.pageY + 10}px`;
 		tooltip.style.opacity = 0.9;

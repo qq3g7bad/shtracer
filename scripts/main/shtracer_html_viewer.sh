@@ -329,7 +329,7 @@ _html_convert_tag_table() {
             gsub(/"/, "\\&quot;", safeFromTags)
             return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
                 "<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;, &quot;" safeTag "&quot;, &quot;" safeDesc "&quot;, &quot;" safeTyp "&quot;, &quot;" safeFromTags "&quot;)\" " \
-                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
+                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;, &quot;" safeTag "&quot;, " line ", &quot;" safeTyp "&quot;, &quot;" safeDesc "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
         }
         $0 == "__SHTRACER_TAG_INFO_END__" {
             mode = 1

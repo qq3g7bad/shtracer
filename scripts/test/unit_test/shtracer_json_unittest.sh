@@ -181,7 +181,7 @@ EOF
 	assertTrue "Should contain trace_tags array" "grep -q '\"trace_tags\":' '$_JSON_OUTPUT'"
 	assertTrue "Should contain at least one tag" "grep -q '\"id\":' '$_JSON_OUTPUT'"
 	assertTrue "Should contain file_id field" "grep -q '\"file_id\":' '$_JSON_OUTPUT'"
-	assertTrue "Should contain from_tag field" "grep -q '\"from_tag\":' '$_JSON_OUTPUT'"
+	assertTrue "Should contain from_tags field" "grep -q '\"from_tags\":' '$_JSON_OUTPUT'"
 	assertFalse "Should NOT contain nodes array" "grep -q '\"nodes\":' '$_JSON_OUTPUT'"
 }
 
