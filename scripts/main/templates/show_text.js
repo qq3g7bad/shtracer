@@ -12,18 +12,108 @@ const files = {
 
 };
 
+// Global tag lookup cache (built from traceabilityData)
+let tagLocationCache = null;
+let childTagCache = null;
+
+/**
+ * Build tag location cache from trace Tags
+ */
+function buildTagLocationCache() {
+	if (tagLocationCache) return;
+	if (typeof traceabilityData === 'undefined') return;
+
+	tagLocationCache = {};
+	(traceabilityData.trace_tags || []).forEach(tag => {
+		const file = traceabilityData.files[tag.file_id];
+		if (!file) return;
+
+		const baseName = file.file.replace(/.*\//, '').replace(/\./g, '_');
+		const fileName = 'Target_' + baseName;
+		const ext = file.file.match(/\.([^.]+)$/)?.[1] || 'txt';
+		const layer = traceabilityData.layers[tag.layer_id];
+
+		tagLocationCache[tag.id] = {
+			fileName: fileName,
+			line: tag.line,
+			ext: ext,
+			description: tag.description || '',
+			layerName: layer ? layer.name : 'Unknown',
+			fromTags: tag.from_tags || []
+		};
+	});
+}
+
+/**
+ * Build child tag cache (reverse lookup)
+ */
+function buildChildTagCache() {
+	if (childTagCache) return;
+	if (typeof traceabilityData === 'undefined') return;
+
+	childTagCache = {};
+
+	// Initialize empty arrays for all tags
+	(traceabilityData.trace_tags || []).forEach(tag => {
+		childTagCache[tag.id] = [];
+	});
+
+	// Build reverse lookup: for each tag, record it as a child of its parent tags
+	(traceabilityData.trace_tags || []).forEach(tag => {
+		if (tag.from_tags && tag.from_tags.length > 0) {
+			tag.from_tags.forEach(parentTag => {
+				if (parentTag !== 'NONE' && childTagCache[parentTag]) {
+					childTagCache[parentTag].push(tag.id);
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Find tag location by tag ID
+ */
+function findTagLocation(tagId) {
+	if (!tagLocationCache) buildTagLocationCache();
+	return tagLocationCache[tagId] || null;
+}
+
+/**
+ * Find child tags for a given tag ID
+ */
+function findChildTags(tagId) {
+	if (!childTagCache) buildChildTagCache();
+	return childTagCache[tagId] || [];
+}
+
+/**
+ * Navigate to a tag by ID
+ */
+function navigateToTag(event, tagId) {
+	event.preventDefault();
+	const tagInfo = findTagLocation(tagId);
+	if (tagInfo) {
+		showText(event, tagInfo.fileName, tagInfo.line, tagInfo.ext,
+				 tagId, tagInfo.description, tagInfo.layerName, tagInfo.fromTags.join(','));
+	}
+}
+
 /**
  * @brief Show text data in the right side of the output html (text-container).
  * @param event          : [MouseEvent]
  * @param fileName       : [str] filename used in files (different from the real filename).
  * @param highlightLine  : [int] a line number to highlight
  * @param language       : [str] language for syntax highlighting (highlight.js)
+ * @param tagId          : [str] optional tag ID being viewed
+ * @param tagDescription : [str] optional tag description
+ * @param layerName      : [str] optional layer name
+ * @param fromTagsStr    : [str] optional comma-separated parent tag IDs
  */
-function showText(event, fileName, highlightLine, language) {
+function showText(event, fileName, highlightLine, language, tagId, tagDescription, layerName, fromTagsStr) {
 	event.preventDefault();
 	const file = files[fileName];
 	const textContainer = document.getElementById('text-container');
-	const outputElement = document.getElementById("file-information");
+	const tagInfoPanel = document.getElementById('tag-info-panel');
 
     const content = file.content;
 
@@ -63,7 +153,61 @@ function showText(event, fileName, highlightLine, language) {
 		highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
-	outputElement.textContent = file.path;
+	// Populate tag info panel if tag metadata is provided
+	if (tagId && tagInfoPanel) {
+		// Build parent tags HTML
+		let parentTagsHtml = '';
+		const fromTags = fromTagsStr ? fromTagsStr.split(',').filter(t => t && t !== 'NONE') : [];
+		if (fromTags.length > 0) {
+			parentTagsHtml = fromTags.map(tag => {
+				const parentInfo = findTagLocation(tag);
+				if (!parentInfo) return `<span class="tag-link-missing">${escapeHtml(tag)}</span>`;
+				return `<a href="#" class="tag-link" onclick="navigateToTag(event, '${escapeHtml(tag)}')">${escapeHtml(tag)}</a>`;
+			}).join(', ');
+		} else {
+			parentTagsHtml = '<span class="no-parent">None (root)</span>';
+		}
+
+		// Build child tags HTML (reverse lookup)
+		const childTags = findChildTags(tagId);
+		let childTagsHtml = '';
+		if (childTags && childTags.length > 0) {
+			childTagsHtml = childTags.map(tag => {
+				return `<a href="#" class="tag-link" onclick="navigateToTag(event, '${escapeHtml(tag)}')">${escapeHtml(tag)}</a>`;
+			}).join(', ');
+		} else {
+			childTagsHtml = '<span class="no-child">None (leaf)</span>';
+		}
+
+		tagInfoPanel.innerHTML = `
+			<div class="tag-info-header">
+				<span class="tag-id">${escapeHtml(tagId)}</span>
+				<span class="tag-layer">${escapeHtml(layerName || '')}</span>
+			</div>
+			<div class="tag-description">${escapeHtml(tagDescription || '(no description)')}</div>
+			<div class="tag-parent">
+				<span class="label">⬆ Parent:</span> ${parentTagsHtml}
+			</div>
+			<div class="tag-children">
+				<span class="label">⬇ Children:</span> ${childTagsHtml}
+			</div>
+			<div class="tag-file-location">
+				<span class="label">📄 Location:</span> ${escapeHtml(file.path)}:${highlightLine}
+			</div>
+		`;
+		tagInfoPanel.style.display = 'block';
+	} else if (tagInfoPanel) {
+		tagInfoPanel.style.display = 'none';
+	}
+}
+
+/**
+ * Escape HTML characters
+ */
+function escapeHtml(text) {
+	const div = document.createElement('div');
+	div.textContent = text;
+	return div.innerHTML;
 }
 
 /**
@@ -186,4 +330,9 @@ function hideTooltip() {
 
 window.onload = function() {
 	hideSameText();
+	// Initialize tag location cache
+	if (typeof traceabilityData !== 'undefined') {
+		buildTagLocationCache();
+		buildChildTagCache();
+	}
 };

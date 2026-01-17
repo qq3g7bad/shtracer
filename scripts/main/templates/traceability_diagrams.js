@@ -1353,7 +1353,12 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
                 const baseName = getBaseName(filePath);
                 const filename = 'Target_' + baseName.replace(/\./g, '_');
                 const extension = getFileExtension(filePath);
-                showText(event, filename, d.line, extension);
+                const tagId = d.id || '';
+                const tagDescription = d.description || '';
+                const layerName = (d.layer_id !== undefined && traceabilityData.layers && traceabilityData.layers[d.layer_id])
+                    ? traceabilityData.layers[d.layer_id].name : '';
+                const fromTags = (d.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                showText(event, filename, d.line, extension, tagId, tagDescription, layerName, fromTags);
             }
         })
         .on('mouseover', function(event, d) {
