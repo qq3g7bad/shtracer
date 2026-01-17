@@ -556,6 +556,119 @@ function renderSummary(data) {
 }
 
 /**
+ * Render the Traceability Health section with coverage analysis and isolated tags
+ * @param {Object} data - Traceability data object containing health information
+ */
+function renderHealth(data) {
+    const el = document.getElementById('traceability-health');
+    if (!el) return;
+    if (!data.health) {
+        el.innerHTML = '<p>No health data available.</p>';
+        return;
+    }
+
+    const health = data.health;
+    const totalTags = health.total_tags || 0;
+    const tagsWithLinks = health.tags_with_links || 0;
+    const isolatedTags = health.isolated_tags || 0;
+
+    // Calculate percentages
+    let isolatedPct = 0;
+    let tagsWithLinksPct = 0;
+    if (totalTags > 0) {
+        isolatedPct = Math.floor((100 * isolatedTags) / totalTags);
+        tagsWithLinksPct = 100 - isolatedPct;
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeJsSingle(s) {
+        return String(s)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
+    }
+
+    function getBaseName(path) {
+        if (!path) return '';
+        return path.split('/').pop();
+    }
+
+    function getFileExtension(fileName) {
+        if (!fileName) return 'txt';
+        const parts = fileName.split('.');
+        return parts.length > 1 ? parts[parts.length - 1] : 'txt';
+    }
+
+    function fileIdFromRawName(rawName) {
+        return 'Target_' + String(rawName).replace(/\./g, '_');
+    }
+
+    // Build Coverage Analysis table
+    let html = '<h3>Coverage Analysis</h3>';
+    html += '<table class="health-table">';
+    html += '<thead><tr><th>Metric</th><th>Value</th></tr></thead>';
+    html += '<tbody>';
+    html += `<tr><td>Total Tags</td><td>${totalTags}</td></tr>`;
+    html += `<tr><td>Tags with Links</td><td>${tagsWithLinks} (${tagsWithLinksPct}%)</td></tr>`;
+    html += `<tr><td>Isolated Tags</td><td>${isolatedTags} (${isolatedPct}%)</td></tr>`;
+    html += '</tbody></table>';
+
+    // Build Isolated Tags section
+    html += '<h3>Isolated Tags</h3>';
+
+    const isolatedList = health.isolated_tag_list || [];
+    const isolatedCount = isolatedList.length;
+
+    if (isolatedCount === 0) {
+        html += '<p>✓ No isolated tags found.</p>';
+    } else {
+        html += `<p>${isolatedCount} isolated tag(s) with no downstream traceability:</p>`;
+        html += '<details>';
+        html += `<summary>Show isolated tags (${isolatedCount})</summary>`;
+        html += '<ul class="isolated-tags-list">';
+        
+        isolatedList.forEach(item => {
+            const tagId = item.id || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+            
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+            
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+                html += '<li>';
+                html += `<strong>${escapeHtml(tagId)}</strong> `;
+                html += `(<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}')" onmouseout="hideTooltip()">${escapeHtml(fileBaseName)}:${line}</a>)`;
+                html += '</li>';
+            } else {
+                html += `<li><strong>${escapeHtml(tagId)}</strong></li>`;
+            }
+        });
+        
+        html += '</ul>';
+        html += '</details>';
+    }
+
+    html += '<hr>';
+    el.innerHTML = html;
+}
+
+/**
  * Compute coverage statistics for Parallel Sets diagram
  * @param {Array} dims - Dimension array (trace types)
  * @param {Map} dimOrder - Map of dimension to order index
@@ -1410,6 +1523,7 @@ function renderSankey(data) {
         annotateTraceTargets(data);
         annotateMatrixBadges();
         renderSummary(data);
+        renderHealth(data);
 
 		// Prepare nodes and links for full diagram
 		const sankeyNodes = (data.trace_tags || data.nodes || []).map((d, i) => ({ ...d, index: i }));
