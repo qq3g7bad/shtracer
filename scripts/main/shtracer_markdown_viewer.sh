@@ -207,14 +207,13 @@ EOF
 
 	# Isolated tags section
 	_isolated_lines=$(printf '%s\n' "$_health_data" | grep '^isolated|')
-	_isolated_count=$(printf '%s\n' "$_isolated_lines" | grep -c '^' || echo 0)
 
 	printf '### Isolated Tags\n\n'
 
-	if [ "$_isolated_count" -eq 0 ]; then
+	if [ "$_isolated_tags" -eq 0 ]; then
 		printf '✓ No isolated tags found.\n\n'
 	else
-		printf '%s isolated tag(s) with no downstream traceability:\n\n' "$_isolated_count"
+		printf '%s isolated tag(s) with no downstream traceability:\n\n' "$_isolated_tags"
 		printf '%s\n' "$_isolated_lines" | while IFS='|' read -r _prefix _isolated_tag _file _line; do
 			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
 				# Extract basename from full path for better readability
