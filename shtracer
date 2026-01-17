@@ -87,7 +87,7 @@ print_usage() {
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
 		  --summary                        Print traceability summary to stdout (direct links only)
-		  --debug                          Keep ${OUTPUT_DIR} and output tag table to stderr
+		  --debug                          Keep ${OUTPUT_DIR} for debugging
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -113,7 +113,7 @@ print_usage() {
 		  7. Markdown mode
 		     $ ./shtracer --markdown ./sample/config.md > report.md
 
-		  8. Debug mode (JSON + tag table to stderr)
+		  8. Debug mode (keep output directory)
 		     $ ./shtracer --debug ./sample/config.md > output.json
 
 		Note:
@@ -494,11 +494,6 @@ main_routine() {
 		else
 			# Default output: JSON
 			cat "$_JSON_OUTPUT_FILE"
-			# Debug mode: also output tag table to stderr
-			if [ "$SHTRACER_DEBUG" = 'true' ]; then
-				echo "[shtracer][debug]: Tag table output:" >&2
-				cat "$_TAG_TABLE_FILENAME" >&2
-			fi
 			_cleanup_output_dir
 			return 0
 		fi
