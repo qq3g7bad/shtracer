@@ -808,10 +808,10 @@ _html_generate_cross_ref_table_from_json() {
 		}
 		function escape_html(s,   t) {
 			t = s
-			gsub(/&/, "\\&amp;", t)
-			gsub(/</, "\\&lt;", t)
-			gsub(/>/, "\\&gt;", t)
-			gsub(/"/, "\\&quot;", t)
+			gsub(/&/, "&amp;", t)
+			gsub(/</, "&lt;", t)
+			gsub(/>/, "&gt;", t)
+			gsub(/"/, "&quot;", t)
 			return t
 		}
 		function basename(path,   t) {

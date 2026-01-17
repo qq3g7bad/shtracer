@@ -638,7 +638,7 @@ function renderHealth(data) {
             const tagId = item.id || '';
             const fileId = item.file_id;
             const line = item.line || 1;
-            
+
             // Resolve file path
             let filePath = 'unknown';
             let fileBaseName = 'unknown';
@@ -646,13 +646,26 @@ function renderHealth(data) {
                 filePath = data.files[fileId].file || 'unknown';
                 fileBaseName = getBaseName(filePath);
             }
-            
+
             if (filePath !== 'unknown') {
                 const targetId = fileIdFromRawName(fileBaseName);
                 const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === tagId);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
                 html += '<li>';
                 html += `<strong>${escapeHtml(tagId)}</strong> `;
-                html += `(<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}')" `;
+                html += `(<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
                 html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}')" onmouseout="hideTooltip()">${escapeHtml(fileBaseName)}:${line}</a>)`;
                 html += '</li>';
             } else {

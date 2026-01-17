@@ -154,8 +154,6 @@ The HTML viewer now includes a tab-based interface to explore traceability relat
 
 **Features:**
 
-- 🎯 **Tab persistence** - Your selected tab is remembered using localStorage
-- 🎨 **Theme support** - Light and dark modes with color-coded tag badges
 - 🔗 **Clickable tags** - All tags link to source files (opens on right side)
 - 📊 **Sparse matrices** - "x" markers show direct traceability links between adjacent levels
 - 🔄 **Dynamic generation** - Tabs automatically adapt to your config.md structure
