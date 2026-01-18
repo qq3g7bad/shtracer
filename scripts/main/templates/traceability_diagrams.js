@@ -569,16 +569,22 @@ function renderHealth(data) {
 
     const health = data.health;
     const totalTags = health.total_tags || 0;
-    const tagsWithLinks = health.tags_with_links || 0;
+    let tagsWithLinks = health.tags_with_links || 0;
     const isolatedTags = health.isolated_tags || 0;
     const danglingRefs = health.dangling_references || 0;
+
+    // Sanity check: tags_with_links should never exceed total_tags
+    if (tagsWithLinks > totalTags) {
+        console.warn(`Data inconsistency: tags_with_links (${tagsWithLinks}) > total_tags (${totalTags}). Capping to total_tags.`);
+        tagsWithLinks = totalTags;
+    }
 
     // Calculate percentages
     let isolatedPct = 0;
     let tagsWithLinksPct = 0;
     if (totalTags > 0) {
         isolatedPct = Math.floor((100 * isolatedTags) / totalTags);
-        tagsWithLinksPct = 100 - isolatedPct;
+        tagsWithLinksPct = Math.floor((100 * tagsWithLinks) / totalTags);
     }
 
     function escapeHtml(s) {

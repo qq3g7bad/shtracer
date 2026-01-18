@@ -1058,7 +1058,7 @@ BEGIN {
 			# Read tags with links (source tags from pairs)
 			while ((getline line < tag_pairs) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
 				}
 			}
@@ -1066,7 +1066,7 @@ BEGIN {
 
 			while ((getline line < tag_pairs_downstream) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
 				}
 			}
@@ -1561,13 +1561,12 @@ END { printf "\n" }
 
 			# Read tags with links - track tags appearing in EITHER column
 			# A tag is considered "connected" if it appears as FROM or TO (excluding NONE)
+			# AND both tags in the connection actually exist in the codebase
 			while ((getline line < tag_pairs) > 0) {
 				split(line, fields, " ")
-				# Mark both FROM and TO tags as having connections
-				if (fields[1] != "NONE") {
+				# Mark both FROM and TO tags as having connections (only if BOTH exist)
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
-				}
-				if (fields[2] != "NONE") {
 					tags_with_links[fields[2]] = 1
 				}
 			}
@@ -1575,10 +1574,8 @@ END { printf "\n" }
 
 			while ((getline line < tag_pairs_downstream) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
-				}
-				if (fields[2] != "NONE") {
 					tags_with_links[fields[2]] = 1
 				}
 			}
