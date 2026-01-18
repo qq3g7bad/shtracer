@@ -98,7 +98,7 @@ test_integration_normal_mode() {
 		grep -q "traceabilityData" shtracer_output/output.html
 		assertEquals "HTML should include embedded JSON" 0 $?
 
-		# Check JSON structure (v0.2.0 format)
+		# Check JSON structure
 		grep -q '"metadata"' shtracer_output/output.json
 		assertEquals "JSON should contain metadata" 0 $?
 		grep -q '"files"' shtracer_output/output.json
