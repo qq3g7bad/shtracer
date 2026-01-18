@@ -923,6 +923,44 @@ print_verification_result() {
 }
 
 ##
+# @brief  Get verification status without printing details
+# @param  $1 : filenames of verification output
+# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
+# @tag    @IMP2.5@ (FROM: @ARC2.5@)
+get_verification_status() {
+	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
+
+	_has_isolated="0"
+	_has_duplicated="0"
+	_has_dangling="0"
+
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
+		_has_isolated="1"
+	fi
+	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
+		_has_duplicated="1"
+	fi
+	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
+		_has_dangling="1"
+	fi
+
+	_code=0
+	if [ "$_has_isolated" = "1" ]; then
+		_code=$((_code + 1))
+	fi
+	if [ "$_has_duplicated" = "1" ]; then
+		_code=$((_code + 2))
+	fi
+	if [ "$_has_dangling" = "1" ]; then
+		_code=$((_code + 4))
+	fi
+
+	return "$_code"
+}
+
+##
 # @brief  Generate JSON output for traceability data
 # @param  $1 : TAG_OUTPUT_DATA (01_tags file path)
 # @param  $2 : TAG_PAIRS (02_tag_pairs file path)
@@ -942,6 +980,9 @@ make_json() {
 	_XREF_DIR="${7:-}"
 
 	_JSON_OUTPUT_FILENAME="${OUTPUT_DIR%/}/output.json"
+	_ISOLATED_FILE="${OUTPUT_DIR%/}/tags/verified/10_isolated_fromtag"
+	_DUPLICATED_FILE="${OUTPUT_DIR%/}/tags/verified/11_duplicated"
+	_DANGLING_FILE="${OUTPUT_DIR%/}/tags/verified/12_dangling_fromtag"
 
 	# Generate timestamp
 	_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -954,6 +995,131 @@ make_json() {
 		printf '    "generated": "%s",\n' "$_TIMESTAMP"
 		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
 		printf '  },\n'
+
+		printf '  "verificationErrors": '
+		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
+			-v sep="$SHTRACER_SEPARATOR" \
+			-v isolated_file="$_ISOLATED_FILE" \
+			-v duplicated_file="$_DUPLICATED_FILE" \
+			-v dangling_file="$_DANGLING_FILE" '
+		function json_escape(s,   result) {
+			result = s
+			gsub(/\\/, "\\\\", result)
+			gsub(/"/, "\\\"", result)
+			gsub(/\n/, "\\n", result)
+			gsub(/\r/, "\\r", result)
+			gsub(/\t/, "\\t", result)
+			return result
+		}
+		function trim(s) {
+			gsub(/^[[:space:]]+/, "", s)
+			gsub(/[[:space:]]+$/, "", s)
+			return s
+		}
+		BEGIN {
+			while ((getline line < isolated_file) > 0) {
+				split(line, parts, " ")
+				if (length(parts) >= 2 && parts[2] != "") {
+					isolated[parts[2]] = 1
+				}
+			}
+			close(isolated_file)
+
+			while ((getline line < duplicated_file) > 0) {
+				line = trim(line)
+				if (line != "") {
+					duplicates[line] = 1
+				}
+			}
+			close(duplicated_file)
+
+			while ((getline line < dangling_file) > 0) {
+				split(line, parts, " ")
+				if (length(parts) >= 4) {
+					d_child[d_count] = parts[1]
+					d_parent[d_count] = parts[2]
+					d_file[d_count] = parts[3]
+					d_line[d_count] = parts[4]
+					d_count++
+				}
+			}
+			close(dangling_file)
+
+			while ((getline line < tag_output_data) > 0) {
+				split(line, fields, sep)
+				if (length(fields) >= 8) {
+					tag_id = fields[2]
+					file_path = fields[5]
+					line_num = fields[6]
+
+					if (!(file_path in file_to_id)) {
+						file_to_id[file_path] = file_id
+						file_id++
+					}
+
+					if (tag_id in isolated) {
+						iso_count++
+						iso_tag[iso_count] = tag_id
+						iso_file[iso_count] = file_path
+						iso_line[iso_count] = line_num
+					}
+
+					if (tag_id in duplicates) {
+						dup_count++
+						dup_tag[dup_count] = tag_id
+						dup_file[dup_count] = file_path
+						dup_line[dup_count] = line_num
+					}
+				}
+			}
+			close(tag_output_data)
+
+			print "{"
+			print "    \"isolated\": ["
+			first = 1
+			for (i = 1; i <= iso_count; i++) {
+				if (!first) print ","
+				first = 0
+				tag = json_escape(iso_tag[i])
+				file_path = iso_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = iso_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag, fid, line_num
+			}
+			print "\n    ],"
+
+			print "    \"duplicates\": ["
+			first = 1
+			for (i = 1; i <= dup_count; i++) {
+				if (!first) print ","
+				first = 0
+				tag = json_escape(dup_tag[i])
+				file_path = dup_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = dup_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag, fid, line_num
+			}
+			print "\n    ],"
+
+			print "    \"dangling\": ["
+			first = 1
+			for (i = 0; i < d_count; i++) {
+				if (!first) print ","
+				first = 0
+				child_tag = json_escape(d_child[i])
+				parent_tag = json_escape(d_parent[i])
+				file_path = d_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = d_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"child_tag\": \"%s\", \"missing_parent\": \"%s\", \"file_id\": %d, \"line\": %d}", child_tag, parent_tag, fid, line_num
+			}
+			print "\n    ]"
+			print "  }"
+		}'
+		printf ',\n'
 
 		# NEW: Generate files array and layers array first, then collect stats
 		# This requires reading all data upfront in one AWK pass

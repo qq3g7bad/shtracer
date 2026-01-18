@@ -1135,8 +1135,7 @@ convert_template_html() {
 
 		_TAG_TABLE_FILENAME="$1"
 		_TAG_INFO_TABLE="$2"
-		_TEMPLATE_HTML_DIR="$3"
-		_JSON_FILE="${4:-}"
+		_JSON_FILE="${3:-}"
 
 		profile_start "convert_template_html_read_json"
 		if [ -z "$_JSON_FILE" ]; then
@@ -1978,18 +1977,17 @@ shtracer_viewer_main() {
 	}
 	trap cleanup EXIT INT TERM
 
-	if [ -n "$JSON_FILE" ]; then
+	if [ ! -t 0 ]; then
+		cat >"$_json_tmp"
+	elif [ -n "$JSON_FILE" ]; then
 		[ -r "$JSON_FILE" ] || {
 			echo "[shtracer_html_viewer.sh][error]: json not readable: $JSON_FILE" 1>&2
 			exit 1
 		}
 		cat "$JSON_FILE" >"$_json_tmp"
 	else
-		if [ -t 0 ]; then
-			echo "[shtracer_html_viewer.sh][error]: no stdin; use -i <json_file>" 1>&2
-			exit 1
-		fi
-		cat >"$_json_tmp"
+		echo "[shtracer_html_viewer.sh][error]: no stdin; use -i <json_file>" 1>&2
+		exit 1
 	fi
 
 	if [ -z "$TAG_TABLE_FILE" ]; then

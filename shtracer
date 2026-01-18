@@ -84,7 +84,7 @@ print_usage() {
 
 		Options:
 		  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
-		  -v                               Verify mode: detect duplicate or isolated tags
+		  -v, --verify                      Verify mode: detect duplicate or isolated tags
 		  -t                               Test mode: execute unit tests
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
@@ -102,6 +102,7 @@ print_usage() {
 
 		  3. Verify mode (check for duplicate or isolated tags)
 		     $ ./shtracer -v ./sample/config.md
+		     $ ./shtracer --verify ./sample/config.md
 
 		  4. Test mode
 		     $ ./shtracer -t
@@ -151,9 +152,8 @@ parse_arguments() {
 	# Special case: single argument (help, version, test, or config only)
 	if [ "$#" -eq 1 ]; then
 		case "$1" in
-			-h | -v | --help | --version)
-				# Note: -v alone prints usage (backward compatibility)
-				# -v with config file activates verify mode
+			-h | -v | --verify | --help | --version)
+				# Note: -v/--verify alone prints usage (config required)
 				print_usage
 				;;
 			-t)
@@ -185,10 +185,10 @@ parse_arguments() {
 
 		while [ $# -gt 0 ]; do
 			case "$1" in
-				-v)
+				-v | --verify)
 					_found_option=$((_found_option + 1))
 					_opt_mode="VERIFY"
-					_opt_flag="-v"
+					_opt_flag="--verify"
 					shift
 					;;
 				-c)
@@ -249,7 +249,7 @@ parse_arguments() {
 
 		# Validation: reject multiple simultaneous options
 		if [ "$_found_option" -gt 1 ]; then
-			error_exit "$EXIT_USAGE" "parse_arguments" "Multiple options not supported (use only one of: -v, -c, --html, --markdown, --summary)"
+			error_exit "$EXIT_USAGE" "parse_arguments" "Multiple options not supported (use only one of: -v/--verify, -c, --html, --markdown, --summary)"
 		fi
 
 		# Validation: mode flags and export flags are mutually exclusive
@@ -488,21 +488,14 @@ main_routine() {
 		fi
 	fi
 
-	if print_verification_result "$_VERIFICATION_FILENAME"; then
-		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+	if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+		if print_verification_result "$_VERIFICATION_FILENAME"; then
 			# Verification passed - no issues found
 			_cleanup_output_dir
 			return 0
 		else
-			# Default output: JSON
-			cat "$_JSON_OUTPUT_FILE"
-			_cleanup_output_dir
-			return 0
-		fi
-	else
-		# Verification failed - capture the return code (0-7 bitmask)
-		_verification_status=$?
-		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
+			# Verification failed - capture the return code (0-7 bitmask)
+			_verification_status=$?
 			_cleanup_output_dir
 			# Map verification result to specific exit codes
 			# Bitmask: 1=isolated, 2=duplicate, 4=dangling
@@ -516,9 +509,18 @@ main_routine() {
 				7) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found all issues (isolated, duplicate, and dangling)" ;;
 				*) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed with unknown error" ;;
 			esac
+		fi
+	else
+		if get_verification_status "$_VERIFICATION_FILENAME"; then
+			# Default output: JSON
+			cat "$_JSON_OUTPUT_FILE"
+			_cleanup_output_dir
+			return 0
 		else
-			# In normal mode, suppress table output when verification errors exist
-			# Only show error messages (already printed to stderr by print_verification_result)
+			# Verification failed - capture the return code (0-7 bitmask)
+			_verification_status=$?
+			# Output JSON even when verification errors exist
+			cat "$_JSON_OUTPUT_FILE"
 			_cleanup_output_dir
 			case "$_verification_status" in
 				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
