@@ -301,8 +301,8 @@ Usage: shtracer <configfile> [options]
 
 Options:
   -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
-  -v                               Verify mode: detect duplicate or isolated tags
-  -t                               Test mode: execute unit tests
+  -v, --verify                     Verify mode: detect duplicate or isolated tags
+  -t, --test                       Test mode: execute unit tests
   --html                           Export a single HTML document to stdout (JSON -> viewer)
   --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
   --summary                        Print traceability summary to stdout (direct links only)
@@ -322,6 +322,7 @@ Examples:
 
   4. Test mode
      $ ./shtracer -t
+     $ ./shtracer --test
 
   5. Summary mode
      $ ./shtracer --summary ./sample/config.md
@@ -492,11 +493,13 @@ Tags with no downstream traceability - nothing references them via `(FROM: @TAG@
 ```
 
 **Why it matters:**
+
 - Indicates unused specifications
 - Incomplete implementation
 - Orphaned requirements that should be traced
 
 **How to fix:**
+
 - Add implementation/test tags that reference the isolated tag
 - Remove the isolated tag if no longer needed
 - Update FROM: references to connect to the traceability chain
@@ -504,6 +507,7 @@ Tags with no downstream traceability - nothing references them via `(FROM: @TAG@
 **Exit code:** `20` (verify mode)
 
 **Where to find:**
+
 - Markdown report: "Isolated Tags" section with file:line references
 - HTML report: "Traceability Health" section with clickable links
 - JSON output: `health.isolated_tag_list` array
@@ -524,11 +528,13 @@ function my_feature() {
 ```
 
 **Why it matters:**
+
 - Indicates broken traceability links
 - Typos in tag references
 - Deleted/renamed requirements without updating references
 
 **How to fix:**
+
 - Correct the FROM: reference to point to the right parent tag
 - Create the missing parent tag if it should exist
 - Remove the FROM: reference if it's no longer needed
@@ -536,11 +542,13 @@ function my_feature() {
 **Exit code:** `23` (verify mode)
 
 **Where to find:**
+
 - Markdown report: "Dangling References" table showing child → missing parent
 - HTML report: "Traceability Health" section with interactive table
 - JSON output: `health.dangling_reference_list` array
 
 **Example JSON:**
+
 ```json
 {
   "health": {
@@ -571,6 +579,7 @@ Use exit codes to fail builds when traceability issues are detected:
 - `26` - Multiple issues found (combinations of isolated, duplicate, and dangling)
 
 **Example CI pipeline:**
+
 ```bash
 # Fail build if any traceability issues exist
 ./shtracer -v config.md

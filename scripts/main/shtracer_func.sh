@@ -930,7 +930,7 @@ print_verification_result() {
 # @brief  Get verification status without printing details
 # @param  $1 : filenames of verification output
 # @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
-# @tag    @IMP2.5@ (FROM: @ARC2.5@)
+# @tag    @IMP2.7@ (FROM: @ARC2.5@)
 get_verification_status() {
 	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
 	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
