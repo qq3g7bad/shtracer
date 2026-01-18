@@ -571,6 +571,7 @@ function renderHealth(data) {
     const totalTags = health.total_tags || 0;
     let tagsWithLinks = health.tags_with_links || 0;
     const isolatedTags = health.isolated_tags || 0;
+    const duplicateTags = health.duplicate_tags || 0;
     const danglingRefs = health.dangling_references || 0;
 
     // Sanity check: tags_with_links should never exceed total_tags
@@ -625,6 +626,7 @@ function renderHealth(data) {
     html += `<tr><td>Total Tags</td><td>${totalTags}</td></tr>`;
     html += `<tr><td>Tags with Links</td><td>${tagsWithLinks} (${tagsWithLinksPct}%)</td></tr>`;
     html += `<tr><td>Isolated Tags</td><td>${isolatedTags} (${isolatedPct}%)</td></tr>`;
+    html += `<tr><td>Duplicate Tags</td><td>${duplicateTags}</td></tr>`;
     html += `<tr><td>Dangling References</td><td>${danglingRefs}</td></tr>`;
     html += '</tbody></table>';
 
@@ -689,6 +691,71 @@ function renderHealth(data) {
             }
         });
         
+        html += '</ul>';
+        html += '</details>';
+    }
+
+    // Build Duplicate Tags section
+    html += '<h3>Duplicate Tags</h3>';
+
+    const duplicateList = health.duplicate_tag_list || [];
+    const duplicateCount = duplicateList.length;
+
+    if (duplicateCount === 0) {
+        html += '<p>✓ No duplicate tags found.</p>';
+    } else {
+        html += `<p>${duplicateCount} duplicate tag(s) detected (same tag ID appears multiple times):</p>`;
+        html += '<details>';
+        html += `<summary>Show duplicate tags (${duplicateCount})</summary>`;
+        html += '<ul class="isolated-tags-list">';
+
+        duplicateList.forEach(item => {
+            const tagId = item.id || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === tagId);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(tagId)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</a>`;
+                html += `</span>`;
+                html += '</li>';
+            } else {
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</span>`;
+                html += '</li>';
+            }
+        });
+
         html += '</ul>';
         html += '</details>';
     }

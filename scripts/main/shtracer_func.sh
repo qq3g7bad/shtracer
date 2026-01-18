@@ -441,6 +441,7 @@ _detect_isolated_tags() {
 	# A tag is isolated only if it has NO connections (not in FROM or TO column)
 	_connected_tags="$(shtracer_tmpfile)" || return 1
 	_all_tags="$(shtracer_tmpfile)" || return 1
+	_isolated_ids="$(shtracer_tmpfile)" || return 1
 
 	awk <"$1" '{
 		if ($1 != "'"$NODATA_STRING"'") print $1
@@ -452,10 +453,30 @@ _detect_isolated_tags() {
 
 	# Output tags NOT in connected_tags (truly isolated tags)
 	# comm -23: lines only in file1 (all_tags) not in file2 (connected_tags)
-	comm -23 "$_all_tags" "$_connected_tags" \
-		| sed 's/^/'"$NODATA_STRING"' /' >"$3"
+	comm -23 "$_all_tags" "$_connected_tags" >"$_isolated_ids"
 
-	rm -f "$_connected_tags" "$_all_tags"
+	# Enrich isolated tags with file and line info from tag output data
+	awk -F"$SHTRACER_SEPARATOR" -v nodata="$NODATA_STRING" '
+		NR==FNR {
+			tag = $2
+			if (tag != "" && !(tag in file_path)) {
+				file_path[tag] = $5
+				line_num[tag] = $6
+			}
+			next
+		}
+		{
+			tag = $1
+			if (tag != "") {
+				file = (tag in file_path) ? file_path[tag] : "unknown"
+				line = (tag in line_num) ? line_num[tag] : 1
+				if (line == "" || line + 0 < 1) line = 1
+				print nodata " " tag " " file " " line
+			}
+		}
+	' "$2" "$_isolated_ids" >"$3"
+
+	rm -f "$_connected_tags" "$_all_tags" "$_isolated_ids"
 }
 
 ##
@@ -866,6 +887,7 @@ print_verification_result() {
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
+		printf "Format: NONE tag file line\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 		_has_isolated="1"
 	fi
@@ -1636,6 +1658,7 @@ END { printf "\n" }
 			-v tag_pairs_downstream="$_TAG_PAIRS_DOWNSTREAM" \
 			-v config_table="$_CONFIG_TABLE" \
 			-v file_mapping="$_FILE_MAPPING_TEMP2" \
+			-v output_dir="${OUTPUT_DIR%/}" \
 			-v sep="$SHTRACER_SEPARATOR" '
 	# JSON escape function (defined outside BEGIN)
 	function json_escape(s,   result) {
@@ -1648,8 +1671,8 @@ END { printf "\n" }
 		return result
 	}
 
-		# Selection sort to keep isolated tags and their metadata aligned alphabetically
-		function sort_isolated(n, tags, files, lines,    i, j, min, tmpTag, tmpFile, tmpLine) {
+		# Selection sort to keep tag lists and their metadata aligned alphabetically
+		function sort_tag_list(n, tags, files, lines,    i, j, min, tmpTag, tmpFile, tmpLine) {
 			if (n <= 1) return
 			for (i = 0; i < n - 1; i++) {
 				min = i
@@ -1707,6 +1730,32 @@ END { printf "\n" }
 			}
 			close(tag_output_data)
 
+			# Read duplicated tags list
+			dup_file = output_dir "/tags/verified/11_duplicated"
+			while ((getline line < dup_file) > 0) {
+				gsub(/^[[:space:]]+/, "", line)
+				gsub(/[[:space:]]+$/, "", line)
+				if (line != "") {
+					duplicated_tags[line] = 1
+				}
+			}
+			close(dup_file)
+
+			# Read dangling FROM tag references (file format: child_tag parent_tag file line)
+			dangling_file = output_dir "/tags/verified/12_dangling_fromtag"
+			dangling_count = 0
+			while ((getline line < dangling_file) > 0) {
+				split(line, fields, " ")
+				if (length(fields) >= 4) {
+					dangling_child[dangling_count] = fields[1]
+					dangling_parent[dangling_count] = fields[2]
+					dangling_file_path[dangling_count] = fields[3]
+					dangling_line[dangling_count] = fields[4]
+					dangling_count++
+				}
+			}
+			close(dangling_file)
+
 			# Read tags with links - track tags appearing in EITHER column
 			# A tag is considered "connected" if it appears as FROM or TO (excluding NONE)
 			# AND both tags in the connection actually exist in the codebase
@@ -1746,7 +1795,22 @@ END { printf "\n" }
 			}
 
 			# Sort isolated tags alphabetically for deterministic output
-			sort_isolated(isolated_count, isolated_tags, isolated_file_id, isolated_line)
+			sort_tag_list(isolated_count, isolated_tags, isolated_file_id, isolated_line)
+
+			# Build duplicate tag list with file/line info
+			duplicate_count = 0
+			for (tag in duplicated_tags) {
+				if (tag in all_tags) {
+					duplicate_tags[duplicate_count] = tag
+					file_path = tag_file[tag]
+					duplicate_file_id[duplicate_count] = file_global_id[file_path]
+					duplicate_line[duplicate_count] = tag_line[tag]
+					duplicate_count++
+				}
+			}
+
+			# Sort duplicate tags alphabetically for deterministic output
+			sort_tag_list(duplicate_count, duplicate_tags, duplicate_file_id, duplicate_line)
 
 			# Build tag-to-layer mapping
 			for (tag in all_tags) {
@@ -1892,6 +1956,20 @@ END { printf "\n" }
 				tag_id = json_escape(isolated_tags[i])
 				fid = isolated_file_id[i]
 				line_num = isolated_line[i]
+				if (fid == "") fid = -1
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag_id, fid, line_num
+			}
+			printf "\n    ],\n"
+
+			# Output duplicate tag information
+			printf "    \"duplicate_tags\": %d,\n", duplicate_count
+			printf "    \"duplicate_tag_list\": [\n"
+			for (i = 0; i < duplicate_count; i++) {
+				if (i > 0) printf ",\n"
+				tag_id = json_escape(duplicate_tags[i])
+				fid = duplicate_file_id[i]
+				line_num = duplicate_line[i]
 				if (fid == "") fid = -1
 				if (line_num == "" || line_num + 0 < 1) line_num = 1
 				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag_id, fid, line_num

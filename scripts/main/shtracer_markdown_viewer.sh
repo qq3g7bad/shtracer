@@ -181,9 +181,11 @@ _generate_markdown_health() {
 	_total_tags=$(printf '%s\n' "$_health_data" | grep '^total_tags=' | cut -d= -f2)
 	_tags_with_links=$(printf '%s\n' "$_health_data" | grep '^tags_with_links=' | cut -d= -f2)
 	_isolated_tags=$(printf '%s\n' "$_health_data" | grep '^isolated_tags=' | cut -d= -f2)
+	_duplicate_tags=$(printf '%s\n' "$_health_data" | grep '^duplicate_tags=' | cut -d= -f2)
 	_dangling_refs=$(printf '%s\n' "$_health_data" | grep '^dangling_references=' | cut -d= -f2)
 
 	# Default to 0 if not found
+	_duplicate_tags=${_duplicate_tags:-0}
 	_dangling_refs=${_dangling_refs:-0}
 
 	# Calculate percentages
@@ -206,6 +208,7 @@ _generate_markdown_health() {
 | Total Tags            | $_total_tags      |
 | Tags with Links       | $_tags_with_links ($_tags_with_links_pct%) |
 | Isolated Tags         | $_isolated_tags ($_isolated_pct%) |
+| Duplicate Tags        | $_duplicate_tags |
 | Dangling References   | $_dangling_refs |
 
 EOF
@@ -234,6 +237,27 @@ EOF
 
 	# Dangling references section
 	_dangling_lines=$(printf '%s\n' "$_health_data" | grep '^dangling|')
+
+	# Duplicate tags section
+	_duplicate_lines=$(printf '%s\n' "$_health_data" | grep '^duplicate|')
+
+	printf '### Duplicate Tags\n\n'
+
+	if [ "$_duplicate_tags" -eq 0 ]; then
+		printf '✓ No duplicate tags found.\n\n'
+	else
+		printf '%s duplicate tag(s) detected (same tag ID appears multiple times):\n\n' "$_duplicate_tags"
+		printf '%s\n' "$_duplicate_lines" | while IFS='|' read -r _prefix _dup_tag _file _line; do
+			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
+				_file_basename=$(basename "$_file")
+				printf "%s **%s** (%s:%s)\n" "-" "$_dup_tag" "$_file_basename" "${_line:-1}"
+			else
+				printf "%s **%s**\n" "-" "$_dup_tag"
+			fi
+		done
+
+		printf '\n'
+	fi
 
 	printf '### Dangling References\n\n'
 
@@ -912,6 +936,7 @@ _parse_json_health() {
 			in_isolated_obj=0
 			isolated_count=0
 			in_dangling_list=0
+			in_duplicate_list=0
 		}
 
 		# Parse top-level files array to map file_id -> file path
@@ -978,6 +1003,12 @@ _parse_json_health() {
 			print "isolated_tags=" isolated_tags
 		}
 
+		in_health && /"duplicate_tags":/ {
+			match($0, /"duplicate_tags": ([0-9]+)/, arr)
+			duplicate_tags = arr[1]
+			print "duplicate_tags=" duplicate_tags
+		}
+
 		in_health && /"isolated_tag_list": \[/ {
 			in_isolated_list=1
 			next
@@ -985,6 +1016,16 @@ _parse_json_health() {
 
 		in_isolated_list && /^    \]/ {
 			in_isolated_list=0
+			next
+		}
+
+		in_health && /"duplicate_tag_list": \[/ {
+			in_duplicate_list=1
+			next
+		}
+
+		in_duplicate_list && /^    \]/ {
+			in_duplicate_list=0
 			next
 		}
 
@@ -1012,6 +1053,29 @@ _parse_json_health() {
 			if (iso_id != "") {
 				file_path_out = (iso_file_id in file_map) ? file_map[iso_file_id] : "unknown"
 				print "isolated|" iso_id "|" file_path_out "|" iso_line
+			}
+		}
+
+		# Parse single-line JSON objects in duplicate_tag_list
+		# Example: {"id": "@TAG1@", "file_id": 0, "line": 1},
+		in_duplicate_list && /\{"id":/ {
+			dup_id=""; dup_file_id=""; dup_line=""
+
+			if (match($0, /"id": *"([^"]+)"/, arr)) {
+				dup_id = arr[1]
+			}
+
+			if (match($0, /"file_id": *([0-9]+)/, arr)) {
+				dup_file_id = arr[1]
+			}
+
+			if (match($0, /"line": *([0-9]+)/, arr)) {
+				dup_line = arr[1]
+			}
+
+			if (dup_id != "") {
+				file_path_out = (dup_file_id in file_map) ? file_map[dup_file_id] : "unknown"
+				print "duplicate|" dup_id "|" file_path_out "|" dup_line
 			}
 		}
 
