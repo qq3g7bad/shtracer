@@ -407,45 +407,27 @@ _verify_duplicated_tags() {
 # @param   $2 : Output file path for dangling references
 # @return  None (writes to file with format: child_tag parent_tag file line)
 _verify_dangling_fromtags() {
-	# Create temporary files for tracking valid tags and references
-	_valid_tags="$(shtracer_tmpfile)" || return 1
-	_all_references="$(shtracer_tmpfile)" || return 1
-
-	# Step 1: Extract all valid tag IDs (field 2) and sort them
-	awk -F"$SHTRACER_SEPARATOR" '{print $2}' "$1" | sort -u >"$_valid_tags"
-
-	# Step 2: Extract all FROM tag references (field 3, comma-separated)
+	# Single AWK pass over the tag data to avoid temp file/grep mismatches
 	# Output format: child_tag parent_tag file line
-	awk -F"$SHTRACER_SEPARATOR" '{
-		tag_id = $2
-		from_tags = $3
-		file = $5
-		line = $6
+	awk -F"$SHTRACER_SEPARATOR" -v nodata="${NODATA_STRING}" '
+		NR==FNR { tags[$2]=1; next }
+		{
+			tag_id = $2
+			from_tags = $3
+			file = $5
+			line = $6
 
-		# Remove leading/trailing whitespace from from_tags field
-		gsub(/^[[:space:]]+|[[:space:]]+$/, "", from_tags)
-
-		# Split comma-separated FROM tags
-		n = split(from_tags, arr, /[[:space:]]*,[[:space:]]*/)
-		for (i = 1; i <= n; i++) {
-			parent = arr[i]
-			# Skip NONE and empty strings
-			if (parent != "'"$NODATA_STRING"'" && parent != "") {
-				print tag_id " " parent " " file " " line
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", from_tags)
+			n = split(from_tags, arr, /[[:space:]]*,[[:space:]]*/)
+			for (i = 1; i <= n; i++) {
+				parent = arr[i]
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", parent)
+				if (parent != nodata && parent != "" && !(parent in tags)) {
+					print tag_id " " parent " " file " " line
+				}
 			}
 		}
-	}' "$1" >"$_all_references"
-
-	# Step 3: Check each parent reference against valid tags
-	# Output dangling references to result file
-	while read -r _child _parent _file _line; do
-		if ! grep -qxF "$_parent" "$_valid_tags"; then
-			printf "%s %s %s %s\n" "$_child" "$_parent" "$_file" "$_line"
-		fi
-	done <"$_all_references" >"$2"
-
-	# Clean up temporary files
-	rm -f "$_valid_tags" "$_all_references"
+	' "$1" "$1" >"$2"
 }
 
 ##
