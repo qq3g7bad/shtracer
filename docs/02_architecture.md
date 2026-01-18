@@ -109,7 +109,9 @@ Exit codes are defined as constants for CI/CD integration:
 
 * `EXIT_ISOLATED_TAGS=20` - Found isolated tags
 * `EXIT_DUPLICATE_TAGS=21` - Found duplicate tags
-* `EXIT_BOTH_ISSUES=22` - Found both isolated and duplicate tags
+* `EXIT_DANGLING_TAGS=23` - Found dangling FROM tag references
+* `EXIT_DUPLICATE_DANGLING=25` - Found duplicate tags and dangling references
+* `EXIT_ALL_ISSUES=26` - Found multiple issues (combinations of isolated, duplicate, and dangling)
 
 **System Errors (30-39)**
 

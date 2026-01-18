@@ -566,9 +566,9 @@ Use exit codes to fail builds when traceability issues are detected:
 
 - `20` - Isolated tags found
 - `21` - Duplicate tags found
-- `22` - Both isolated and duplicate tags found
 - `23` - Dangling references found
-- `24` - Both isolated tags and dangling references found
+- `25` - Duplicate tags and dangling references found
+- `26` - Multiple issues found (combinations of isolated, duplicate, and dangling)
 
 **Example CI pipeline:**
 ```bash

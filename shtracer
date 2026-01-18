@@ -24,11 +24,9 @@ EXIT_VIEWER_FAILED=13       # Viewer script execution failed
 # VERIFICATION ERRORS (20-29)
 EXIT_ISOLATED_TAGS=20      # Found isolated tags (no downstream references)
 EXIT_DUPLICATE_TAGS=21     # Found duplicate tags
-EXIT_BOTH_ISSUES=22        # Found both isolated and duplicate tags
 EXIT_DANGLING_TAGS=23      # Found dangling FROM tag references
-EXIT_ISOLATED_DANGLING=24  # Found isolated tags and dangling references
 EXIT_DUPLICATE_DANGLING=25 # Found duplicate tags and dangling references
-EXIT_ALL_ISSUES=26         # Found all three issues (isolated, duplicate, and dangling)
+EXIT_ALL_ISSUES=26         # Found multiple issues (combinations of isolated, duplicate, and dangling)
 #
 # SYSTEM ERRORS (30-39)
 EXIT_INTERNAL_ERROR=30   # Internal error (directory change, etc.)
@@ -511,9 +509,9 @@ main_routine() {
 			case "$_verification_status" in
 				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Verification failed: found isolated tags" ;;
 				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Verification failed: found duplicate tags" ;;
-				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed: found both isolated and duplicate tags" ;;
+				3) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found multiple issues (isolated and duplicate tags)" ;;
 				4) error_exit "$EXIT_DANGLING_TAGS" "main_routine" "Verification failed: found dangling FROM tag references" ;;
-				5) error_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "Verification failed: found isolated tags and dangling references" ;;
+				5) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found multiple issues (isolated tags and dangling references)" ;;
 				6) error_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "Verification failed: found duplicate tags and dangling references" ;;
 				7) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found all issues (isolated, duplicate, and dangling)" ;;
 				*) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed with unknown error" ;;
@@ -525,9 +523,9 @@ main_routine() {
 			case "$_verification_status" in
 				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
 				2) warn_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "found duplicate tags" ;;
-				3) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "found both isolated and duplicate tags" ;;
+				3) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found multiple issues (isolated and duplicate tags)" ;;
 				4) warn_exit "$EXIT_DANGLING_TAGS" "main_routine" "found dangling FROM tag references" ;;
-				5) warn_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "found isolated tags and dangling references" ;;
+				5) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found multiple issues (isolated tags and dangling references)" ;;
 				6) warn_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "found duplicate tags and dangling references" ;;
 				7) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found all issues (isolated, duplicate, and dangling)" ;;
 				*) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "verification issues detected" ;;
