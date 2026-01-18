@@ -672,14 +672,20 @@ function renderHealth(data) {
                 }
 
                 html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
                 html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
                 html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(tagId)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
                 html += `onmouseout="hideTooltip()">`;
-                html += `<strong>${escapeHtml(tagId)}</strong>`;
+                html += `${escapeHtml(tagId)}`;
                 html += `</a>`;
+                html += `</span>`;
                 html += '</li>';
             } else {
-                html += `<li><strong>${escapeHtml(tagId)}</strong></li>`;
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</span>`;
+                html += '</li>';
             }
         });
         
@@ -735,11 +741,13 @@ function renderHealth(data) {
 
                 html += '<tr>';
                 html += '<td>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
                 html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(childTag)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
                 html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(childTag)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
                 html += `onmouseout="hideTooltip()">`;
-                html += `<strong>${escapeHtml(childTag)}</strong>`;
+                html += `${escapeHtml(childTag)}`;
                 html += `</a>`;
+                html += `</span>`;
                 html += '</td>';
                 html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
                 html += `<td>${escapeHtml(fileBaseName)}</td>`;
@@ -747,7 +755,11 @@ function renderHealth(data) {
                 html += '</tr>';
             } else {
                 html += '<tr>';
-                html += `<td><strong>${escapeHtml(childTag)}</strong></td>`;
+                html += '<td>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `${escapeHtml(childTag)}`;
+                html += `</span>`;
+                html += '</td>';
                 html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
                 html += `<td>${escapeHtml(fileBaseName)}</td>`;
                 html += `<td>${line}</td>`;
@@ -1624,6 +1636,8 @@ function renderSankey(data) {
         annotateMatrixBadges();
         renderSummary(data);
         renderHealth(data);
+        // Re-apply badge colors after renderHealth creates isolated/dangling badges
+        annotateMatrixBadges();
 
 		// Prepare nodes and links for full diagram
 		const sankeyNodes = (data.trace_tags || data.nodes || []).map((d, i) => ({ ...d, index: i }));
