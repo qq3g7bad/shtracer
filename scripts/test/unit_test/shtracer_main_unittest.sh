@@ -602,7 +602,7 @@ test_main_routine_normal_mode_with_duplicate_tags() {
 		set -u
 
 		# Act -------------
-		_RETURN="$(main_routine "./unit_test/testdata/config_with_duplicate_tag.md" 2>&1)"
+		_RETURN="$(main_routine --verify "./unit_test/testdata/config_with_duplicate_tag.md" 2>&1)"
 		_EXIT_CODE=$?
 
 		# Assert ----------

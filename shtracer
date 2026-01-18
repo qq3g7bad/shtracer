@@ -84,8 +84,8 @@ print_usage() {
 
 		Options:
 		  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
-		  -v, --verify                      Verify mode: detect duplicate or isolated tags
-		  -t                               Test mode: execute unit tests
+		  -v, --verify                     Verify mode: detect duplicate or isolated tags
+		  -t, --test                       Test mode: execute unit tests
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
 		  --summary                        Print traceability summary to stdout (direct links only)
@@ -106,6 +106,7 @@ print_usage() {
 
 		  4. Test mode
 		     $ ./shtracer -t
+		     $ ./shtracer --test
 
 		  5. Summary mode
 		     $ ./shtracer --summary ./sample/config.md
@@ -156,7 +157,7 @@ parse_arguments() {
 				# Note: -v/--verify alone prints usage (config required)
 				print_usage
 				;;
-			-t)
+			-t | --test)
 				SHTRACER_MODE='TEST'
 				return
 				;;
@@ -226,10 +227,6 @@ parse_arguments() {
 					;;
 				--debug)
 					SHTRACER_DEBUG='true'
-					shift
-					;;
-				-C)
-					# Legacy color mode (deprecated, silently ignore)
 					shift
 					;;
 				-*)
