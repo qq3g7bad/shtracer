@@ -571,6 +571,7 @@ function renderHealth(data) {
     const totalTags = health.total_tags || 0;
     const tagsWithLinks = health.tags_with_links || 0;
     const isolatedTags = health.isolated_tags || 0;
+    const danglingRefs = health.dangling_references || 0;
 
     // Calculate percentages
     let isolatedPct = 0;
@@ -618,6 +619,7 @@ function renderHealth(data) {
     html += `<tr><td>Total Tags</td><td>${totalTags}</td></tr>`;
     html += `<tr><td>Tags with Links</td><td>${tagsWithLinks} (${tagsWithLinksPct}%)</td></tr>`;
     html += `<tr><td>Isolated Tags</td><td>${isolatedTags} (${isolatedPct}%)</td></tr>`;
+    html += `<tr><td>Dangling References</td><td>${danglingRefs}</td></tr>`;
     html += '</tbody></table>';
 
     // Build Isolated Tags section
@@ -676,6 +678,78 @@ function renderHealth(data) {
         });
         
         html += '</ul>';
+        html += '</details>';
+    }
+
+    // Build Dangling References section
+    html += '<h3>Dangling References</h3>';
+
+    const danglingList = health.dangling_reference_list || [];
+    const danglingCount = danglingList.length;
+
+    if (danglingCount === 0) {
+        html += '<p>✓ No dangling references found.</p>';
+    } else {
+        html += `<p>${danglingCount} dangling reference(s) - tags referencing non-existent parents:</p>`;
+        html += '<details>';
+        html += `<summary>Show dangling references (${danglingCount})</summary>`;
+        html += '<table class="dangling-refs-table">';
+        html += '<thead><tr><th>Child Tag</th><th>Missing Parent</th><th>File</th><th>Line</th></tr></thead>';
+        html += '<tbody>';
+
+        danglingList.forEach(item => {
+            const childTag = item.child_tag || '';
+            const missingParent = item.missing_parent || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === childTag);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
+                html += '<tr>';
+                html += '<td>';
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(childTag)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(childTag)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `<strong>${escapeHtml(childTag)}</strong>`;
+                html += `</a>`;
+                html += '</td>';
+                html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
+                html += `<td>${escapeHtml(fileBaseName)}</td>`;
+                html += `<td>${line}</td>`;
+                html += '</tr>';
+            } else {
+                html += '<tr>';
+                html += `<td><strong>${escapeHtml(childTag)}</strong></td>`;
+                html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
+                html += `<td>${escapeHtml(fileBaseName)}</td>`;
+                html += `<td>${line}</td>`;
+                html += '</tr>';
+            }
+        });
+
+        html += '</tbody></table>';
         html += '</details>';
     }
 

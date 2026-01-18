@@ -242,6 +242,29 @@ body[data-theme="light"] .matrix-tag-badge.matrix-tag-badge-nodata {
     margin: 4px 0;
 }
 
+.dangling-refs-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.dangling-refs-table td,
+.dangling-refs-table th {
+    border: 1px solid var(--border-default);
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.dangling-refs-table th {
+    background-color: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.dangling-refs-table tr:hover {
+    background-color: var(--table-row-hover);
+}
+
 #traceability-health h3 {
     margin-top: 16px;
     margin-bottom: 8px;

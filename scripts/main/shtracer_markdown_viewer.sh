@@ -181,6 +181,10 @@ _generate_markdown_health() {
 	_total_tags=$(printf '%s\n' "$_health_data" | grep '^total_tags=' | cut -d= -f2)
 	_tags_with_links=$(printf '%s\n' "$_health_data" | grep '^tags_with_links=' | cut -d= -f2)
 	_isolated_tags=$(printf '%s\n' "$_health_data" | grep '^isolated_tags=' | cut -d= -f2)
+	_dangling_refs=$(printf '%s\n' "$_health_data" | grep '^dangling_references=' | cut -d= -f2)
+
+	# Default to 0 if not found
+	_dangling_refs=${_dangling_refs:-0}
 
 	# Calculate percentages
 	if [ "$_total_tags" -gt 0 ]; then
@@ -197,11 +201,12 @@ _generate_markdown_health() {
 
 ### Coverage Analysis
 
-| Metric           | Value    |
-| ---------------- | -------- |
-| Total Tags       | $_total_tags      |
-| Tags with Links  | $_tags_with_links ($_tags_with_links_pct%) |
-| Isolated Tags    | $_isolated_tags ($_isolated_pct%) |
+| Metric                | Value    |
+| --------------------- | -------- |
+| Total Tags            | $_total_tags      |
+| Tags with Links       | $_tags_with_links ($_tags_with_links_pct%) |
+| Isolated Tags         | $_isolated_tags ($_isolated_pct%) |
+| Dangling References   | $_dangling_refs |
 
 EOF
 
@@ -221,6 +226,30 @@ EOF
 				printf "%s **%s** (%s:%s)\n" "-" "$_isolated_tag" "$_file_basename" "${_line:-1}"
 			else
 				printf "%s **%s**\n" "-" "$_isolated_tag"
+			fi
+		done
+
+		printf '\n'
+	fi
+
+	# Dangling references section
+	_dangling_lines=$(printf '%s\n' "$_health_data" | grep '^dangling|')
+
+	printf '### Dangling References\n\n'
+
+	if [ "$_dangling_refs" -eq 0 ]; then
+		printf '✓ No dangling references found.\n\n'
+	else
+		printf '%s dangling reference(s) - tags referencing non-existent parents:\n\n' "$_dangling_refs"
+		printf '| Child Tag | Missing Parent | File | Line |\n'
+		printf '|-----------|----------------|------|------|\n'
+		printf '%s\n' "$_dangling_lines" | while IFS='|' read -r _prefix _child_tag _parent_tag _file _line; do
+			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
+				# Extract basename from full path for better readability
+				_file_basename=$(basename "$_file")
+				printf '| %s | %s | %s | %s |\n' "$_child_tag" "$_parent_tag" "$_file_basename" "${_line:-1}"
+			else
+				printf '| %s | %s | %s | %s |\n' "$_child_tag" "$_parent_tag" "unknown" "${_line:-1}"
 			fi
 		done
 
@@ -882,6 +911,7 @@ _parse_json_health() {
 			in_isolated_list=0
 			in_isolated_obj=0
 			isolated_count=0
+			in_dangling_list=0
 		}
 
 		# Parse top-level files array to map file_id -> file path
@@ -982,6 +1012,54 @@ _parse_json_health() {
 			if (iso_id != "") {
 				file_path_out = (iso_file_id in file_map) ? file_map[iso_file_id] : "unknown"
 				print "isolated|" iso_id "|" file_path_out "|" iso_line
+			}
+		}
+
+		in_health && /"dangling_references":/ {
+			match($0, /"dangling_references": ([0-9]+)/, arr)
+			dangling_refs = arr[1]
+			print "dangling_references=" dangling_refs
+		}
+
+		in_health && /"dangling_reference_list": \[/ {
+			in_dangling_list=1
+			next
+		}
+
+		in_dangling_list && /^    \]/ {
+			in_dangling_list=0
+			next
+		}
+
+		# Parse single-line JSON objects in dangling_reference_list
+		# Example: {"child_tag": "@ARC1.1@", "missing_parent": "@REQ6.1@", "file_id": 1, "line": 64},
+		in_dangling_list && /\{"child_tag":/ {
+			dang_child=""; dang_parent=""; dang_file_id=""; dang_line=""
+
+			# Extract child_tag
+			if (match($0, /"child_tag": *"([^"]+)"/, arr)) {
+				dang_child = arr[1]
+			}
+
+			# Extract missing_parent
+			if (match($0, /"missing_parent": *"([^"]+)"/, arr)) {
+				dang_parent = arr[1]
+			}
+
+			# Extract file_id
+			if (match($0, /"file_id": *([0-9]+)/, arr)) {
+				dang_file_id = arr[1]
+			}
+
+			# Extract line
+			if (match($0, /"line": *([0-9]+)/, arr)) {
+				dang_line = arr[1]
+			}
+
+			# Output immediately
+			if (dang_child != "" && dang_parent != "") {
+				file_path_out = (dang_file_id in file_map) ? file_map[dang_file_id] : "unknown"
+				print "dangling|" dang_child "|" dang_parent "|" file_path_out "|" dang_line
 			}
 		}
 	'
