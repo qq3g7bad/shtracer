@@ -98,7 +98,7 @@ test_integration_normal_mode() {
 		grep -q "traceabilityData" shtracer_output/output.html
 		assertEquals "HTML should include embedded JSON" 0 $?
 
-		# Check JSON structure (v0.2.0 format)
+		# Check JSON structure
 		grep -q '"metadata"' shtracer_output/output.json
 		assertEquals "JSON should contain metadata" 0 $?
 		grep -q '"files"' shtracer_output/output.json
@@ -496,7 +496,7 @@ test_markdown_tag_index() {
 		mkdir -p shtracer_output
 
 		# Act -------------
-		"${SHTRACER_BIN}" --markdown ./config_integration.md >shtracer_output/output.md 2>&1
+		"${SHTRACER_BIN}" --debug --markdown ./config_integration.md >shtracer_output/output.md 2>&1
 		_EXIT_CODE=$?
 
 		# Assert ----------
@@ -507,7 +507,7 @@ test_markdown_tag_index() {
 		assertEquals "Markdown should have Tag Index section" 0 $?
 
 		# Verify that tag index has actual tag entries (not just "****")
-		_TAG_ENTRIES=$(grep -c "^- @" shtracer_output/output.md || echo "0")
+		_TAG_ENTRIES=$(grep -c "^- \*\*@" shtracer_output/output.md || echo "0")
 		assertTrue "Tag index should have actual tag entries" "[ ${_TAG_ENTRIES} -gt 0 ]"
 
 		# Verify tags are not showing "(unknown)" file paths

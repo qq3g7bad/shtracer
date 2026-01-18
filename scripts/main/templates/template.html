@@ -33,7 +33,7 @@
     </div>
 
     <div class="right">
-      <div id="file-information"></div>
+      <div id="tag-info-panel" class="tag-info-panel" style="display: none;"></div>
       <pre id="text-container"></pre>
     </div>
   </div>
@@ -51,7 +51,6 @@
       const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 
       body.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
 
       updateThemeButton(newTheme);
     }
@@ -68,13 +67,6 @@
         text.textContent = 'Dark';
       }
     }
-
-    // Initialize theme from localStorage
-    (function() {
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      document.body.setAttribute('data-theme', savedTheme);
-      updateThemeButton(savedTheme);
-    })();
 
     // Cross-reference matrix tab switching functionality
     function switchMatrixTab(event, tabId) {
@@ -95,24 +87,11 @@
       if (selectedTab) selectedTab.classList.add('active');
       if (selectedTable) selectedTable.classList.add('active');
 
-      // Persist to localStorage
-      localStorage.setItem('selectedMatrixTab', tabId);
-
       // Re-apply badge colors for newly visible badges
       if (typeof annotateMatrixBadges === 'function') {
         setTimeout(annotateMatrixBadges, 0);
       }
     }
-
-    // Initialize selected matrix tab from localStorage
-    (function() {
-      const savedTab = localStorage.getItem('selectedMatrixTab');
-      if (savedTab && document.querySelector(`.matrix-tab[data-matrix="${savedTab}"]`)) {
-        document.addEventListener('DOMContentLoaded', function() {
-          switchMatrixTab({ preventDefault: function() {} }, savedTab);
-        });
-      }
-    })();
   </script>
 </body>
 </html>

@@ -360,7 +360,8 @@ test_print_verification_result_no_errors() {
 		mkdir -p "$OUTPUT_DIR/verified"
 		touch "$OUTPUT_DIR/verified/isolated"
 		touch "$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated"
+		touch "$OUTPUT_DIR/verified/dangling"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
 
 		# Act -------------
 		print_verification_result "$_INPUT"
@@ -378,7 +379,9 @@ test_print_verification_result_with_isolated() {
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
 		echo "@ISOLATED_TAG@" >"$OUTPUT_DIR/verified/isolated"
-		_INPUT="$OUTPUT_DIR/verified/isolated"
+		touch "$OUTPUT_DIR/verified/duplicated"
+		touch "$OUTPUT_DIR/verified/dangling"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
@@ -395,15 +398,146 @@ test_print_verification_result_with_duplicated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
+		touch "$OUTPUT_DIR/verified/isolated"
 		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
-		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
-		_INPUT="$OUTPUT_DIR/verified/duplicated"
+		echo "@DUPLICATE_TAG@" >>"$OUTPUT_DIR/verified/duplicated"
+		touch "$OUTPUT_DIR/verified/dangling"
+		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
 
 		# Act -------------
 		print_verification_result "$_INPUT" 2>/dev/null
 
 		# Assert ----------
-		assertEquals 1 "$?"
+		assertEquals 2 "$?"
+	)
+}
+
+##
+# @brief  Test for _verify_dangling_fromtags with valid references
+# @tag    @UT2.14@
+test_verify_dangling_fromtags_no_dangling() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		# Create a tag file with valid references
+		# Format: trace_target<SEP>tag_id<SEP>from_tags<SEP>description<SEP>file<SEP>line<SEP>...
+		_TAG_FILE="$OUTPUT_DIR/tag_data"
+		_OUTPUT_FILE="$OUTPUT_DIR/verified/dangling"
+		cat >"$_TAG_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Implementation${SHTRACER_SEPARATOR}@IMP1@${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}Impl 1${SHTRACER_SEPARATOR}impl.sh${SHTRACER_SEPARATOR}30${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		_verify_dangling_fromtags "$_TAG_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have no dangling references
+		assertEquals "0" "$(wc -l <"$_OUTPUT_FILE")"
+	)
+}
+
+##
+# @brief  Test for _verify_dangling_fromtags with dangling reference
+# @tag    @UT2.15@
+test_verify_dangling_fromtags_with_dangling() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		_TAG_FILE="$OUTPUT_DIR/tag_data"
+		_OUTPUT_FILE="$OUTPUT_DIR/verified/dangling"
+		cat >"$_TAG_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ-MISSING@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		_verify_dangling_fromtags "$_TAG_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have 1 dangling reference
+		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE")"
+		# Check the output format: child_tag parent_tag file line
+		_RESULT="$(cat "$_OUTPUT_FILE")"
+		echo "$_RESULT" | grep -q "@ARC1@ @REQ-MISSING@ arch.md 20"
+		assertEquals "0" "$?"
+	)
+}
+
+##
+# @brief  Test for _verify_dangling_fromtags with multiple dangling references
+# @tag    @UT2.16@
+test_verify_dangling_fromtags_multiple_dangling() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		_TAG_FILE="$OUTPUT_DIR/tag_data"
+		_OUTPUT_FILE="$OUTPUT_DIR/verified/dangling"
+		cat >"$_TAG_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ-MISSING@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Implementation${SHTRACER_SEPARATOR}@IMP1@${SHTRACER_SEPARATOR}@ARC-MISSING@${SHTRACER_SEPARATOR}Impl 1${SHTRACER_SEPARATOR}impl.sh${SHTRACER_SEPARATOR}30${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		_verify_dangling_fromtags "$_TAG_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have 2 dangling references
+		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE")"
+	)
+}
+
+##
+# @brief  Test for _verify_dangling_fromtags with comma-separated FROM tags
+# @tag    @UT2.17@
+test_verify_dangling_fromtags_comma_separated() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		_TAG_FILE="$OUTPUT_DIR/tag_data"
+		_OUTPUT_FILE="$OUTPUT_DIR/verified/dangling"
+		cat >"$_TAG_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@, @REQ-MISSING@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		_verify_dangling_fromtags "$_TAG_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have 1 dangling reference (@REQ-MISSING@)
+		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE")"
+		_RESULT="$(cat "$_OUTPUT_FILE")"
+		echo "$_RESULT" | grep -q "@ARC1@ @REQ-MISSING@ arch.md 20"
+		assertEquals "0" "$?"
+	)
+}
+
+##
+# @brief  Test for _verify_dangling_fromtags with mixed valid and dangling
+# @tag    @UT2.18@
+test_verify_dangling_fromtags_mixed() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/verified"
+		_TAG_FILE="$OUTPUT_DIR/tag_data"
+		_OUTPUT_FILE="$OUTPUT_DIR/verified/dangling"
+		cat >"$_TAG_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Requirement${SHTRACER_SEPARATOR}@REQ2@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 2${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}15${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC2@${SHTRACER_SEPARATOR}@REQ2@, @REQ-MISSING@, @REQ-MISSING2@${SHTRACER_SEPARATOR}Arch 2${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}25${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Implementation${SHTRACER_SEPARATOR}@IMP1@${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}Impl 1${SHTRACER_SEPARATOR}impl.sh${SHTRACER_SEPARATOR}30${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		_verify_dangling_fromtags "$_TAG_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have 2 dangling references from @ARC2@
+		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE")"
 	)
 }
 

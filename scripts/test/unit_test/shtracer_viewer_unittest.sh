@@ -22,6 +22,9 @@ export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 
+# Version to use in test fixtures (should match SHTRACER_VERSION in main script)
+SHTRACER_VERSION='0.1.3'
+
 ##
 # @brief
 #
@@ -185,7 +188,7 @@ test_shtracer_viewer_single_file_output() {
 		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
 		cat >"$OUTPUT_DIR/output.json" <<EOF
 {
-	"metadata": {"version": "0.1.3", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
+	"metadata": {"version": "$SHTRACER_VERSION", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
 	"files": [
 		{"file_id": 0, "file": "$_TEST_FILE", "version": "unknown"}
 	],

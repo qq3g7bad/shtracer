@@ -181,6 +181,12 @@ _generate_markdown_health() {
 	_total_tags=$(printf '%s\n' "$_health_data" | grep '^total_tags=' | cut -d= -f2)
 	_tags_with_links=$(printf '%s\n' "$_health_data" | grep '^tags_with_links=' | cut -d= -f2)
 	_isolated_tags=$(printf '%s\n' "$_health_data" | grep '^isolated_tags=' | cut -d= -f2)
+	_duplicate_tags=$(printf '%s\n' "$_health_data" | grep '^duplicate_tags=' | cut -d= -f2)
+	_dangling_refs=$(printf '%s\n' "$_health_data" | grep '^dangling_references=' | cut -d= -f2)
+
+	# Default to 0 if not found
+	_duplicate_tags=${_duplicate_tags:-0}
+	_dangling_refs=${_dangling_refs:-0}
 
 	# Calculate percentages
 	if [ "$_total_tags" -gt 0 ]; then
@@ -197,24 +203,25 @@ _generate_markdown_health() {
 
 ### Coverage Analysis
 
-| Metric           | Value    |
-| ---------------- | -------- |
-| Total Tags       | $_total_tags      |
-| Tags with Links  | $_tags_with_links ($_tags_with_links_pct%) |
-| Isolated Tags    | $_isolated_tags ($_isolated_pct%) |
+| Metric                | Value    |
+| --------------------- | -------- |
+| Total Tags            | $_total_tags      |
+| Tags with Links       | $_tags_with_links ($_tags_with_links_pct%) |
+| Isolated Tags         | $_isolated_tags ($_isolated_pct%) |
+| Duplicate Tags        | $_duplicate_tags |
+| Dangling References   | $_dangling_refs |
 
 EOF
 
 	# Isolated tags section
 	_isolated_lines=$(printf '%s\n' "$_health_data" | grep '^isolated|')
-	_isolated_count=$(printf '%s\n' "$_isolated_lines" | grep -c '^' || echo 0)
 
 	printf '### Isolated Tags\n\n'
 
-	if [ "$_isolated_count" -eq 0 ]; then
+	if [ "$_isolated_tags" -eq 0 ]; then
 		printf '✓ No isolated tags found.\n\n'
 	else
-		printf '%s isolated tag(s) with no downstream traceability:\n\n' "$_isolated_count"
+		printf '%s isolated tag(s) with no downstream traceability:\n\n' "$_isolated_tags"
 		printf '%s\n' "$_isolated_lines" | while IFS='|' read -r _prefix _isolated_tag _file _line; do
 			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
 				# Extract basename from full path for better readability
@@ -222,6 +229,51 @@ EOF
 				printf "%s **%s** (%s:%s)\n" "-" "$_isolated_tag" "$_file_basename" "${_line:-1}"
 			else
 				printf "%s **%s**\n" "-" "$_isolated_tag"
+			fi
+		done
+
+		printf '\n'
+	fi
+
+	# Dangling references section
+	_dangling_lines=$(printf '%s\n' "$_health_data" | grep '^dangling|')
+
+	# Duplicate tags section
+	_duplicate_lines=$(printf '%s\n' "$_health_data" | grep '^duplicate|')
+
+	printf '### Duplicate Tags\n\n'
+
+	if [ "$_duplicate_tags" -eq 0 ]; then
+		printf '✓ No duplicate tags found.\n\n'
+	else
+		printf '%s duplicate tag(s) detected (same tag ID appears multiple times):\n\n' "$_duplicate_tags"
+		printf '%s\n' "$_duplicate_lines" | while IFS='|' read -r _prefix _dup_tag _file _line; do
+			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
+				_file_basename=$(basename "$_file")
+				printf "%s **%s** (%s:%s)\n" "-" "$_dup_tag" "$_file_basename" "${_line:-1}"
+			else
+				printf "%s **%s**\n" "-" "$_dup_tag"
+			fi
+		done
+
+		printf '\n'
+	fi
+
+	printf '### Dangling References\n\n'
+
+	if [ "$_dangling_refs" -eq 0 ]; then
+		printf '✓ No dangling references found.\n\n'
+	else
+		printf '%s dangling reference(s) - tags referencing non-existent parents:\n\n' "$_dangling_refs"
+		printf '| Child Tag | Missing Parent | File | Line |\n'
+		printf '|-----------|----------------|------|------|\n'
+		printf '%s\n' "$_dangling_lines" | while IFS='|' read -r _prefix _child_tag _parent_tag _file _line; do
+			if [ -n "$_file" ] && [ "$_file" != "unknown" ]; then
+				# Extract basename from full path for better readability
+				_file_basename=$(basename "$_file")
+				printf '| %s | %s | %s | %s |\n' "$_child_tag" "$_parent_tag" "$_file_basename" "${_line:-1}"
+			else
+				printf '| %s | %s | %s | %s |\n' "$_child_tag" "$_parent_tag" "unknown" "${_line:-1}"
 			fi
 		done
 
@@ -410,23 +462,27 @@ _get_layer_display_name() {
 	_json="$1"
 	_abbrev="$2"
 
-	# Extract layer name from JSON nodes' trace_target field
+	# Extract layer name from JSON layers array
 	# Returns first match or fallback to abbreviation
 	printf '%s\n' "$_json" | awk -v abbrev="$_abbrev" '
-		/"trace_target":/ {
-			match($0, /"trace_target": "([^"]*)"/, arr)
-			trace_target = arr[1]
-
-			# Extract last segment after colon
-			n = split(trace_target, parts, ":")
-			layer = parts[n]
-
-			# Check if this layer matches the abbreviation pattern
-			# Handles case-insensitive prefix match
-			if (tolower(layer) ~ "^" tolower(abbrev)) {
-				# Store first match
-				if (found == "") {
-					found = layer
+		BEGIN { in_layers = 0; in_layer_obj = 0 }
+		/"layers":/ && /\[/ { in_layers = 1; next }
+		in_layers && /^\s*\]/ { in_layers = 0; next }
+		in_layers && /^\s*\{/ { in_layer_obj = 1; layer_name = ""; next }
+		in_layer_obj && /"name":/ {
+			match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
+			layer_name = arr[1]
+		}
+		in_layer_obj && /^\s*\}/ {
+			in_layer_obj = 0
+			if (layer_name != "") {
+				# Check if this layer matches the abbreviation pattern
+				# Handles case-insensitive prefix match
+				if (tolower(layer_name) ~ "^" tolower(abbrev)) {
+					# Store first match
+					if (found == "") {
+						found = layer_name
+					}
 				}
 			}
 		}
@@ -879,6 +935,8 @@ _parse_json_health() {
 			in_isolated_list=0
 			in_isolated_obj=0
 			isolated_count=0
+			in_dangling_list=0
+			in_duplicate_list=0
 		}
 
 		# Parse top-level files array to map file_id -> file path
@@ -945,6 +1003,12 @@ _parse_json_health() {
 			print "isolated_tags=" isolated_tags
 		}
 
+		in_health && /"duplicate_tags":/ {
+			match($0, /"duplicate_tags": ([0-9]+)/, arr)
+			duplicate_tags = arr[1]
+			print "duplicate_tags=" duplicate_tags
+		}
+
 		in_health && /"isolated_tag_list": \[/ {
 			in_isolated_list=1
 			next
@@ -952,6 +1016,16 @@ _parse_json_health() {
 
 		in_isolated_list && /^    \]/ {
 			in_isolated_list=0
+			next
+		}
+
+		in_health && /"duplicate_tag_list": \[/ {
+			in_duplicate_list=1
+			next
+		}
+
+		in_duplicate_list && /^    \]/ {
+			in_duplicate_list=0
 			next
 		}
 
@@ -979,6 +1053,77 @@ _parse_json_health() {
 			if (iso_id != "") {
 				file_path_out = (iso_file_id in file_map) ? file_map[iso_file_id] : "unknown"
 				print "isolated|" iso_id "|" file_path_out "|" iso_line
+			}
+		}
+
+		# Parse single-line JSON objects in duplicate_tag_list
+		# Example: {"id": "@TAG1@", "file_id": 0, "line": 1},
+		in_duplicate_list && /\{"id":/ {
+			dup_id=""; dup_file_id=""; dup_line=""
+
+			if (match($0, /"id": *"([^"]+)"/, arr)) {
+				dup_id = arr[1]
+			}
+
+			if (match($0, /"file_id": *([0-9]+)/, arr)) {
+				dup_file_id = arr[1]
+			}
+
+			if (match($0, /"line": *([0-9]+)/, arr)) {
+				dup_line = arr[1]
+			}
+
+			if (dup_id != "") {
+				file_path_out = (dup_file_id in file_map) ? file_map[dup_file_id] : "unknown"
+				print "duplicate|" dup_id "|" file_path_out "|" dup_line
+			}
+		}
+
+		in_health && /"dangling_references":/ {
+			match($0, /"dangling_references": ([0-9]+)/, arr)
+			dangling_refs = arr[1]
+			print "dangling_references=" dangling_refs
+		}
+
+		in_health && /"dangling_reference_list": \[/ {
+			in_dangling_list=1
+			next
+		}
+
+		in_dangling_list && /^    \]/ {
+			in_dangling_list=0
+			next
+		}
+
+		# Parse single-line JSON objects in dangling_reference_list
+		# Example: {"child_tag": "@ARC1.1@", "missing_parent": "@REQ6.1@", "file_id": 1, "line": 64},
+		in_dangling_list && /\{"child_tag":/ {
+			dang_child=""; dang_parent=""; dang_file_id=""; dang_line=""
+
+			# Extract child_tag
+			if (match($0, /"child_tag": *"([^"]+)"/, arr)) {
+				dang_child = arr[1]
+			}
+
+			# Extract missing_parent
+			if (match($0, /"missing_parent": *"([^"]+)"/, arr)) {
+				dang_parent = arr[1]
+			}
+
+			# Extract file_id
+			if (match($0, /"file_id": *([0-9]+)/, arr)) {
+				dang_file_id = arr[1]
+			}
+
+			# Extract line
+			if (match($0, /"line": *([0-9]+)/, arr)) {
+				dang_line = arr[1]
+			}
+
+			# Output immediately
+			if (dang_child != "" && dang_parent != "") {
+				file_path_out = (dang_file_id in file_map) ? file_map[dang_file_id] : "unknown"
+				print "dangling|" dang_child "|" dang_parent "|" file_path_out "|" dang_line
 			}
 		}
 	'

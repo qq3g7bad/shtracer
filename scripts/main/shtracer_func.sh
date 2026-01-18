@@ -402,20 +402,81 @@ _verify_duplicated_tags() {
 }
 
 ##
-# @brief   Detect isolated FROM tags (tags not referenced anywhere)
+# @brief   Verify and detect dangling FROM tag references (references to non-existent tags)
+# @param   $1 : TAG_OUTPUT_DATA file path (01_tag_extracted_all)
+# @param   $2 : Output file path for dangling references
+# @return  None (writes to file with format: child_tag parent_tag file line)
+_verify_dangling_fromtags() {
+	# Single AWK pass over the tag data to avoid temp file/grep mismatches
+	# Output format: child_tag parent_tag file line
+	awk -F"$SHTRACER_SEPARATOR" -v nodata="${NODATA_STRING}" '
+		NR==FNR { tags[$2]=1; next }
+		{
+			tag_id = $2
+			from_tags = $3
+			file = $5
+			line = $6
+
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", from_tags)
+			n = split(from_tags, arr, /[[:space:]]*,[[:space:]]*/)
+			for (i = 1; i <= n; i++) {
+				parent = arr[i]
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", parent)
+				if (parent != nodata && parent != "" && !(parent in tags)) {
+					print tag_id " " parent " " file " " line
+				}
+			}
+		}
+	' "$1" "$1" >"$2"
+}
+
+##
+# @brief   Detect isolated tags (tags with no connections at all)
 # @param   $1 : TAG_PAIRS file path
-# @param   $2 : Output file path for isolated tags
+# @param   $2 : TAG_OUTPUT_DATA file path (all tags)
+# @param   $3 : Output file path for isolated tags
 # @return  None (writes to file)
 _detect_isolated_tags() {
-	# Find tags that appear only once in the entire tag pairs list
-	# Pipeline: print both columns (with $2 twice for weighting) → sort →
-	#           uniq -u finds unique → add NONE prefix → remove empty → extract tag
-	awk <"$1" '{print $1; print $2; print $2}' \
-		| sort \
-		| uniq -u \
-		| sed 's/^/'"$NODATA_STRING"' /' \
-		| sed '/^$/d' \
-		| awk '{print $2}' >"$2"
+	# Get all tags that appear in tag pairs (both columns, excluding NONE)
+	# A tag is isolated only if it has NO connections (not in FROM or TO column)
+	_connected_tags="$(shtracer_tmpfile)" || return 1
+	_all_tags="$(shtracer_tmpfile)" || return 1
+	_isolated_ids="$(shtracer_tmpfile)" || return 1
+
+	awk <"$1" '{
+		if ($1 != "'"$NODATA_STRING"'") print $1
+		if ($2 != "'"$NODATA_STRING"'") print $2
+	}' | sort -u >"$_connected_tags"
+
+	# Get all tags from tag extraction (second column is tag ID)
+	awk <"$2" -F"$SHTRACER_SEPARATOR" '{print $2}' | sort -u >"$_all_tags"
+
+	# Output tags NOT in connected_tags (truly isolated tags)
+	# comm -23: lines only in file1 (all_tags) not in file2 (connected_tags)
+	comm -23 "$_all_tags" "$_connected_tags" >"$_isolated_ids"
+
+	# Enrich isolated tags with file and line info from tag output data
+	awk -F"$SHTRACER_SEPARATOR" -v nodata="$NODATA_STRING" '
+		NR==FNR {
+			tag = $2
+			if (tag != "" && !(tag in file_path)) {
+				file_path[tag] = $5
+				line_num[tag] = $6
+			}
+			next
+		}
+		{
+			tag = $1
+			if (tag != "") {
+				file = (tag in file_path) ? file_path[tag] : "unknown"
+				line = (tag in line_num) ? line_num[tag] : 1
+				if (line == "" || line + 0 < 1) line = 1
+				print nodata " " tag " " file " " line
+			}
+		}
+	' "$2" "$_isolated_ids" >"$3"
+
+	rm -f "$_connected_tags" "$_all_tags" "$_isolated_ids"
 }
 
 ##
@@ -471,6 +532,7 @@ make_tag_table() {
 		_TAG_TABLE="${_TAG_OUTPUT_DIR%/}/04_tag_table"
 		_ISOLATED_FROM_TAG="${_TAG_OUTPUT_VERIFIED_DIR%/}/10_isolated_fromtag"
 		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_VERIFIED_DIR%/}/11_duplicated"
+		_TAG_TABLE_DANGLING="${_TAG_OUTPUT_VERIFIED_DIR%/}/12_dangling_fromtag"
 
 		mkdir -p "$_TAG_OUTPUT_DIR"
 		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR"
@@ -509,11 +571,12 @@ make_tag_table() {
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
 
-		# Verify tag integrity (duplicates and isolated tags)
+		# Verify tag integrity (duplicates, isolated tags, and dangling references)
 		_verify_duplicated_tags "$1" "$_TAG_TABLE_DUPLICATED"
-		_detect_isolated_tags "$_TAG_PAIRS" "$_ISOLATED_FROM_TAG"
+		_verify_dangling_fromtags "$1" "$_TAG_TABLE_DANGLING"
+		_detect_isolated_tags "$_TAG_PAIRS" "$1" "$_ISOLATED_FROM_TAG"
 
-		echo "$_TAG_TABLE$SHTRACER_SEPARATOR$_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED"
+		echo "$_TAG_TABLE$SHTRACER_SEPARATOR$_ISOLATED_FROM_TAG$SHTRACER_SEPARATOR$_TAG_TABLE_DUPLICATED$SHTRACER_SEPARATOR$_TAG_TABLE_DANGLING"
 	)
 }
 
@@ -809,19 +872,22 @@ print_summary_direct_links() {
 }
 
 ##
-# @brief  Display tag verification results (isolated and duplicated tags)
+# @brief  Display tag verification results (isolated, duplicated, and dangling tags)
 # @param  $1 : filenames of verification output
-# @return 0 if no issues, 1 if isolated tags only, 2 if duplicate tags only, 3 if both
+# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
 	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
 	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
 
 	_has_isolated="0"
 	_has_duplicated="0"
+	_has_dangling="0"
 
 	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
 		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
+		printf "Format: NONE tag file line\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
 		_has_isolated="1"
 	fi
@@ -830,21 +896,72 @@ print_verification_result() {
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
 		_has_duplicated="1"
 	fi
+	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
+		printf "[shtracer][error][print_verification_result]: Following tags have non-existent FROM tags\n" 1>&2
+		printf "Format: child_tag dangling_parent_tag file line\n" 1>&2
+		cat <"$_TAG_TABLE_DANGLING" 1>&2
+		_has_dangling="1"
+	fi
 
-	# Return specific codes:
+	# Return specific codes using bitmask:
 	# 0 = no issues
 	# 1 = isolated tags only
 	# 2 = duplicate tags only
-	# 3 = both isolated and duplicate tags
-	if [ "$_has_isolated" = "1" ] && [ "$_has_duplicated" = "1" ]; then
-		return 3
-	elif [ "$_has_isolated" = "1" ]; then
-		return 1
-	elif [ "$_has_duplicated" = "1" ]; then
-		return 2
-	else
-		return 0
+	# 3 = isolated + duplicate
+	# 4 = dangling only
+	# 5 = isolated + dangling
+	# 6 = duplicate + dangling
+	# 7 = all three issues
+	_code=0
+	if [ "$_has_isolated" = "1" ]; then
+		_code=$((_code + 1))
 	fi
+	if [ "$_has_duplicated" = "1" ]; then
+		_code=$((_code + 2))
+	fi
+	if [ "$_has_dangling" = "1" ]; then
+		_code=$((_code + 4))
+	fi
+
+	return "$_code"
+}
+
+##
+# @brief  Get verification status without printing details
+# @param  $1 : filenames of verification output
+# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
+# @tag    @IMP2.7@ (FROM: @ARC2.5@)
+get_verification_status() {
+	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
+	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
+
+	_has_isolated="0"
+	_has_duplicated="0"
+	_has_dangling="0"
+
+	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
+		_has_isolated="1"
+	fi
+	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
+		_has_duplicated="1"
+	fi
+	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
+		_has_dangling="1"
+	fi
+
+	_code=0
+	if [ "$_has_isolated" = "1" ]; then
+		_code=$((_code + 1))
+	fi
+	if [ "$_has_duplicated" = "1" ]; then
+		_code=$((_code + 2))
+	fi
+	if [ "$_has_dangling" = "1" ]; then
+		_code=$((_code + 4))
+	fi
+
+	return "$_code"
 }
 
 ##
@@ -867,6 +984,9 @@ make_json() {
 	_XREF_DIR="${7:-}"
 
 	_JSON_OUTPUT_FILENAME="${OUTPUT_DIR%/}/output.json"
+	_ISOLATED_FILE="${OUTPUT_DIR%/}/tags/verified/10_isolated_fromtag"
+	_DUPLICATED_FILE="${OUTPUT_DIR%/}/tags/verified/11_duplicated"
+	_DANGLING_FILE="${OUTPUT_DIR%/}/tags/verified/12_dangling_fromtag"
 
 	# Generate timestamp
 	_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -875,10 +995,135 @@ make_json() {
 	{
 		printf '{\n'
 		printf '  "metadata": {\n'
-		printf '    "version": "0.1.3",\n'
+		printf '    "version": "%s",\n' "$SHTRACER_VERSION"
 		printf '    "generated": "%s",\n' "$_TIMESTAMP"
 		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
 		printf '  },\n'
+
+		printf '  "verificationErrors": '
+		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
+			-v sep="$SHTRACER_SEPARATOR" \
+			-v isolated_file="$_ISOLATED_FILE" \
+			-v duplicated_file="$_DUPLICATED_FILE" \
+			-v dangling_file="$_DANGLING_FILE" '
+		function json_escape(s,   result) {
+			result = s
+			gsub(/\\/, "\\\\", result)
+			gsub(/"/, "\\\"", result)
+			gsub(/\n/, "\\n", result)
+			gsub(/\r/, "\\r", result)
+			gsub(/\t/, "\\t", result)
+			return result
+		}
+		function trim(s) {
+			gsub(/^[[:space:]]+/, "", s)
+			gsub(/[[:space:]]+$/, "", s)
+			return s
+		}
+		BEGIN {
+			while ((getline line < isolated_file) > 0) {
+				split(line, parts, " ")
+				if (length(parts) >= 2 && parts[2] != "") {
+					isolated[parts[2]] = 1
+				}
+			}
+			close(isolated_file)
+
+			while ((getline line < duplicated_file) > 0) {
+				line = trim(line)
+				if (line != "") {
+					duplicates[line] = 1
+				}
+			}
+			close(duplicated_file)
+
+			while ((getline line < dangling_file) > 0) {
+				split(line, parts, " ")
+				if (length(parts) >= 4) {
+					d_child[d_count] = parts[1]
+					d_parent[d_count] = parts[2]
+					d_file[d_count] = parts[3]
+					d_line[d_count] = parts[4]
+					d_count++
+				}
+			}
+			close(dangling_file)
+
+			while ((getline line < tag_output_data) > 0) {
+				split(line, fields, sep)
+				if (length(fields) >= 8) {
+					tag_id = fields[2]
+					file_path = fields[5]
+					line_num = fields[6]
+
+					if (!(file_path in file_to_id)) {
+						file_to_id[file_path] = file_id
+						file_id++
+					}
+
+					if (tag_id in isolated) {
+						iso_count++
+						iso_tag[iso_count] = tag_id
+						iso_file[iso_count] = file_path
+						iso_line[iso_count] = line_num
+					}
+
+					if (tag_id in duplicates) {
+						dup_count++
+						dup_tag[dup_count] = tag_id
+						dup_file[dup_count] = file_path
+						dup_line[dup_count] = line_num
+					}
+				}
+			}
+			close(tag_output_data)
+
+			print "{"
+			print "    \"isolated\": ["
+			first = 1
+			for (i = 1; i <= iso_count; i++) {
+				if (!first) print ","
+				first = 0
+				tag = json_escape(iso_tag[i])
+				file_path = iso_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = iso_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag, fid, line_num
+			}
+			print "\n    ],"
+
+			print "    \"duplicates\": ["
+			first = 1
+			for (i = 1; i <= dup_count; i++) {
+				if (!first) print ","
+				first = 0
+				tag = json_escape(dup_tag[i])
+				file_path = dup_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = dup_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag, fid, line_num
+			}
+			print "\n    ],"
+
+			print "    \"dangling\": ["
+			first = 1
+			for (i = 0; i < d_count; i++) {
+				if (!first) print ","
+				first = 0
+				child_tag = json_escape(d_child[i])
+				parent_tag = json_escape(d_parent[i])
+				file_path = d_file[i]
+				fid = (file_path in file_to_id) ? file_to_id[file_path] : -1
+				line_num = d_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"child_tag\": \"%s\", \"missing_parent\": \"%s\", \"file_id\": %d, \"line\": %d}", child_tag, parent_tag, fid, line_num
+			}
+			print "\n    ]"
+			print "  }"
+		}'
+		printf ',\n'
 
 		# NEW: Generate files array and layers array first, then collect stats
 		# This requires reading all data upfront in one AWK pass
@@ -900,7 +1145,7 @@ make_json() {
 		gsub(/\t/, "\\t", result)
 		return result
 	}
-	
+
 BEGIN {
 	# STEP 1: Read layer order AND patterns from config table
 	n_layers = 0
@@ -983,7 +1228,7 @@ BEGIN {
 			# Read tags with links (source tags from pairs)
 			while ((getline line < tag_pairs) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
 				}
 			}
@@ -991,11 +1236,26 @@ BEGIN {
 
 			while ((getline line < tag_pairs_downstream) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
 				}
 			}
 			close(tag_pairs_downstream)
+
+			# Read dangling FROM tag references (file format: child_tag parent_tag file line)
+			dangling_file = output_dir "/tags/verified/12_dangling_fromtag"
+			dangling_count = 0
+			while ((getline line < dangling_file) > 0) {
+				split(line, fields, " ")
+				if (length(fields) >= 4) {
+					dangling_child[dangling_count] = fields[1]
+					dangling_parent[dangling_count] = fields[2]
+					dangling_file_path[dangling_count] = fields[3]
+					dangling_line[dangling_count] = fields[4]
+					dangling_count++
+				}
+			}
+			close(dangling_file)
 
 			# Count tags with links
 			tags_with_links_count = 0
@@ -1168,7 +1428,7 @@ BEGIN {
 				if (up_layers_str != "") {
 					n_up = split(up_layers_str, up_arr, ",")
 					layer_up_count[layer]++
-					
+
 					# Track connected target layers
 					for (k = 1; k <= n_up; k++) {
 						target_layer = up_arr[k]
@@ -1326,7 +1586,6 @@ NF >= 8 {
 	gsub(/^ +| +$/, "", raw_from)
 	gsub(/[;,]/, " ", raw_from)
 	from_tags_json = "[]"
-	from_tag_first = "NONE"
 
 	if (raw_from != "" && raw_from != "NONE" && raw_from != "null") {
 		n_from = split(raw_from, from_arr, /[ \t]+/)
@@ -1335,14 +1594,10 @@ NF >= 8 {
 		for (i = 1; i <= n_from; i++) {
 			tag = from_arr[i]
 			if (tag == "" || tag == "NONE" || tag == "null") continue
-			if (from_tag_first == "NONE") from_tag_first = tag
 			from_tags_json = from_tags_json sep "\"" tag "\""
 			sep = ", "
 		}
 		from_tags_json = from_tags_json "]"
-		if (from_tag_first == "NONE") {
-			from_tags_json = "[]"
-		}
 	}
 
 	# Escape quotes and backslashes in description
@@ -1358,10 +1613,9 @@ NF >= 8 {
 
 	printf "    {\n"
 	printf "      \"id\": \"%s\",\n", $2
-	printf "      \"from_tag\": \"%s\",\n", from_tag_first  # NEW: Add from_tag
 	printf "      \"from_tags\": %s,\n", from_tags_json
 	printf "      \"description\": \"%s\",\n", desc
-	printf "      \"file_id\": %d,\n", file_id  # Global file_id
+	printf "      \"file_id\": %d,\n", file_id
 	printf "      \"line\": %d,\n", $6
 	printf "      \"layer_id\": %d\n", layer_id
 	printf "    }"
@@ -1374,7 +1628,7 @@ END { printf "\n" }
 
 		printf '  ],\n'
 
-		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tag)
+		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tags)
 
 		# Generate chains array from tag table (unchanged)
 		printf '  "chains": [\n'
@@ -1404,6 +1658,7 @@ END { printf "\n" }
 			-v tag_pairs_downstream="$_TAG_PAIRS_DOWNSTREAM" \
 			-v config_table="$_CONFIG_TABLE" \
 			-v file_mapping="$_FILE_MAPPING_TEMP2" \
+			-v output_dir="${OUTPUT_DIR%/}" \
 			-v sep="$SHTRACER_SEPARATOR" '
 	# JSON escape function (defined outside BEGIN)
 	function json_escape(s,   result) {
@@ -1416,8 +1671,8 @@ END { printf "\n" }
 		return result
 	}
 
-		# Selection sort to keep isolated tags and their metadata aligned alphabetically
-		function sort_isolated(n, tags, files, lines,    i, j, min, tmpTag, tmpFile, tmpLine) {
+		# Selection sort to keep tag lists and their metadata aligned alphabetically
+		function sort_tag_list(n, tags, files, lines,    i, j, min, tmpTag, tmpFile, tmpLine) {
 			if (n <= 1) return
 			for (i = 0; i < n - 1; i++) {
 				min = i
@@ -1433,7 +1688,7 @@ END { printf "\n" }
 				}
 			}
 		}
-	
+
 	BEGIN {
 		# Load global file_id mapping (full path -> file_id) generated earlier
 		while ((getline line < file_mapping) > 0) {
@@ -1475,19 +1730,50 @@ END { printf "\n" }
 			}
 			close(tag_output_data)
 
-			# Read tags with links
+			# Read duplicated tags list
+			dup_file = output_dir "/tags/verified/11_duplicated"
+			while ((getline line < dup_file) > 0) {
+				gsub(/^[[:space:]]+/, "", line)
+				gsub(/[[:space:]]+$/, "", line)
+				if (line != "") {
+					duplicated_tags[line] = 1
+				}
+			}
+			close(dup_file)
+
+			# Read dangling FROM tag references (file format: child_tag parent_tag file line)
+			dangling_file = output_dir "/tags/verified/12_dangling_fromtag"
+			dangling_count = 0
+			while ((getline line < dangling_file) > 0) {
+				split(line, fields, " ")
+				if (length(fields) >= 4) {
+					dangling_child[dangling_count] = fields[1]
+					dangling_parent[dangling_count] = fields[2]
+					dangling_file_path[dangling_count] = fields[3]
+					dangling_line[dangling_count] = fields[4]
+					dangling_count++
+				}
+			}
+			close(dangling_file)
+
+			# Read tags with links - track tags appearing in EITHER column
+			# A tag is considered "connected" if it appears as FROM or TO (excluding NONE)
+			# AND both tags in the connection actually exist in the codebase
 			while ((getline line < tag_pairs) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				# Mark both FROM and TO tags as having connections (only if BOTH exist)
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
+					tags_with_links[fields[2]] = 1
 				}
 			}
 			close(tag_pairs)
 
 			while ((getline line < tag_pairs_downstream) > 0) {
 				split(line, fields, " ")
-				if (fields[1] != "NONE" && fields[2] != "NONE") {
+				if (fields[1] != "NONE" && fields[2] != "NONE" && fields[1] in all_tags && fields[2] in all_tags) {
 					tags_with_links[fields[1]] = 1
+					tags_with_links[fields[2]] = 1
 				}
 			}
 			close(tag_pairs_downstream)
@@ -1509,7 +1795,22 @@ END { printf "\n" }
 			}
 
 			# Sort isolated tags alphabetically for deterministic output
-			sort_isolated(isolated_count, isolated_tags, isolated_file_id, isolated_line)
+			sort_tag_list(isolated_count, isolated_tags, isolated_file_id, isolated_line)
+
+			# Build duplicate tag list with file/line info
+			duplicate_count = 0
+			for (tag in duplicated_tags) {
+				if (tag in all_tags) {
+					duplicate_tags[duplicate_count] = tag
+					file_path = tag_file[tag]
+					duplicate_file_id[duplicate_count] = file_global_id[file_path]
+					duplicate_line[duplicate_count] = tag_line[tag]
+					duplicate_count++
+				}
+			}
+
+			# Sort duplicate tags alphabetically for deterministic output
+			sort_tag_list(duplicate_count, duplicate_tags, duplicate_file_id, duplicate_line)
 
 			# Build tag-to-layer mapping
 			for (tag in all_tags) {
@@ -1661,6 +1962,36 @@ END { printf "\n" }
 			}
 			printf "\n    ],\n"
 
+			# Output duplicate tag information
+			printf "    \"duplicate_tags\": %d,\n", duplicate_count
+			printf "    \"duplicate_tag_list\": [\n"
+			for (i = 0; i < duplicate_count; i++) {
+				if (i > 0) printf ",\n"
+				tag_id = json_escape(duplicate_tags[i])
+				fid = duplicate_file_id[i]
+				line_num = duplicate_line[i]
+				if (fid == "") fid = -1
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"id\": \"%s\", \"file_id\": %d, \"line\": %d}", tag_id, fid, line_num
+			}
+			printf "\n    ],\n"
+
+			# Output dangling reference information
+			printf "    \"dangling_references\": %d,\n", dangling_count
+			printf "    \"dangling_reference_list\": [\n"
+			for (i = 0; i < dangling_count; i++) {
+				if (i > 0) printf ",\n"
+				child_tag = json_escape(dangling_child[i])
+				parent_tag = json_escape(dangling_parent[i])
+				file_path = dangling_file_path[i]
+				fid = file_global_id[file_path]
+				if (fid == "") fid = -1
+				line_num = dangling_line[i]
+				if (line_num == "" || line_num + 0 < 1) line_num = 1
+				printf "      {\"child_tag\": \"%s\", \"missing_parent\": \"%s\", \"file_id\": %d, \"line\": %d}", child_tag, parent_tag, fid, line_num
+			}
+			printf "\n    ],\n"
+
 			printf "    \"coverage\": {\n"
 			printf "      \"layers\": [\n"
 
@@ -1773,7 +2104,7 @@ END { printf "\n" }
 ##
 # @brief Generate cross-reference matrix files from JSON trace_tags
 # @details Creates 06_cross_ref_matrix_* files in OUTPUT_DIR/tags/ directory
-#          by parsing trace_tags[].from_tag field for backward compatibility
+#          by parsing trace_tags[].from_tags field for backward compatibility
 #          with HTML and Markdown viewers
 # @param $1 : JSON file path
 # @param $2 : OUTPUT_DIR
@@ -1825,7 +2156,7 @@ _generate_cross_reference_matrix_files() {
 
 		/"trace_tags": \[/ { in_trace_tags=1; next }
 		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
-		in_trace_tags && /^    \{/ { in_tag_obj=1; tag_id=""; from_tag=""; layer_id=""; file_id=""; line=""; from_tags_count=0; delete from_tags; next }
+		in_trace_tags && /^    \{/ { in_tag_obj=1; tag_id=""; layer_id=""; file_id=""; line=""; from_tags_count=0; delete from_tags; next }
 		in_trace_tags && in_tag_obj && /^    \},?$/ {
 			if (tag_id != "" && layer_id != "" && file_id != "") {
 				tag_layer[tag_id] = layer_id
@@ -1834,14 +2165,11 @@ _generate_cross_reference_matrix_files() {
 				tags_in_layer_count[layer_id]++
 				tags_in_layer[layer_id, tags_in_layer_count[layer_id]] = tag_id
 
-				# Choose upstream sources from from_tags (array) first, then fallback to from_tag
+				# Collect upstream sources from from_tags array
 				n_up = 0
 				if (from_tags_count > 0) {
 					for (u = 1; u <= from_tags_count; u++) upstream[u] = from_tags[u]
 					n_up = from_tags_count
-				} else if (from_tag != "" && from_tag != "null" && from_tag != "NONE") {
-					n_up = 1
-					upstream[1] = from_tag
 				}
 
 				for (u = 1; u <= n_up; u++) {
@@ -1858,7 +2186,6 @@ _generate_cross_reference_matrix_files() {
 			in_tag_obj=0; next
 		}
 		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
-		in_tag_obj && /"from_tag":/ { match($0, /"from_tag": "([^"]+)"/, arr); from_tag = arr[1] }
 		in_tag_obj && /"from_tags":/ {
 			from_tags_count = 0
 			delete from_tags

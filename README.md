@@ -154,8 +154,6 @@ The HTML viewer now includes a tab-based interface to explore traceability relat
 
 **Features:**
 
-- 🎯 **Tab persistence** - Your selected tab is remembered using localStorage
-- 🎨 **Theme support** - Light and dark modes with color-coded tag badges
 - 🔗 **Clickable tags** - All tags link to source files (opens on right side)
 - 📊 **Sparse matrices** - "x" markers show direct traceability links between adjacent levels
 - 🔄 **Dynamic generation** - Tabs automatically adapt to your config.md structure
@@ -303,8 +301,8 @@ Usage: shtracer <configfile> [options]
 
 Options:
   -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
-  -v                               Verify mode: detect duplicate or isolated tags
-  -t                               Test mode: execute unit tests
+  -v, --verify                     Verify mode: detect duplicate or isolated tags
+  -t, --test                       Test mode: execute unit tests
   --html                           Export a single HTML document to stdout (JSON -> viewer)
   --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
   --summary                        Print traceability summary to stdout (direct links only)
@@ -324,6 +322,7 @@ Examples:
 
   4. Test mode
      $ ./shtracer -t
+     $ ./shtracer --test
 
   5. Summary mode
      $ ./shtracer --summary ./sample/config.md
@@ -446,12 +445,24 @@ Detect traceability issues before they become problems:
 ```bash
 # Run verification mode
 ./shtracer -v config.md
+
+# View health indicators in markdown report
+./shtracer --markdown config.md > report.md
+
+# View health indicators in HTML report
+./shtracer --html config.md > report.html
+
+# Query health data programmatically
+./shtracer config.md | jq '.health.isolated_tag_list'
+./shtracer config.md | jq '.health.dangling_reference_list'
 ```
 
 **Detects:**
 
 <details>
 <summary><strong>Duplicate Tags</strong></summary>
+
+Tags that appear in multiple locations with the same identifier.
 
 ```markdown
 <!-- file1.md -->
@@ -463,17 +474,119 @@ Detect traceability issues before they become problems:
 ## Feature B
 ```
 
+**Exit code:** `21` (verify mode)
+
 </details>
 
 <details>
-<summary><strong>Orphaned Tags</strong></summary>
+<summary><strong>Isolated Tags</strong></summary>
+
+Tags with no downstream traceability - nothing references them via `(FROM: @TAG@)` syntax.
 
 ```markdown
-<!-- requirements.md -->
-<!-- @REQ-999@ -->
-## Isolated Requirement
+<!-- architecture.md -->
+<!-- @ARC-999@ -->  <!-- ⚠️ Nothing references this -->
+## Isolated Component
 
-<!-- ⚠️  No references to @REQ-999@ in architecture, implementation, or tests -->
+<!-- Expected but missing: -->
+<!-- # @IMP-X.X@ (FROM: @ARC-999@) in implementation files -->
+```
+
+**Why it matters:**
+
+- Indicates unused specifications
+- Incomplete implementation
+- Orphaned requirements that should be traced
+
+**How to fix:**
+
+- Add implementation/test tags that reference the isolated tag
+- Remove the isolated tag if no longer needed
+- Update FROM: references to connect to the traceability chain
+
+**Exit code:** `20` (verify mode)
+
+**Where to find:**
+
+- Markdown report: "Isolated Tags" section with file:line references
+- HTML report: "Traceability Health" section with clickable links
+- JSON output: `health.isolated_tag_list` array
+
+</details>
+
+<details>
+<summary><strong>Dangling References</strong></summary>
+
+Tags that reference non-existent parent tags via `(FROM: @PARENT@)` syntax.
+
+```markdown
+<!-- implementation.sh -->
+# @IMP1.1@ (FROM: @ARC-999@)  <!-- ❌ @ARC-999@ doesn't exist! -->
+function my_feature() {
+    ...
+}
+```
+
+**Why it matters:**
+
+- Indicates broken traceability links
+- Typos in tag references
+- Deleted/renamed requirements without updating references
+
+**How to fix:**
+
+- Correct the FROM: reference to point to the right parent tag
+- Create the missing parent tag if it should exist
+- Remove the FROM: reference if it's no longer needed
+
+**Exit code:** `23` (verify mode)
+
+**Where to find:**
+
+- Markdown report: "Dangling References" table showing child → missing parent
+- HTML report: "Traceability Health" section with interactive table
+- JSON output: `health.dangling_reference_list` array
+
+**Example JSON:**
+
+```json
+{
+  "health": {
+    "dangling_references": 2,
+    "dangling_reference_list": [
+      {
+        "child_tag": "@IMP1.1@",
+        "missing_parent": "@ARC-999@",
+        "file_id": 2,
+        "line": 69
+      }
+    ]
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Exit Codes for CI/CD Integration</strong></summary>
+
+Use exit codes to fail builds when traceability issues are detected:
+
+- `20` - Isolated tags found
+- `21` - Duplicate tags found
+- `23` - Dangling references found
+- `25` - Duplicate tags and dangling references found
+- `26` - Multiple issues found (combinations of isolated, duplicate, and dangling)
+
+**Example CI pipeline:**
+
+```bash
+# Fail build if any traceability issues exist
+./shtracer -v config.md
+if [ $? -ne 0 ]; then
+    echo "❌ Traceability issues detected!"
+    exit 1
+fi
 ```
 
 </details>

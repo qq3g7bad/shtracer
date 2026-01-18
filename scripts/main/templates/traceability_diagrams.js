@@ -1,199 +1,3 @@
-#!/bin/sh
-
-# This script can be executed (JSON -> single HTML to stdout) or sourced (unit tests).
-
-_viewer_emit_show_text_js_template() {
-	cat <<'EOF'
-const files = {
-	// js_contents
-
-	/*
-	 *  @TRACE_TARGET_FILENAME@: {
-	 *    path: "@TRACE_TARGET_PATH@,
-	 *    content: `
-	 *  @TRACE_TARGET_CONTENTS@
-	 *  `,
-	 *  },
-	 */
-
-};
-
-/**
- * @brief Show text data in the right side of the output html (text-container).
- * @param event          : [MouseEvent]
- * @param fileName       : [str] filename used in files (different from the real filename).
- * @param highlightLine  : [int] a line number to highlight
- * @param language       : [str] language for syntax highlighting (highlight.js)
- */
-function showText(event, fileName, highlightLine, language) {
-	event.preventDefault();
-	const file = files[fileName];
-	const textContainer = document.getElementById('text-container');
-	const outputElement = document.getElementById("file-information");
-
-    const content = file.content;
-
-	// Skip syntax highlighting for markdown files
-	let highlightedContent;
-	if (language === 'md' || language === 'markdown' || language === 'txt') {
-		// For markdown and text files, escape HTML and add basic formatting
-		highlightedContent = content
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;')
-			// Add color to markdown headings
-			.replace(/^(#{1,6})\s+(.+)$/gm, '<span style="color: #0969da; font-weight: bold;">$1 $2</span>');
-	} else {
-		// For code files, use syntax highlighting
-		if (hljs.getLanguage(language)) {
-			highlightedContent = hljs.highlight(content, { language }).value;
-		} else {
-			highlightedContent = hljs.highlightAuto(content).value;
-		}
-	}
-
-	// Split the highlighted HTML into lines and add highlight-line class to the target line
-	// Note: highlightLine is 1-based (human-readable line number), but array index is 0-based
-	const lines = highlightedContent.split('\n');
-	const finalText = lines.map((line, index) => {
-		const lineClass = (index === highlightLine - 1) ? ' class="highlight-line"' : '';
-		return `<div${lineClass}>${line || '&#8203;'}</div>`;
-	}).join('');
-
-	textContainer.innerHTML = `<pre><code class="hljs">${finalText}</code></pre>`;
-
-	const highlightedElement = textContainer.querySelector('.highlight-line');
-	if (highlightedElement) {
-		highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-	}
-
-	outputElement.textContent = file.path;
-}
-
-/**
- * @brief Hide display if it is the same tag as the tag one line above
- */
-function hideSameText() {
-	const table = document.getElementById("tag-table");
-
-	/* reset hidden text */
-	const rows = table.rows;
-	const tags = table.querySelectorAll('a');
-		tags.forEach(tag => {
-		tag.classList.remove("hidden-text");
-	});
-
-	/* check each row */
-	for (let i = 1; i < rows.length; i++) {
-		const cells = rows[i].cells;
-		for (let j = 0; j < cells.length; j++) {
-			const currentCellText = cells[j].innerText.trim();
-			const previousCellText = rows[i - 1].cells[j].innerText.trim();
-			if (currentCellText === previousCellText) {
-				const tag = cells[j].querySelector('a');
-				if (tag) {
-					tag.classList.add("hidden-text");
-				}
-			}
-		}
-	}
-}
-
-/**
- * @brief Sort the table based by a clicked column
- * @param columnIndex : [int] selected column
- */
-function sortTable(columnIndex) {
-	const table = document.getElementById("tag-table");
-
-	if (!table.sortStates) {
-		table.sortStates = Array.from(table.querySelectorAll('th')).map(() => false);
-	}
-
-	const ascending = !table.sortStates[columnIndex];
-	table.sortStates = table.sortStates.map((_, index) => index === columnIndex ? ascending : false);
-
-	const rows = Array.from(table.rows).slice(1);
-
-	rows.sort((a, b) => {
-		const cellA = a.cells[columnIndex].innerText.trim();
-		const cellB = b.cells[columnIndex].innerText.trim();
-
-		// "REQ" や "@" を除去し、数値部分だけを取り出す
-		const extractNumbers = (str) => str
-			.replace(/[^\d.]/g, '') // 数字とピリオド以外を削除
-			.split('.')             // ピリオドで分割
-			.map(num => /^\d+$/.test(num) ? parseInt(num, 10) : NaN) // 数値変換
-			.filter(num => !isNaN(num)); // NaN を除外
-
-		const valueA = extractNumbers(cellA);
-		const valueB = extractNumbers(cellB);
-
-		// **各要素ごとに比較**
-		for (let i = 0; i < Math.max(valueA.length, valueB.length); i++) {
-			const numA = valueA[i] || 0; // 足りない桁は 0 として扱う
-			const numB = valueB[i] || 0;
-			if (numA !== numB) {
-				return ascending ? numA - numB : numB - numA;
-			}
-		}
-
-		return 0;
-	});
-
-	rows.forEach(row => table.appendChild(row));
-
-	const headers = table.querySelectorAll('th');
-	headers.forEach((header, index) => {
-		const sortIndicator = header.querySelector('.sort-indicator');
-		if (index === columnIndex) {
-			if (!sortIndicator) {
-				const span = document.createElement('span');
-				span.classList.add('sort-indicator');
-				header.appendChild(span);
-			}
-			header.querySelector('.sort-indicator').textContent = ascending ? '🔼' : '🔽';
-		}
-		else if (sortIndicator) {
-			header.removeChild(sortIndicator);
-		}
-	});
-
-	hideSameText();
-}
-
-/**
- * @brief Show the tooltip
- * @param event          : [MoueseEvent]
- * @param fileName       : [str] filename used in files (different from the real filename).
- */
-function showTooltip(event, fileName) {
-		const tooltip = document.getElementById('tooltip');
-
-		tooltip.textContent = files[fileName].path;
-		tooltip.style.left = `${event.pageX + 10}px`;
-		tooltip.style.top = `${event.pageY + 10}px`;
-		tooltip.style.opacity = 0.9;
-}
-
-/**
- * @brief Hide the tooltip
- */
-function hideTooltip() {
-		const tooltip = document.getElementById('tooltip');
-		tooltip.style.opacity = 0;
-}
-
-window.onload = function() {
-	hideSameText();
-};
-EOF
-}
-
-_viewer_emit_traceability_diagrams_js() {
-	cat <<'EOF'
 // traceability_diagrams.js - Traceability visualizations for shtracer
 // Renders the interactive full Sankey diagram and the requirements-centric Type view.
 
@@ -209,18 +13,139 @@ _viewer_emit_traceability_diagrams_js() {
 
     // If traceTargetOrder exists, use it to initialize color mapping
     if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder)) {
+        console.log('[Color Init] Initializing colors for', traceTargetOrder.length, 'layer types:', traceTargetOrder);
         traceTargetOrder.forEach((type, index) => {
             if (!window._traceTypeColorMap.has(type)) {
-                window._traceTypeColorMap.set(type, colorScheme[index % colorScheme.length]);
+                const color = colorScheme[index % colorScheme.length];
+                window._traceTypeColorMap.set(type, color);
+                console.log(`[Color Init] ${type} → ${color}`);
             }
         });
+    } else {
+        console.warn('[Color Init] traceTargetOrder not defined or not an array');
     }
 
     // Always ensure Unknown has a color
     if (!window._traceTypeColorMap.has('Unknown')) {
         window._traceTypeColorMap.set('Unknown', '#7f8c8d');
     }
+
+    console.log('[Color Init] Final color map:', Array.from(window._traceTypeColorMap.entries()));
 })();
+
+// Configuration constants for diagram rendering
+const DIAGRAM_CONFIG = {
+    SANKEY: {
+        NODE_HEIGHT: 24,
+        NODE_GAP: 6,
+        NODE_WIDTH: 20,
+        NODE_PADDING: 12,
+        TOP_PADDING: 20,
+        BOTTOM_PADDING: 60
+    },
+    PARALLEL_SETS: {
+        BAR_WIDTH: 16,
+        HEIGHT_PER_NODE: 15,
+        MIN_BAR_HEIGHT: 30,
+        MAX_BAR_HEIGHT: 200,
+        BAR_SPACING: 15,
+        MIN_HEIGHT: 150,
+        MAX_HEIGHT: 800
+    },
+    TOOLTIP: {
+        FONT_SIZE: '12px',
+        OFFSET_X: 10,
+        OFFSET_Y: -10
+    },
+    COLORS: {
+        UNKNOWN: '#7f8c8d',
+        STROKE: '#333',
+        TEXT: '#333'
+    }
+};
+
+// Utility functions for file path resolution
+/**
+ * Resolve file path for a node, handling both v0.1.3 (file_id) and legacy (file) formats
+ * @param {Object} node - The node object
+ * @param {Object} data - The traceability data (with files array)
+ * @returns {string|null} The resolved file path or null
+ */
+function resolveFilePath(node, data) {
+    if (node.file_id !== undefined && data && data.files && data.files[node.file_id]) {
+        return data.files[node.file_id].file;
+    }
+    return node.file || null;
+}
+
+/**
+ * Extract base filename from a path
+ * @param {string} path - Full file path
+ * @returns {string} Base filename
+ */
+function getBaseName(path) {
+    const parts = String(path || '').split('/');
+    return parts.length ? parts[parts.length - 1] : path;
+}
+
+/**
+ * Extract file extension from a path
+ * @param {string} path - Full file path
+ * @returns {string} File extension (default: 'sh')
+ */
+function getFileExtension(path) {
+    const match = String(path || '').match(/\.([^.]+)$/);
+    return match ? match[1] : 'sh';
+}
+
+/**
+ * Create a reusable D3 tooltip
+ * @param {string} className - CSS class name for the tooltip (optional)
+ * @returns {Object} D3 selection for the tooltip
+ */
+function createTooltip(className = 'sankey-tooltip') {
+    return d3.select('body').append('div')
+        .attr('class', className)
+        .style('position', 'absolute')
+        .style('visibility', 'hidden')
+        .style('background-color', 'white')
+        .style('border', '1px solid #ccc')
+        .style('border-radius', '4px')
+        .style('padding', '8px')
+        .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)')
+        .style('font-size', DIAGRAM_CONFIG.TOOLTIP.FONT_SIZE)
+        .style('pointer-events', 'none')
+        .style('z-index', '1000');
+}
+
+/**
+ * Prepare links for rendering (normalize source/target references)
+ * @param {Array} links - Raw link array
+ * @param {Array} nodes - Node array for index lookup
+ * @returns {Array} Prepared links with source/target as objects
+ */
+function prepareLinksForRendering(links, nodes) {
+    return links.map((l, i) => {
+        const src = (typeof l.source === 'number') ? nodes[l.source] : l.source;
+        const tgt = (typeof l.target === 'number') ? nodes[l.target] : l.target;
+        return Object.assign({}, l, {
+            source: src,
+            target: tgt,
+            index: l.index != null ? l.index : i
+        });
+    });
+}
+
+/**
+ * Filter out padding links (internal-only links)
+ * @param {Array} links - Link array
+ * @returns {Array} Visible links only
+ */
+function filterVisibleLinks(links) {
+    const visible = links.filter(l => !l._padding);
+    visible.forEach((d, i) => { d.visibleIndex = i; });
+    return visible;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Use embedded JSON data instead of fetching
@@ -236,11 +161,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function traceTypeFromTraceTarget(traceTarget) {
+function getLayerName(layerId) {
+    // Get layer name from layer_id using global traceabilityData
+    if (typeof traceabilityData === 'undefined' || !traceabilityData.layers) {
+        console.warn('[getLayerName] traceabilityData or layers not defined');
+        return 'Unknown';
+    }
+    if (layerId === null || layerId === undefined || layerId < 0) {
+        console.warn('[getLayerName] Invalid layerId:', layerId);
+        return 'Unknown';
+    }
+    const layer = traceabilityData.layers[layerId];
+    if (!layer) {
+        console.warn('[getLayerName] Layer not found for layerId:', layerId);
+        return 'Unknown';
+    }
+    // Debug: log first few layer lookups
+    if (layerId < 5) {
+        console.log(`[getLayerName] layer_id=${layerId} → name="${layer.name}"`);
+    }
+    return layer.name;
+}
+
+// Legacy function - kept for compatibility but now uses layer_id
+function traceTypeFromTraceTarget(traceTarget, layerId) {
+    // If layer_id is provided, use it directly
+    if (layerId !== null && layerId !== undefined) {
+        return getLayerName(layerId);
+    }
+    // Fallback: parse trace_target string (for backward compatibility)
     if (!traceTarget) return 'Unknown';
     const parts = String(traceTarget).split(':');
     const type = parts[parts.length - 1].trim() || 'Unknown';
-    // Return the trace target as-is (after the last colon)
     return type;
 }
 
@@ -271,8 +223,8 @@ function renderLegend(containerId, types) {
         if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
             // Use config.md order and filter to only types present in nodes
             const nodesTypes = new Set();
-            (traceabilityData.nodes || []).forEach(n => {
-                const t = traceTypeFromTraceTarget(n && n.trace_target);
+            (traceabilityData.trace_tags || traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target, n && n.layer_id);
                 if (t && t !== 'Unknown') nodesTypes.add(t);
             });
             types = traceTargetOrder.filter(t => nodesTypes.has(t));
@@ -280,8 +232,8 @@ function renderLegend(containerId, types) {
             // Fallback: extract unique trace types from nodes in order of first appearance
             const seenTypes = new Set();
             const extractedTypes = [];
-            (traceabilityData.nodes || []).forEach(n => {
-                const t = traceTypeFromTraceTarget(n && n.trace_target);
+            (traceabilityData.trace_tags || traceabilityData.nodes || []).forEach(n => {
+                const t = traceTypeFromTraceTarget(n && n.trace_target, n && n.layer_id);
                 if (t && t !== 'Unknown' && !seenTypes.has(t)) {
                     seenTypes.add(t);
                     extractedTypes.push(t);
@@ -307,10 +259,12 @@ function renderLegend(containerId, types) {
 
 function annotateTraceTargets(data) {
     const fileToTypes = new Map();
-    (data.nodes || []).forEach(n => {
-        if (!n || !n.file) return;
-        const base = String(n.file).split('/').pop();
-        const t = traceTypeFromTraceTarget(n.trace_target);
+    (data.trace_tags || data.nodes || []).forEach(n => {
+        if (!n) return;
+        const filePath = resolveFilePath(n, data);
+        if (!filePath) return;
+        const base = getBaseName(filePath);
+        const t = traceTypeFromTraceTarget(n.trace_target, n.layer_id);
         if (!fileToTypes.has(base)) fileToTypes.set(base, new Set());
         fileToTypes.get(base).add(t);
     });
@@ -352,8 +306,14 @@ function renderSummary(data) {
     const el = document.getElementById('trace-summary');
     if (!el) return;
 
-    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
-    const links = Array.isArray(data.direct_links) ? data.direct_links : (Array.isArray(data.links) ? data.links : []);
+    const nodes = Array.isArray(data.trace_tags) ? data.trace_tags : (Array.isArray(data.nodes) ? data.nodes : []);
+    // Derive links from trace_tags using from_tags array
+    const links = Array.isArray(data.trace_tags) || Array.isArray(data.nodes)
+        ? (data.trace_tags || data.nodes || [])
+            .flatMap(tag => (tag.from_tags || [])
+                .filter(ft => ft && ft !== 'NONE')
+                .map(ft => ({ source: ft, target: tag.id })))
+        : [];
 
     function escapeHtml(s) {
         return String(s)
@@ -375,20 +335,8 @@ function renderSummary(data) {
             .replace(/'/g, "\\'");
     }
 
-    function baseName(p) {
-        const s = String(p || '');
-        const parts = s.split('/');
-        return parts.length ? parts[parts.length - 1] : s;
-    }
-
     function fileIdFromRawName(rawName) {
         return 'Target_' + String(rawName).replace(/\./g, '_');
-    }
-
-    function fileExtFromRawName(rawName) {
-        const s = String(rawName || '');
-        const m = s.match(/\.([^.]+)$/);
-        return m ? m[1] : 'sh';
     }
 
     function formatVersionDisplay(versionRaw) {
@@ -429,7 +377,7 @@ function renderSummary(data) {
         // Use config.md order and filter to only types present in nodes
         const nodesTypes = new Set();
         nodes.forEach(n => {
-            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            const t = traceTypeFromTraceTarget(n && n.trace_target, n && n.layer_id);
             if (t && t !== 'Unknown') nodesTypes.add(t);
         });
         dims = traceTargetOrder.filter(t => nodesTypes.has(t));
@@ -437,7 +385,7 @@ function renderSummary(data) {
         // Fallback: extract unique trace types from nodes in order of first appearance
         const seenTypes = new Set();
         nodes.forEach(n => {
-            const t = traceTypeFromTraceTarget(n && n.trace_target);
+            const t = traceTypeFromTraceTarget(n && n.trace_target, n && n.layer_id);
             if (t && t !== 'Unknown' && !seenTypes.has(t)) {
                 seenTypes.add(t);
                 dims.push(t);
@@ -460,7 +408,7 @@ function renderSummary(data) {
         if (n && typeof n.id === 'string') idxById.set(n.id, i);
     });
 
-    const typeOf = nodes.map(n => traceTypeFromTraceTarget(n && n.trace_target));
+    const typeOf = nodes.map(n => traceTypeFromTraceTarget(n && n.trace_target, n && n.layer_id));
     const idxByDim = {};
     dims.forEach(d => { idxByDim[d] = []; });
     typeOf.forEach((t, i) => {
@@ -527,7 +475,14 @@ function renderSummary(data) {
         const srcOrder = dimOrder.get(src);
         idxByDim[src].forEach(i => {
             const n = nodes[i] || {};
-            const raw = baseName(n.file);
+
+            // Handle both v0.1.2 (file field) and v0.1.3 (file_id field) formats
+            const filePath = resolveFilePath(n, data);
+            const raw = filePath ? getBaseName(filePath) : '';
+            const fileVersion = (typeof n.file_id === 'number' && data.files && data.files[n.file_id])
+                ? data.files[n.file_id].version || 'unknown'
+                : n.file_version || 'unknown';
+
             if (!raw || raw === 'config.md') return;
 
             let hasUp = false;
@@ -540,7 +495,7 @@ function renderSummary(data) {
                 else if (o > srcOrder) hasDown = true;
             });
 
-            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0, version: n.file_version || 'unknown' };
+            const m = fileCoverageByDim[src].get(raw) || { total: 0, up: 0, down: 0, version: fileVersion };
             m.total += 1;
             if (hasUp) m.up += 1;
             if (hasDown) m.down += 1;
@@ -585,7 +540,7 @@ function renderSummary(data) {
             const up = formatPct(stats.up, stats.total);
             const down = formatPct(stats.down, stats.total);
             const id = fileIdFromRawName(rawName);
-            const ext = fileExtFromRawName(rawName);
+            const ext = getFileExtension(rawName);
             const versionDisplay = formatVersionDisplay(stats.version);
             html += `<li class=\"summary-target-item\">`;
             html += `<a href=\"#\" onclick=\"showText(event, '${escapeJsSingle(id)}', 1, '${escapeJsSingle(ext)}')\" `;
@@ -600,6 +555,512 @@ function renderSummary(data) {
     el.innerHTML = html;
 }
 
+/**
+ * Render the Traceability Health section with coverage analysis and isolated tags
+ * @param {Object} data - Traceability data object containing health information
+ */
+function renderHealth(data) {
+    const el = document.getElementById('traceability-health');
+    if (!el) return;
+    if (!data.health) {
+        el.innerHTML = '<p>No health data available.</p>';
+        return;
+    }
+
+    const health = data.health;
+    const totalTags = health.total_tags || 0;
+    let tagsWithLinks = health.tags_with_links || 0;
+    const isolatedTags = health.isolated_tags || 0;
+    const duplicateTags = health.duplicate_tags || 0;
+    const danglingRefs = health.dangling_references || 0;
+
+    // Sanity check: tags_with_links should never exceed total_tags
+    if (tagsWithLinks > totalTags) {
+        console.warn(`Data inconsistency: tags_with_links (${tagsWithLinks}) > total_tags (${totalTags}). Capping to total_tags.`);
+        tagsWithLinks = totalTags;
+    }
+
+    // Calculate percentages
+    let isolatedPct = 0;
+    let tagsWithLinksPct = 0;
+    if (totalTags > 0) {
+        isolatedPct = Math.floor((100 * isolatedTags) / totalTags);
+        tagsWithLinksPct = Math.floor((100 * tagsWithLinks) / totalTags);
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeJsSingle(s) {
+        return String(s)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
+    }
+
+    function getBaseName(path) {
+        if (!path) return '';
+        return path.split('/').pop();
+    }
+
+    function getFileExtension(fileName) {
+        if (!fileName) return 'txt';
+        const parts = fileName.split('.');
+        return parts.length > 1 ? parts[parts.length - 1] : 'txt';
+    }
+
+    function fileIdFromRawName(rawName) {
+        return 'Target_' + String(rawName).replace(/\./g, '_');
+    }
+
+    // Build Coverage Analysis table
+    let html = '<h3>Coverage Analysis</h3>';
+    html += '<table class="health-table">';
+    html += '<thead><tr><th>Metric</th><th>Value</th></tr></thead>';
+    html += '<tbody>';
+    html += `<tr><td>Total Tags</td><td>${totalTags}</td></tr>`;
+    html += `<tr><td>Tags with Links</td><td>${tagsWithLinks} (${tagsWithLinksPct}%)</td></tr>`;
+    html += `<tr><td>Isolated Tags</td><td>${isolatedTags} (${isolatedPct}%)</td></tr>`;
+    html += `<tr><td>Duplicate Tags</td><td>${duplicateTags}</td></tr>`;
+    html += `<tr><td>Dangling References</td><td>${danglingRefs}</td></tr>`;
+    html += '</tbody></table>';
+
+    // Build Isolated Tags section
+    html += '<h3>Isolated Tags</h3>';
+
+    const isolatedList = health.isolated_tag_list || [];
+    const isolatedCount = isolatedList.length;
+
+    if (isolatedCount === 0) {
+        html += '<p>✓ No isolated tags found.</p>';
+    } else {
+        html += `<p>${isolatedCount} isolated tag(s) with no downstream traceability:</p>`;
+        html += '<details>';
+        html += `<summary>Show isolated tags (${isolatedCount})</summary>`;
+        html += '<ul class="isolated-tags-list">';
+        
+        isolatedList.forEach(item => {
+            const tagId = item.id || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === tagId);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(tagId)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</a>`;
+                html += `</span>`;
+                html += '</li>';
+            } else {
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</span>`;
+                html += '</li>';
+            }
+        });
+        
+        html += '</ul>';
+        html += '</details>';
+    }
+
+    // Build Duplicate Tags section
+    html += '<h3>Duplicate Tags</h3>';
+
+    const duplicateList = health.duplicate_tag_list || [];
+    const duplicateCount = duplicateList.length;
+
+    if (duplicateCount === 0) {
+        html += '<p>✓ No duplicate tags found.</p>';
+    } else {
+        html += `<p>${duplicateCount} duplicate tag(s) detected (same tag ID appears multiple times):</p>`;
+        html += '<details>';
+        html += `<summary>Show duplicate tags (${duplicateCount})</summary>`;
+        html += '<ul class="isolated-tags-list">';
+
+        duplicateList.forEach(item => {
+            const tagId = item.id || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === tagId);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(tagId)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(tagId)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</a>`;
+                html += `</span>`;
+                html += '</li>';
+            } else {
+                html += '<li>';
+                html += `<span class="matrix-tag-badge" data-type="">`;
+                html += `${escapeHtml(tagId)}`;
+                html += `</span>`;
+                html += '</li>';
+            }
+        });
+
+        html += '</ul>';
+        html += '</details>';
+    }
+
+    // Build Dangling References section
+    html += '<h3>Dangling References</h3>';
+
+    const danglingList = health.dangling_reference_list || [];
+    const danglingCount = danglingList.length;
+
+    if (danglingCount === 0) {
+        html += '<p>✓ No dangling references found.</p>';
+    } else {
+        html += `<p>${danglingCount} dangling reference(s) - tags referencing non-existent parents:</p>`;
+        html += '<details>';
+        html += `<summary>Show dangling references (${danglingCount})</summary>`;
+        html += '<table class="dangling-refs-table">';
+        html += '<thead><tr><th>Child Tag</th><th>Missing Parent</th><th>File</th><th>Line</th></tr></thead>';
+        html += '<tbody>';
+
+        danglingList.forEach(item => {
+            const childTag = item.child_tag || '';
+            const missingParent = item.missing_parent || '';
+            const fileId = item.file_id;
+            const line = item.line || 1;
+
+            // Resolve file path
+            let filePath = 'unknown';
+            let fileBaseName = 'unknown';
+            if (typeof fileId === 'number' && data.files && data.files[fileId]) {
+                filePath = data.files[fileId].file || 'unknown';
+                fileBaseName = getBaseName(filePath);
+            }
+
+            if (filePath !== 'unknown') {
+                const targetId = fileIdFromRawName(fileBaseName);
+                const ext = getFileExtension(fileBaseName);
+
+                // Get tag info from traceabilityData
+                let tagDescription = '';
+                let layerName = '';
+                let fromTags = '';
+                const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === childTag);
+                if (tagNode) {
+                    tagDescription = tagNode.description || '';
+                    const layer = data.layers && data.layers[tagNode.layer_id];
+                    layerName = layer ? layer.name : '';
+                    fromTags = (tagNode.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                }
+
+                html += '<tr>';
+                html += '<td>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `<a href="#" onclick="showText(event, '${escapeJsSingle(targetId)}', ${line}, '${escapeJsSingle(ext)}', '${escapeJsSingle(childTag)}', '${escapeJsSingle(tagDescription)}', '${escapeJsSingle(layerName)}', '${escapeJsSingle(fromTags)}')" `;
+                html += `onmouseover="showTooltip(event, '${escapeJsSingle(targetId)}', '${escapeJsSingle(childTag)}', ${line}, '${escapeJsSingle(layerName)}', '${escapeJsSingle(tagDescription)}')" `;
+                html += `onmouseout="hideTooltip()">`;
+                html += `${escapeHtml(childTag)}`;
+                html += `</a>`;
+                html += `</span>`;
+                html += '</td>';
+                html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
+                html += `<td>${escapeHtml(fileBaseName)}</td>`;
+                html += `<td>${line}</td>`;
+                html += '</tr>';
+            } else {
+                html += '<tr>';
+                html += '<td>';
+                html += `<span class="matrix-tag-badge" data-type="${escapeHtml(layerName)}">`;
+                html += `${escapeHtml(childTag)}`;
+                html += `</span>`;
+                html += '</td>';
+                html += `<td><code>${escapeHtml(missingParent)}</code></td>`;
+                html += `<td>${escapeHtml(fileBaseName)}</td>`;
+                html += `<td>${line}</td>`;
+                html += '</tr>';
+            }
+        });
+
+        html += '</tbody></table>';
+        html += '</details>';
+    }
+
+    html += '<hr>';
+    el.innerHTML = html;
+}
+
+/**
+ * Compute coverage statistics for Parallel Sets diagram
+ * @param {Array} dims - Dimension array (trace types)
+ * @param {Map} dimOrder - Map of dimension to order index
+ * @param {Array} nodes - Array of nodes
+ * @param {Array} links - Array of links
+ * @param {Function} getTraceType - Function to get trace type from node
+ * @returns {Object} Object with coverage statistics and adjacency info
+ */
+function computeParallelSetsCoverage(dims, dimOrder, nodes, links, getTraceType) {
+    const isDim = (d) => dimOrder.has(d);
+
+    // Build undirected adjacency from direct links
+    const adj = Array.from({ length: nodes.length }, () => []);
+    links.forEach(l => {
+        if (typeof l.source !== 'number' || typeof l.target !== 'number') return;
+        adj[l.source].push(l.target);
+        adj[l.target].push(l.source);
+    });
+
+    const typeOf = nodes.map(n => getTraceType(n && n.trace_target, n && n.layer_id));
+    const idxByDim = {};
+    dims.forEach(d => { idxByDim[d] = []; });
+    typeOf.forEach((t, i) => {
+        if (isDim(t)) idxByDim[t].push(i);
+    });
+
+    const N = {};
+    const coveredUp = {};
+    const coveredDown = {};
+    const accUp = {};
+    const accDown = {};
+
+    dims.forEach(src => {
+        N[src] = idxByDim[src].length;
+        coveredUp[src] = 0;
+        coveredDown[src] = 0;
+        accUp[src] = {};
+        accDown[src] = {};
+        dims.forEach(tgt => {
+            if (tgt === src) return;
+            accUp[src][tgt] = 0;
+            accDown[src][tgt] = 0;
+        });
+    });
+
+    // Compute upstream/downstream projections
+    dims.forEach(src => {
+        const srcOrder = dimOrder.get(src);
+        idxByDim[src].forEach(i => {
+            const upSet = new Set();
+            const downSet = new Set();
+            (adj[i] || []).forEach(j => {
+                const t = typeOf[j];
+                if (!isDim(t) || t === src) return;
+                const o = dimOrder.get(t);
+                if (o < srcOrder) upSet.add(t);
+                else if (o > srcOrder) downSet.add(t);
+            });
+
+            if (upSet.size) {
+                coveredUp[src] += 1;
+                const w = 1 / upSet.size;
+                upSet.forEach(tgt => { accUp[src][tgt] += w; });
+            }
+
+            if (downSet.size) {
+                coveredDown[src] += 1;
+                const w = 1 / downSet.size;
+                downSet.forEach(tgt => { accDown[src][tgt] += w; });
+            }
+        });
+    });
+
+    const outDegreeUp = {};
+    const outDegreeDown = {};
+    dims.forEach(src => {
+        outDegreeUp[src] = 0;
+        outDegreeDown[src] = 0;
+        dims.forEach(tgt => {
+            if (tgt === src) return;
+            if ((accUp[src][tgt] || 0) > 0) outDegreeUp[src] += 1;
+            if ((accDown[src][tgt] || 0) > 0) outDegreeDown[src] += 1;
+        });
+    });
+
+    return { N, coveredUp, coveredDown, accUp, accDown, outDegreeUp, outDegreeDown };
+}
+
+/**
+ * Calculate bar heights and Y positions for Parallel Sets
+ * @param {Array} dims - Dimension array (trace types)
+ * @param {Map} dimOrder - Map of dimension to order index
+ * @param {Object} N - Node counts per dimension
+ * @param {Object} coveredUp - Upstream coverage per dimension
+ * @param {Object} coveredDown - Downstream coverage per dimension
+ * @param {Object} accDown - Downstream accumulation per dimension pair
+ * @returns {Object} Object with barHeights, barYOffsets, sourceToTargets
+ */
+function calculateParallelSetsBarLayout(dims, dimOrder, N, coveredUp, coveredDown, accDown) {
+    const heightPerNode = DIAGRAM_CONFIG.PARALLEL_SETS.HEIGHT_PER_NODE;
+    const minBarHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MIN_BAR_HEIGHT;
+    const maxBarHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MAX_BAR_HEIGHT;
+    const barSpacing = DIAGRAM_CONFIG.PARALLEL_SETS.BAR_SPACING;
+
+    const barHeights = {};
+    dims.forEach(dim => {
+        const total = N[dim] || 0;
+        const upCov = coveredUp[dim] || 0;
+        const downCov = coveredDown[dim] || 0;
+        const maxCov = Math.max(upCov, downCov, total * 0.3);
+        const calcHeight = maxCov * heightPerNode;
+        barHeights[dim] = Math.min(maxBarHeight, Math.max(minBarHeight, calcHeight));
+    });
+
+    // Build connection map
+    const sourceToTargets = {};
+    dims.forEach(src => {
+        sourceToTargets[src] = [];
+        dims.forEach(tgt => {
+            if (src !== tgt) {
+                const srcOrder = dimOrder.get(src);
+                const tgtOrder = dimOrder.get(tgt);
+                if (srcOrder < tgtOrder && (accDown[src][tgt] > 0)) {
+                    sourceToTargets[src].push(tgt);
+                }
+            }
+        });
+    });
+
+    // Position bars
+    const barYOffsets = {};
+    barYOffsets[dims[0]] = 0;
+
+    for (let i = 1; i < dims.length; i++) {
+        const dim = dims[i];
+        let strongestSource = null;
+        let maxWeight = 0;
+
+        for (let j = 0; j < i; j++) {
+            const prevDim = dims[j];
+            const weight = accDown[prevDim][dim] || 0;
+            if (weight > maxWeight) {
+                maxWeight = weight;
+                strongestSource = prevDim;
+            }
+        }
+
+        if (strongestSource) {
+            const siblings = sourceToTargets[strongestSource];
+            const siblingIndex = siblings.indexOf(dim);
+
+            if (siblingIndex === 0) {
+                barYOffsets[dim] = barYOffsets[strongestSource];
+            } else {
+                const prevSibling = siblings[siblingIndex - 1];
+                barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
+            }
+        } else {
+            barYOffsets[dim] = 0;
+        }
+    }
+
+    return { barHeights, barYOffsets, sourceToTargets };
+}
+
+/**
+ * Calculate band positions for ribbons in Parallel Sets
+ * @param {Array} dims - Dimension array (trace types)
+ * @param {Map} dimOrder - Map of dimension to order index
+ * @param {Object} barYOffsets - Bar Y offsets
+ * @param {Object} barHeights - Bar heights
+ * @param {Object} accUp - Upstream accumulation
+ * @param {Object} accDown - Downstream accumulation
+ * @param {Object} N - Node counts
+ * @returns {Object} Object with bandsUp and bandsDown
+ */
+function calculateParallelSetsBands(dims, dimOrder, barYOffsets, barHeights, accUp, accDown, N) {
+    const heightPerNode = DIAGRAM_CONFIG.PARALLEL_SETS.HEIGHT_PER_NODE;
+
+    const scaleForDim = (dim) => {
+        const total = N[dim] || 0;
+        const barHeight = barHeights[dim];
+        return total > 0 ? (barHeight / total) : 0;
+    };
+
+    const bandsUp = {};
+    const bandsDown = {};
+
+    dims.forEach(src => {
+        const srcOrder = dimOrder.get(src);
+        const srcYOffset = barYOffsets[src];
+
+        bandsUp[src] = {};
+        let yu = srcYOffset;
+        for (let k = dims.length - 1; k >= 0; k--) {
+            const tgt = dims[k];
+            if (tgt === src || dimOrder.get(tgt) >= srcOrder) continue;
+            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
+            if (h <= 0) continue;
+            bandsUp[src][tgt] = { y0: yu, y1: yu + h };
+            yu += h;
+        }
+
+        bandsDown[src] = {};
+        let yd = srcYOffset;
+        for (let k = 0; k < dims.length; k++) {
+            const tgt = dims[k];
+            if (tgt === src || dimOrder.get(tgt) <= srcOrder) continue;
+            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
+            if (h <= 0) continue;
+            bandsDown[src][tgt] = { y0: yd, y1: yd + h };
+            yd += h;
+        }
+    });
+
+    return { bandsUp, bandsDown };
+}
+
 function renderParallelSetsRequirements(containerId, nodes, links, colorScale, getTraceType) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
@@ -610,7 +1071,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     const innerW = Math.max(0, width - margin.left - margin.right);
     let innerH = 200; // Initial value, will be recalculated based on bar heights
     let height = margin.top + margin.bottom + innerH; // Initial height
-    const barW = 16;
+    const barW = DIAGRAM_CONFIG.PARALLEL_SETS.BAR_WIDTH;
 
     const svg = d3.select('#' + containerId)
         .append('svg')
@@ -644,7 +1105,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         // Use config.md order and filter to only types present in nodes
         const nodesTypes = new Set();
         nodes.forEach(n => {
-            const t = getTraceType(n && n.trace_target);
+            const t = getTraceType(n && n.trace_target, n && n.layer_id);
             if (t && t !== 'Unknown') nodesTypes.add(t);
         });
         dims = traceTargetOrder.filter(t => nodesTypes.has(t));
@@ -652,7 +1113,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         // Fallback: extract unique trace types from nodes in order of first appearance
         const seenTypes = new Set();
         nodes.forEach(n => {
-            const t = getTraceType(n && n.trace_target);
+            const t = getTraceType(n && n.trace_target, n && n.layer_id);
             if (t && t !== 'Unknown' && !seenTypes.has(t)) {
                 seenTypes.add(t);
                 dims.push(t);
@@ -670,85 +1131,9 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return s.replace(/\.0$/, '') + '%';
     }
 
-    // Build undirected adjacency from direct links (numeric indices)
-    const adj = Array.from({ length: nodes.length }, () => []);
-    links.forEach(l => {
-        if (typeof l.source !== 'number' || typeof l.target !== 'number') return;
-        adj[l.source].push(l.target);
-        adj[l.target].push(l.source);
-    });
-
-    const typeOf = nodes.map(n => getTraceType(n && n.trace_target));
-    const idxByDim = {};
-    dims.forEach(d => { idxByDim[d] = []; });
-    typeOf.forEach((t, i) => {
-        if (isDim(t)) idxByDim[t].push(i);
-    });
-
-    const N = {};
-    const coveredUp = {};
-    const coveredDown = {};
-    const accUp = {}; // accUp[src][tgt] in "node mass" units (upstream: tgt is earlier layer)
-    const accDown = {}; // accDown[src][tgt] in "node mass" units (downstream: tgt is later layer)
-    dims.forEach(src => {
-        N[src] = idxByDim[src].length;
-        coveredUp[src] = 0;
-        coveredDown[src] = 0;
-        accUp[src] = {};
-        accDown[src] = {};
-        dims.forEach(tgt => {
-            if (tgt === src) return;
-            accUp[src][tgt] = 0;
-            accDown[src][tgt] = 0;
-        });
-    });
-
-    // Compute independent upstream/downstream projections.
-    // A layer is 100% upstream-covered if all its nodes connect to ANY earlier layer.
-    // A layer is 100% downstream-covered if all its nodes connect to ANY later layer.
-    // Each node contributes mass 1 independently to upstream and downstream, split across distinct target layers on that side.
-    dims.forEach(src => {
-        const srcOrder = dimOrder.get(src);
-        idxByDim[src].forEach(i => {
-            const upSet = new Set();
-            const downSet = new Set();
-            (adj[i] || []).forEach(j => {
-                const t = typeOf[j];
-                if (!isDim(t) || t === src) return;
-                const o = dimOrder.get(t);
-                if (o < srcOrder) upSet.add(t);
-                else if (o > srcOrder) downSet.add(t);
-            });
-
-            if (upSet.size) {
-                coveredUp[src] += 1;
-                const w = 1 / upSet.size;
-                upSet.forEach(tgt => {
-                    accUp[src][tgt] += w;
-                });
-            }
-
-            if (downSet.size) {
-                coveredDown[src] += 1;
-                const w = 1 / downSet.size;
-                downSet.forEach(tgt => {
-                    accDown[src][tgt] += w;
-                });
-            }
-        });
-    });
-
-    const outDegreeUp = {};
-    const outDegreeDown = {};
-    dims.forEach(src => {
-        outDegreeUp[src] = 0;
-        outDegreeDown[src] = 0;
-        dims.forEach(tgt => {
-            if (tgt === src) return;
-            if ((accUp[src][tgt] || 0) > 0) outDegreeUp[src] += 1;
-            if ((accDown[src][tgt] || 0) > 0) outDegreeDown[src] += 1;
-        });
-    });
+    // Compute coverage statistics
+    const coverage = computeParallelSetsCoverage(dims, dimOrder, nodes, links, getTraceType);
+    const { N, coveredUp, coveredDown, accUp, accDown, outDegreeUp, outDegreeDown } = coverage;
 
     const maxN = Math.max(0, ...dims.map(d => N[d] || 0));
     if (maxN <= 0) {
@@ -756,179 +1141,39 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         return;
     }
 
-    // Calculate bar heights and positions based on connection relationships
-    // Position bars to minimize ribbon overlap by placing connected bars near each other
-    const heightPerNode = 15; // Height per node in pixels (increased from 6 for better visibility)
-    const minBarHeight = 30; // Minimum bar height
-    const maxBarHeight = 200; // Maximum bar height (increased from 100 to allow more vertical space)
-    const barHeights = {};
-    const barYOffsets = {};
+    // Calculate bar layout
+    const layout = calculateParallelSetsBarLayout(dims, dimOrder, N, coveredUp, coveredDown, accDown);
+    const { barHeights, barYOffsets, sourceToTargets } = layout;
 
-    // Calculate bar heights
-    dims.forEach(dim => {
-        const total = N[dim] || 0;
-        const upCov = coveredUp[dim] || 0;
-        const downCov = coveredDown[dim] || 0;
-        const maxCov = Math.max(upCov, downCov, total * 0.3);
-        const calcHeight = maxCov * heightPerNode;
-        barHeights[dim] = Math.min(maxBarHeight, Math.max(minBarHeight, calcHeight));
-    });
-
-    // Build connection map: source dimension -> [target dimensions]
-    // This helps us stack multiple targets from the same source vertically
-    const sourceToTargets = {};
-    dims.forEach(src => {
-        sourceToTargets[src] = [];
-        dims.forEach(tgt => {
-            if (src !== tgt) {
-                const srcOrder = dimOrder.get(src);
-                const tgtOrder = dimOrder.get(tgt);
-                if (srcOrder < tgtOrder && (accDown[src][tgt] > 0)) {
-                    sourceToTargets[src].push(tgt);
-                }
-            }
-        });
-    });
-
-    // Position bars to avoid link overlap
-    innerH = 0; // Initial canvas height (will be calculated from actual bar positions)
-    const barSpacing = 15; // Vertical spacing between stacked bars
-
-    // Position first dimension at top
-    barYOffsets[dims[0]] = 0;
-
-    // Position subsequent dimensions
-    for (let i = 1; i < dims.length; i++) {
-        const dim = dims[i];
-
-        // Find the strongest connection source (predecessor with most connections)
-        let strongestSource = null;
-        let maxWeight = 0;
-
-        for (let j = 0; j < i; j++) {
-            const prevDim = dims[j];
-            const weight = accDown[prevDim][dim] || accUp[dim][prevDim] || 0;
-            if (weight > maxWeight) {
-                maxWeight = weight;
-                strongestSource = prevDim;
-            }
-        }
-
-        if (strongestSource) {
-            // Get list of targets from this source
-            const siblings = sourceToTargets[strongestSource];
-            const siblingIndex = siblings.indexOf(dim);
-
-            if (siblingIndex === 0) {
-                // First target: align with source (same y coordinate)
-                barYOffsets[dim] = barYOffsets[strongestSource];
-            } else {
-                // Subsequent targets: stack below previous sibling to avoid overlap
-                const prevSibling = siblings[siblingIndex - 1];
-                barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
-            }
-        } else {
-            // No connection, place at top
-            barYOffsets[dim] = 0;
-        }
-    }
-
-    // Adjust canvas height if needed
+    // Adjust canvas height
     let maxY = 0;
     dims.forEach(dim => {
         maxY = Math.max(maxY, barYOffsets[dim] + barHeights[dim]);
     });
-    // Calculate natural height from bar positions, with reasonable min/max bounds
-    const naturalHeight = maxY + 20; // 20px bottom padding
-    const minHeight = 150; // Minimum to prevent tiny diagrams
-    const maxHeight = 800; // Maximum to prevent excessive scrolling
+    const naturalHeight = maxY + 20;
+    const minHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MIN_HEIGHT;
+    const maxHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MAX_HEIGHT;
     innerH = Math.min(maxHeight, Math.max(minHeight, naturalHeight));
 
-    // Update svg height
+    // Update SVG height
     height = margin.top + margin.bottom + innerH;
     svg.attr('height', height);
     container.style.height = height + 'px';
     container.style.minHeight = height + 'px';
     container.style.marginBottom = '20px';
 
-    const scaleForDim = (dim) => {
-        const total = N[dim] || 0;
-        const barHeight = barHeights[dim];
-        return total > 0 ? (barHeight / total) : 0;
-    };
     const x = d3.scalePoint().domain(dims).range([0, innerW]).padding(0.5);
 
-    // Precompute band positions per layer/target for ribbon endpoints.
-    // Upstream (left) and downstream (right) are independent stacks.
-    // Position ribbons within each bar's vertical space.
-    const bandsUp = {}; // bandsUp[src][tgt] = {y0,y1} where tgt is upstream of src
-    const bandsDown = {}; // bandsDown[src][tgt] = {y0,y1} where tgt is downstream of src
-    dims.forEach(src => {
-        const srcOrder = dimOrder.get(src);
-        const srcYOffset = barYOffsets[src];
-        const srcBarHeight = barHeights[src];
+    // Calculate band positions for ribbons
+    const bands = calculateParallelSetsBands(dims, dimOrder, barYOffsets, barHeights, accUp, accDown, N);
+    const { bandsUp, bandsDown } = bands;
 
-        // Calculate total heights first for top alignment within bar
-        bandsUp[src] = {};
-        let totalUpHeight = 0;
-        for (let k = dims.length - 1; k >= 0; k--) {
-            const tgt = dims[k];
-            if (tgt === src) continue;
-            if (dimOrder.get(tgt) >= srcOrder) continue;
-            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
-            if (h > 0) totalUpHeight += h;
-        }
-
-        // Start from top of this bar's vertical space
-        let yu = srcYOffset;
-        for (let k = dims.length - 1; k >= 0; k--) {
-            const tgt = dims[k];
-            if (tgt === src) continue;
-            if (dimOrder.get(tgt) >= srcOrder) continue;
-            const h = (accUp[src][tgt] || 0) * scaleForDim(src);
-            if (h <= 0) continue;
-            bandsUp[src][tgt] = { y0: yu, y1: yu + h };
-            yu += h;
-        }
-
-        bandsDown[src] = {};
-        let totalDownHeight = 0;
-        for (let k = 0; k < dims.length; k++) {
-            const tgt = dims[k];
-            if (tgt === src) continue;
-            if (dimOrder.get(tgt) <= srcOrder) continue;
-            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
-            if (h > 0) totalDownHeight += h;
-        }
-
-        // Start from top of this bar's vertical space
-        let yd = srcYOffset;
-        for (let k = 0; k < dims.length; k++) {
-            const tgt = dims[k];
-            if (tgt === src) continue;
-            if (dimOrder.get(tgt) <= srcOrder) continue;
-            const h = (accDown[src][tgt] || 0) * scaleForDim(src);
-            if (h <= 0) continue;
-            bandsDown[src][tgt] = { y0: yd, y1: yd + h };
-            yd += h;
-        }
-    });
-
-    // Tooltip (reuse existing one if present)
+    // Tooltip (reuse existing one if present, or create new)
     const tooltip = d3.select('body').selectAll('div.sankey-tooltip.parallelsets')
         .data([null])
-        .join('div')
-        .attr('class', 'sankey-tooltip parallelsets')
-        .style('position', 'absolute')
-        .style('visibility', 'hidden')
-        .style('background-color', 'white')
-        .style('border', '1px solid #ccc')
-        .style('border-radius', '4px')
-        .style('padding', '8px')
-        .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)')
-        .style('font-size', '12px')
-        .style('pointer-events', 'none')
-        .style('z-index', '1000');
+        .join(
+            enter => createTooltip('sankey-tooltip parallelsets')
+        );
 
     function ribbonPath(x0, y0a, y0b, x1, y1a, y1b) {
         const c = 0.5;
@@ -1136,230 +1381,69 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
     });
 }
 
-function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, clickable, typeOrder) {
-    const container = document.getElementById(containerId);
-    const width = container.clientWidth;
+/**
+ * Calculate Sankey diagram dimensions based on node counts
+ * @param {Array} orderedTypes - Ordered array of trace types
+ * @param {Map} nodesByType - Map of types to nodes
+ * @param {Object} config - Configuration with nodeHeight, nodeGap, topPadding, bottomPadding
+ * @returns {Object} Object with rows and height properties
+ */
+function calculateSankeyDimensions(orderedTypes, nodesByType, config) {
+    const maxColumnCount = orderedTypes.reduce((max, t) => {
+        const cnt = (nodesByType.get(t) || []).length;
+        return cnt > max ? cnt : max;
+    }, 0);
 
-    // Fixed sizing for the full (clickable) diagram nodes.
-    // Height should be based on the maximum number of nodes in any type column
-    // (not total nodes), otherwise the SVG becomes unnecessarily tall.
-    const fixedNodeHeight = 24; // px per node
-    const nodeGap = 6; // vertical gap between nodes
-    const topPadding = 20;
-    const bottomPadding = 60; // leave space for labels/legend
+    const rows = Math.max(1, maxColumnCount);
+    const height = config.topPadding + (rows * config.nodeHeight) +
+                   Math.max(0, rows - 1) * config.nodeGap + config.bottomPadding;
 
-    let height;
-    if (clickable) {
-        const nodesByTypeForSizing = d3.group(nodes, d => getTraceType(d.trace_target));
-        const presentTypes = Array.from(nodesByTypeForSizing.keys());
+    return { rows, height };
+}
 
-        // Prefer caller-provided order (from config), then append any missing types.
-        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
-        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
-        presentTypes.forEach(t => {
-            if (!orderedTypes.includes(t)) orderedTypes.push(t);
+/**
+ * Position nodes in a grid layout grouped by type
+ * @param {Map} nodesByType - Map of types to nodes
+ * @param {Array} orderedTypes - Ordered array of trace types
+ * @param {number} width - Container width
+ * @param {number} height - Container height
+ * @param {Object} config - Configuration with nodeHeight, nodeGap, topPadding, bottomPadding, nodeWidth
+ */
+function positionNodesInGrid(nodesByType, orderedTypes, width, height, config) {
+    const denom = Math.max(1, orderedTypes.length - 1);
+    const availableH = Math.max(0, height - config.topPadding - config.bottomPadding);
+
+    orderedTypes.forEach((type, typeIndex) => {
+        const typeNodes = nodesByType.get(type) || [];
+        let x = (typeIndex / denom) * (width - 40) + 20;
+        const maxX = width - 20 - config.nodeWidth;
+        if (x > maxX) x = maxX;
+
+        const count = typeNodes.length;
+        const columnHeight = count > 0 ?
+            (count * config.nodeHeight + Math.max(0, count - 1) * config.nodeGap) : 0;
+        const startY = config.topPadding + Math.max(0, (availableH - columnHeight) / 2);
+
+        typeNodes.forEach((node, i) => {
+            node.x0 = x;
+            node.x1 = x + config.nodeWidth;
+            node.y0 = startY + i * (config.nodeHeight + config.nodeGap);
+            node.y1 = node.y0 + config.nodeHeight;
         });
-
-        const maxColumnCount = orderedTypes.reduce((max, t) => {
-            const cnt = (nodesByTypeForSizing.get(t) || []).length;
-            return cnt > max ? cnt : max;
-        }, 0);
-
-        const rows = Math.max(1, maxColumnCount);
-        height = topPadding + (rows * fixedNodeHeight) + Math.max(0, rows - 1) * nodeGap + bottomPadding;
-    } else {
-        // Default sizing (kept for compatibility if this function is reused for non-clickable diagrams).
-        const heightPerNode = 25; // px per node
-        height = nodes.length * heightPerNode;
-    }
-
-    // Clear any existing content
-    container.innerHTML = '';
-
-    // Create SVG
-    const svg = d3.select('#' + containerId)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-    // Create a group for the sankey diagram
-    const g = svg.append('g')
-        .attr('transform', 'translate(10,10)');
-
-    // Create Sankey layout with better node sizing
-    const sankey = d3.sankey()
-        .nodeWidth(20)  // Increased from 15
-        .nodePadding(12)  // Increased for better visual spacing
-        .nodeAlign(d3.sankeyCenter)  // Center-align nodes for better vertical distribution
-        .extent([[5, 5], [width - 20, height - 20]]);
-    const nodeWidth = 20;
-
-    // Prepare layout copies so we don't mutate the original arrays (separate state for 'all' vs 'type')
-    let layoutNodes = nodes.map(n => Object.assign({}, n));
-    let layoutLinks = links.map((l, i) => Object.assign({}, l, { index: i }));
-
-    // Normalize links: if source/target are ids (strings), try to map to indices in layoutNodes
-    const idToIndex = new Map(layoutNodes.map((n, i) => [n.id, i]));
-    layoutLinks.forEach(l => {
-        if (typeof l.source === 'string') l.source = idToIndex.get(l.source);
-        if (typeof l.target === 'string') l.target = idToIndex.get(l.target);
     });
+}
 
-    // Validate links: ensure numeric indices in-range
-    const validLinks = layoutLinks.filter((l, i) => {
-        const s = l.source;
-        const t = l.target;
-        const ok = (typeof s === 'number' && typeof t === 'number' && s >= 0 && s < layoutNodes.length && t >= 0 && t < layoutNodes.length);
-        if (!ok) console.warn(`Dropping invalid link (${containerId}) at index ${i}:`, l);
-        return ok;
-    });
-
-    // (Totals for percent labels are computed later using sankey-produced layout and links.)
-
-    if (validLinks.length > 0) {
-        const result = sankey({ nodes: layoutNodes, links: validLinks });
-        layoutNodes = result.nodes;
-        layoutLinks = result.links;
-        // ensure indices stable for gradients
-        layoutLinks.forEach((l, idx) => { l.index = idx; });
-    } else {
-        // No links, position nodes in a grid
-        const nodesPerRow = Math.ceil(Math.sqrt(layoutNodes.length));
-        const nodeSpacingX = (width - 40) / Math.max(nodesPerRow, 1);
-        const nodeSpacingY = (height - 40) / Math.max(Math.ceil(layoutNodes.length / nodesPerRow), 1);
-        layoutNodes.forEach((node, i) => {
-            const row = Math.floor(i / nodesPerRow);
-            const col = i % nodesPerRow;
-            node.x0 = col * nodeSpacingX + 20;
-            node.x1 = node.x0 + nodeWidth;
-            node.y0 = row * nodeSpacingY + 20;
-            node.y1 = node.y0 + 20;
-        });
-    }
-
-    // If clickable (full diagram), use the original nodes/links and group by type
-    if (clickable) {
-        // Run sankey layout on copies so we don't mutate original node objects shared elsewhere.
-        let layoutNodesFull = nodes.map(n => Object.assign({}, n));
-        let layoutLinksFull = links.map((l, i) => Object.assign({}, l, { index: i }));
-
-        // Normalize numeric/string references if any
-        const idToIndexFull = new Map(layoutNodesFull.map((n, i) => [n.id, i]));
-        layoutLinksFull.forEach(l => {
-            if (typeof l.source === 'string') l.source = idToIndexFull.get(l.source);
-            if (typeof l.target === 'string') l.target = idToIndexFull.get(l.target);
-        });
-
-        const validLinksFull = layoutLinksFull.filter((l, i) => {
-            const s = l.source;
-            const t = l.target;
-            return (typeof s === 'number' && typeof t === 'number' && s >= 0 && s < layoutNodesFull.length && t >= 0 && t < layoutNodesFull.length);
-        });
-
-        if (validLinksFull.length > 0) {
-            try {
-                const resultFull = sankey({ nodes: layoutNodesFull, links: validLinksFull });
-                layoutNodesFull = resultFull.nodes;
-                layoutLinksFull = resultFull.links;
-            } catch (e) {
-                console.warn(`sankey layout (full) failed on copies: ${e}`);
-            }
-        } else {
-            // fallback grid layout for copies
-            const nodesPerRow = Math.ceil(Math.sqrt(layoutNodesFull.length));
-            const nodeSpacingX = (width - 40) / Math.max(nodesPerRow, 1);
-            const nodeSpacingY = (height - 40) / Math.max(Math.ceil(layoutNodesFull.length / nodesPerRow), 1);
-            layoutNodesFull.forEach((node, i) => {
-                const row = Math.floor(i / nodesPerRow);
-                const col = i % nodesPerRow;
-                node.x0 = col * nodeSpacingX + 20;
-                node.x1 = node.x0 + nodeWidth;
-                node.y0 = row * nodeSpacingY + 20;
-                node.y1 = node.y0 + 20;
-            });
-        }
-
-        // Copy computed positions back onto original `nodes` so click handlers and other metadata stay intact.
-        const posById = new Map(layoutNodesFull.map(n => [n.id, n]));
-        nodes.forEach(orig => {
-            const p = posById.get(orig.id);
-            if (p) {
-                orig.x0 = p.x0;
-                orig.x1 = p.x1;
-                orig.y0 = p.y0;
-                orig.y1 = p.y1;
-            }
-        });
-
-        // Finally override x/y positions to group by type in a fixed-size grid.
-        const nodesByType = d3.group(nodes, d => getTraceType(d.trace_target));
-        const presentTypes = Array.from(nodesByType.keys());
-        const fallbackTypeOrder = ['Requirement', 'Architecture', 'Implementation', 'Unit test', 'Integration test'];
-        const orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...fallbackTypeOrder];
-        presentTypes.forEach(t => {
-            if (!orderedTypes.includes(t)) orderedTypes.push(t);
-        });
-
-        // Ensure SVG/container match the computed height so the diagram is not clipped.
-        svg.attr('height', height);
-        container.style.height = height + 'px';
-        container.style.minHeight = height + 'px';
-        container.style.marginBottom = '20px';
-
-        const denom = Math.max(1, orderedTypes.length - 1);
-        const availableH = Math.max(0, height - topPadding - bottomPadding);
-        orderedTypes.forEach((type, typeIndex) => {
-            const typeNodes = nodesByType.get(type) || [];
-            let x = (typeIndex / denom) * (width - 40) + 20;
-            const maxX = width - 20 - nodeWidth;
-            if (x > maxX) x = maxX;
-            const count = typeNodes.length;
-            const columnHeight = count > 0 ? (count * fixedNodeHeight + Math.max(0, count - 1) * nodeGap) : 0;
-            const startY = topPadding + Math.max(0, (availableH - columnHeight) / 2);
-            typeNodes.forEach((node, i) => {
-                node.x0 = x;
-                node.x1 = x + nodeWidth;
-                node.y0 = startY + i * (fixedNodeHeight + nodeGap);
-                node.y1 = node.y0 + fixedNodeHeight;
-            });
-        });
-    }
-
-    // For the type diagram we preserve the sankey-computed node heights
-    // (previously a shrink factor was applied here which caused incorrect sizing).
-
-    // Create tooltip
-    const tooltip = d3.select('body').append('div')
-        .attr('class', 'sankey-tooltip')
-        .style('position', 'absolute')
-        .style('visibility', 'hidden')
-        .style('background-color', 'white')
-        .style('border', '1px solid #ccc')
-        .style('border-radius', '4px')
-        .style('padding', '8px')
-        .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)')
-        .style('font-size', '12px')
-        .style('pointer-events', 'none')
-        .style('z-index', '1000');
-
-    // Draw links
-    // For the full (clickable) diagram, ensure each link.source/target are node objects
-    let linksToRender;
-    if (clickable) {
-        linksToRender = links.map((l, i) => {
-            const src = (typeof l.source === 'number') ? nodes[l.source] : l.source;
-            const tgt = (typeof l.target === 'number') ? nodes[l.target] : l.target;
-            return Object.assign({}, l, { source: src, target: tgt, index: l.index != null ? l.index : i });
-        });
-    } else {
-        linksToRender = (typeof layoutLinks !== 'undefined') ? layoutLinks : links;
-    }
-    // Ensure each link has a unique index for gradient IDs
-    linksToRender.forEach((d, i) => { d.linkRenderIndex = i; });
-    // Filter out padding links (internal-only) from rendering/gradients
-    const visibleLinks = linksToRender.filter(l => !l._padding);
-    // Re-index visible links to ensure continuity
-    visibleLinks.forEach((d, i) => { d.visibleIndex = i; });
+/**
+ * Render Sankey diagram links with gradients
+ * @param {Object} g - D3 group selection
+ * @param {Object} svg - D3 SVG selection
+ * @param {Array} visibleLinks - Array of visible links
+ * @param {Function} colorScale - Color scale function
+ * @param {Function} getTraceType - Function to get trace type from node
+ * @param {string} containerId - Container element ID
+ * @param {Object} tooltip - D3 tooltip selection
+ */
+function renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, containerId, tooltip) {
     const defs = svg.append('defs');
     const grads = defs.selectAll('linearGradient')
         .data(visibleLinks)
@@ -1367,212 +1451,120 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
         .append('linearGradient')
         .attr('id', d => `grad-${containerId}-${d.visibleIndex}`)
         .attr('gradientUnits', 'userSpaceOnUse')
-        // Set coordinates so the gradient follows the link from source to target
         .attr('x1', d => d.source && d.source.x1 != null ? d.source.x1 : 0)
         .attr('y1', d => d.source ? (d.source.y0 + d.source.y1) / 2 : 0)
         .attr('x2', d => d.target && d.target.x0 != null ? d.target.x0 : 0)
         .attr('y2', d => d.target ? (d.target.y0 + d.target.y1) / 2 : 0);
-    grads.append('stop').attr('offset', '0%').attr('stop-color', d => colorScale(getTraceType(d.source && d.source.trace_target)));
-    grads.append('stop').attr('offset', '100%').attr('stop-color', d => colorScale(getTraceType(d.target && d.target.trace_target)));
-    if (clickable) {
-        // For full diagram, draw links manually since node positions were overridden
-        g.append('g')
-            .attr('class', 'links')
-            .selectAll('path')
-            .data(visibleLinks)
-            .enter()
-            .append('path')
-            .attr('d', d => {
-                const sourceX = d.source.x1;
-                const sourceY = (d.source.y0 + d.source.y1) / 2;
-                const targetX = d.target.x0;
-                const targetY = (d.target.y0 + d.target.y1) / 2;
-                const midX = (sourceX + targetX) / 2;
-                return `M${sourceX},${sourceY}C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`;
-            })
-            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
-            .attr('stroke-width', d => Math.max(1, d.width || 2))
-            .attr('fill', 'none')
-            .attr('opacity', 0.6)
-            .on('mouseover', function(event, d) {
-                d3.select(this).attr('opacity', 1);
-                tooltip.style('visibility', 'visible')
-                    .html(`<strong>${d.source.id} → ${d.target.id}</strong><br>Value: ${d.rawValue != null ? d.rawValue : d.value}`);
-            })
-            .on('mousemove', function(event) {
-                tooltip.style('top', (event.pageY - 10) + 'px')
-                    .style('left', (event.pageX + 10) + 'px');
-            })
-                .on('mouseout', function() {
-                    d3.select(this).attr('opacity', 0.6);
-                    tooltip.style('visibility', 'hidden');
-                });
 
+    grads.append('stop').attr('offset', '0%')
+        .attr('stop-color', d => colorScale(getTraceType(d.source && d.source.trace_target, d.source && d.source.layer_id)));
+    grads.append('stop').attr('offset', '100%')
+        .attr('stop-color', d => colorScale(getTraceType(d.target && d.target.trace_target, d.target && d.target.layer_id)));
 
-    } else {
-        // For type diagram, use sankey links
-        g.append('g')
-            .attr('class', 'links')
-            .selectAll('path')
-            .data(visibleLinks)
-            .enter()
-            .append('path')
-            .attr('d', d3.sankeyLinkHorizontal())
-            .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
-            .attr('stroke-width', d => Math.max(1, d.width || 2))
-            .attr('fill', 'none')
-            .attr('opacity', 0.6)
-            .on('mouseover', function(event, d) {
-                d3.select(this).attr('opacity', 1);
-                tooltip.style('visibility', 'visible')
-                    .html(`<strong>${d.source.id} → ${d.target.id}</strong><br>Value: ${d.value}`);
-            })
-            .on('mousemove', function(event) {
-                tooltip.style('top', (event.pageY - 10) + 'px')
-                    .style('left', (event.pageX + 10) + 'px');
-            })
-            .on('mouseout', function() {
-                d3.select(this).attr('opacity', 0.6);
-                tooltip.style('visibility', 'hidden');
-            });
-
-        // Compute totals from sankey-produced layoutLinks (visible only) so percentages are accurate
-        const nodeIndex = new Map(((typeof layoutNodes !== 'undefined') ? layoutNodes : nodes).map((n, i) => [n.id, i]));
-        const totalsOut = new Array(nodeIndex.size).fill(0);
-        const totalsIn = new Array(nodeIndex.size).fill(0);
-        // use visibleLinks (padding excluded)
-        visibleLinks.forEach(l => {
-            const v = (l.value != null) ? l.value : 1;
-            const sId = (l.source && l.source.id) ? l.source.id : null;
-            const tId = (l.target && l.target.id) ? l.target.id : null;
-            if (sId != null && nodeIndex.has(sId)) totalsOut[nodeIndex.get(sId)] += v;
-            if (tId != null && nodeIndex.has(tId)) totalsIn[nodeIndex.get(tId)] += v;
+    g.append('g')
+        .attr('class', 'links')
+        .selectAll('path')
+        .data(visibleLinks)
+        .enter()
+        .append('path')
+        .attr('d', d => {
+            const sourceX = d.source.x1;
+            const sourceY = (d.source.y0 + d.source.y1) / 2;
+            const targetX = d.target.x0;
+            const targetY = (d.target.y0 + d.target.y1) / 2;
+            const midX = (sourceX + targetX) / 2;
+            return `M${sourceX},${sourceY}C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`;
+        })
+        .attr('stroke', d => `url(#grad-${containerId}-${d.visibleIndex})`)
+        .attr('stroke-width', d => Math.max(1, d.width || 2))
+        .attr('fill', 'none')
+        .attr('opacity', 0.6)
+        .on('mouseover', function(event, d) {
+            d3.select(this).attr('opacity', 1);
+            tooltip.style('visibility', 'visible')
+                .html(`<strong>${d.source.id} → ${d.target.id}</strong><br>Value: ${d.rawValue != null ? d.rawValue : d.value}`);
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('top', (event.pageY + DIAGRAM_CONFIG.TOOLTIP.OFFSET_Y) + 'px')
+                .style('left', (event.pageX + DIAGRAM_CONFIG.TOOLTIP.OFFSET_X) + 'px');
+        })
+        .on('mouseout', function() {
+            d3.select(this).attr('opacity', 0.6);
+            tooltip.style('visibility', 'hidden');
         });
+}
 
-        // Draw percent labels along each link (source-side and target-side)
-        // Only for visible (non-padding) links
-        const linkLabelGroup = g.append('g').attr('class', 'link-labels');
-        linkLabelGroup.selectAll('g')
-            .data(visibleLinks)
-            .enter()
-            .append('g')
-            .attr('pointer-events', 'none')
-            .each(function(d) {
-                const gnode = d3.select(this);
-                    const v = (d.value != null) ? d.value : 0;
-                    // Prefer contributor-based percentages: how many distinct source/target nodes participated
-                    // Use contributor counts attached to the aggregated link (from renderSankey) and
-                    // use per-type item counts stored on the sankey nodes as denominators.
-                    const srcNode = d.source;
-                    const tgtNode = d.target;
-                    const srcItemCount = srcNode && (srcNode.itemCount != null) ? srcNode.itemCount : 0;
-                    const tgtItemCount = tgtNode && (tgtNode.itemCount != null) ? tgtNode.itemCount : 0;
-                    const contribFrom = (d.contributorsFromCount != null) ? d.contributorsFromCount : 0;
-                    const contribTo = (d.contributorsToCount != null) ? d.contributorsToCount : 0;
-                    const pctSrc = srcItemCount > 0 ? Math.round((contribFrom / srcItemCount) * 100) : 0;
-                    const pctTgt = tgtItemCount > 0 ? Math.round((contribTo / tgtItemCount) * 100) : 0;
-
-                const sx = d.source && d.source.x1 != null ? d.source.x1 : 0;
-                const tx = d.target && d.target.x0 != null ? d.target.x0 : 0;
-                const sy = d.source ? (d.source.y0 + d.source.y1) / 2 : 0;
-                const ty = d.target ? (d.target.y0 + d.target.y1) / 2 : 0;
-
-                // place source label below the node center to avoid overlapping node text
-                gnode.append('text')
-                    .text(pctSrc + '%')
-                    .attr('x', sx + (tx - sx) * 0.12)
-                    .attr('y', sy + 12)
-                    .attr('font-size', '10px')
-                    .attr('fill', '#111')
-                    .attr('text-anchor', 'start')
-                    .attr('dy', '0.35em');
-
-                // place target label below the node center to match source placement
-                gnode.append('text')
-                    .text(pctTgt + '%')
-                    .attr('x', sx + (tx - sx) * 0.88)
-                    .attr('y', ty + 12)
-                    .attr('font-size', '10px')
-                    .attr('fill', '#111')
-                    .attr('text-anchor', 'end')
-                    .attr('dy', '0.35em');
-            });
-    }
-
-    // Draw nodes
-    // For the full diagram use the original nodes so file/line/description are preserved; for type diagram use layoutNodes
-    // Filter out padding nodes (internal-only) from rendering
-    const nodesToRender = clickable ? nodes : ((typeof layoutNodes !== 'undefined') ? layoutNodes : nodes).filter(n => n.trace_target !== 'pad');
-
-    // Ensure SVG height fits the content: compute vertical extent of nodes and expand SVG/container if needed
-    try {
-        const yMin = nodesToRender.reduce((min, n) => Math.min(min, n.y0 != null ? n.y0 : Infinity), Infinity);
-        const yMax = nodesToRender.reduce((max, n) => Math.max(max, n.y1 != null ? n.y1 : -Infinity), -Infinity);
-        if (isFinite(yMin) && isFinite(yMax)) {
-            const padding = 40; // space for labels/legend
-            const currentSvgHeight = +svg.attr('height') || height;
-            const requiredHeight = Math.max(currentSvgHeight, height, Math.ceil(yMax + padding));
-            // Update svg and container to the required height (never shrink), preventing overlap.
-            svg.attr('height', requiredHeight);
-            container.style.height = requiredHeight + 'px';
-            container.style.minHeight = requiredHeight + 'px';
-            container.style.marginBottom = '20px';
-        }
-    } catch (e) {
-        // ignore and continue if any node lacks coordinates
-        console.warn('Could not compute dynamic SVG height:', e);
-    }
-    const node = g.append('g')
+/**
+ * Render Sankey diagram nodes with interactivity
+ * @param {Object} g - D3 group selection
+ * @param {Array} nodes - Array of nodes
+ * @param {Function} colorScale - Color scale function
+ * @param {Function} getTraceType - Function to get trace type from node
+ * @param {Object} tooltip - D3 tooltip selection
+ */
+function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
+    g.append('g')
         .attr('class', 'nodes')
         .selectAll('rect')
-        .data(nodesToRender)
+        .data(nodes)
         .enter()
         .append('rect')
         .attr('x', d => d.x0)
         .attr('y', d => d.y0)
         .attr('height', d => d.y1 - d.y0)
         .attr('width', d => d.x1 - d.x0)
-        .attr('fill', d => colorScale(getTraceType(d.trace_target)))
-        .attr('stroke', '#333')
+        .attr('fill', d => colorScale(getTraceType(d.trace_target, d.layer_id)))
+        .attr('stroke', DIAGRAM_CONFIG.COLORS.STROKE)
         .attr('stroke-width', 1)
-        .style('cursor', clickable ? 'pointer' : 'default')
-        .on('click', clickable ? function(event, d) {
+        .style('cursor', 'pointer')
+        .on('click', function(event, d) {
             if (typeof showText === 'function') {
-                // Compute fileName
-                const parts = d.file.split('/');
-                let filename = parts[parts.length - 1];
-                filename = filename.replace(/\./g, '_');
-                filename = 'Target_' + filename;
-                // Get extension
-                const extParts = d.file.split('.');
-                const extension = extParts[extParts.length - 1];
-                showText(event, filename, d.line, extension);
+                const filePath = resolveFilePath(d, traceabilityData);
+                if (!filePath) {
+                    console.error('Cannot determine file path for node:', d);
+                    return;
+                }
+                const baseName = getBaseName(filePath);
+                const filename = 'Target_' + baseName.replace(/\./g, '_');
+                const extension = getFileExtension(filePath);
+                const tagId = d.id || '';
+                const tagDescription = d.description || '';
+                const layerName = (d.layer_id !== undefined && traceabilityData.layers && traceabilityData.layers[d.layer_id])
+                    ? traceabilityData.layers[d.layer_id].name : '';
+                const fromTags = (d.from_tags || []).filter(t => t && t !== 'NONE').join(',');
+                showText(event, filename, d.line, extension, tagId, tagDescription, layerName, fromTags);
             }
-        } : null)
+        })
         .on('mouseover', function(event, d) {
             d3.select(this).attr('stroke-width', 2);
+            const filePath = resolveFilePath(d, traceabilityData);
             tooltip.style('visibility', 'visible')
-                .html(clickable ? `<strong>${d.id}</strong><br>` +
-                      `Type: ${getTraceType(d.trace_target)}<br>` +
-                      `File: ${d.file}:${d.line}<br>` +
-                      `<em>${d.description}</em>` : `<strong>${d.id}</strong><br>` +
-                      `Type: ${d.id}`);
+                .html(`<strong>${d.id}</strong><br>` +
+                      `Type: ${getTraceType(d.trace_target, d.layer_id)}<br>` +
+                      `File: ${filePath || 'unknown'}:${d.line}<br>` +
+                      `<em>${d.description}</em>`);
         })
         .on('mousemove', function(event) {
-            tooltip.style('top', (event.pageY - 10) + 'px')
-                .style('left', (event.pageX + 10) + 'px');
+            tooltip.style('top', (event.pageY + DIAGRAM_CONFIG.TOOLTIP.OFFSET_Y) + 'px')
+                .style('left', (event.pageX + DIAGRAM_CONFIG.TOOLTIP.OFFSET_X) + 'px');
         })
         .on('mouseout', function() {
             d3.select(this).attr('stroke-width', 1);
             tooltip.style('visibility', 'hidden');
         });
+}
 
-    // Add node labels
-    // Node labels with white background behind text for readability
+/**
+ * Render node labels for Sankey diagram
+ * @param {Object} g - D3 group selection
+ * @param {Array} nodes - Array of nodes
+ * @param {number} width - Container width
+ */
+function renderSankeyLabels(g, nodes, width) {
     const labelGroups = g.append('g')
         .attr('class', 'node-labels')
         .selectAll('g')
-        .data(nodesToRender)
+        .data(nodes)
         .enter()
         .append('g')
         .attr('class', 'node-label')
@@ -1589,8 +1581,88 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
         .attr('dy', '0.35em')
         .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
         .attr('font-size', '10px')
-        .attr('fill', '#333')
+        .attr('fill', DIAGRAM_CONFIG.COLORS.TEXT)
         .text(d => d.id);
+}
+
+function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, typeOrder) {
+    const container = document.getElementById(containerId);
+    const width = container.clientWidth;
+
+    // Configuration for diagram sizing
+    const config = {
+        nodeHeight: DIAGRAM_CONFIG.SANKEY.NODE_HEIGHT,
+        nodeGap: DIAGRAM_CONFIG.SANKEY.NODE_GAP,
+        topPadding: DIAGRAM_CONFIG.SANKEY.TOP_PADDING,
+        bottomPadding: DIAGRAM_CONFIG.SANKEY.BOTTOM_PADDING,
+        nodeWidth: DIAGRAM_CONFIG.SANKEY.NODE_WIDTH
+    };
+
+    // Group nodes by type and determine ordering
+    const nodesByType = d3.group(nodes, d => getTraceType(d.trace_target, d.layer_id));
+    const presentTypes = Array.from(nodesByType.keys());
+
+    // Use caller-provided order (from config), or extract dynamically from data
+    let orderedTypes = (Array.isArray(typeOrder) && typeOrder.length > 0) ? [...typeOrder] : [...presentTypes];
+    // Append any missing types not in the provided order
+    if (Array.isArray(typeOrder) && typeOrder.length > 0) {
+        presentTypes.forEach(t => {
+            if (!orderedTypes.includes(t)) orderedTypes.push(t);
+        });
+    }
+
+    // Calculate diagram dimensions
+    const { rows, height } = calculateSankeyDimensions(orderedTypes, nodesByType, config);
+
+    // Clear any existing content
+    container.innerHTML = '';
+
+    // Create SVG
+    const svg = d3.select('#' + containerId)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    // Create a group for the sankey diagram
+    const g = svg.append('g')
+        .attr('transform', 'translate(10,10)');
+
+    // Position nodes in a custom grid layout grouped by type
+    positionNodesInGrid(nodesByType, orderedTypes, width, height, config);
+
+    // Ensure SVG/container match the computed height
+    svg.attr('height', height);
+    container.style.height = height + 'px';
+    container.style.minHeight = height + 'px';
+    container.style.marginBottom = '20px';
+
+    // Create tooltip
+    const tooltip = createTooltip('sankey-tooltip');
+
+    // Prepare and render links
+    const linksToRender = prepareLinksForRendering(links, nodes);
+    const visibleLinks = filterVisibleLinks(linksToRender);
+    renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, containerId, tooltip);
+
+    // Adjust SVG height if needed based on actual node positions
+    try {
+        const yMin = nodes.reduce((min, n) => Math.min(min, n.y0 != null ? n.y0 : Infinity), Infinity);
+        const yMax = nodes.reduce((max, n) => Math.max(max, n.y1 != null ? n.y1 : -Infinity), -Infinity);
+        if (isFinite(yMin) && isFinite(yMax)) {
+            const padding = 40;
+            const currentSvgHeight = +svg.attr('height') || height;
+            const requiredHeight = Math.max(currentSvgHeight, height, Math.ceil(yMax + padding));
+            svg.attr('height', requiredHeight);
+            container.style.height = requiredHeight + 'px';
+            container.style.minHeight = requiredHeight + 'px';
+        }
+    } catch (e) {
+        console.warn('Could not compute dynamic SVG height:', e);
+    }
+
+    // Render nodes and labels
+    renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip);
+    renderSankeyLabels(g, nodes, width);
 }
 
 function renderSankey(data) {
@@ -1602,16 +1674,16 @@ function renderSankey(data) {
 		if (typeof traceTargetOrder !== 'undefined' && Array.isArray(traceTargetOrder) && traceTargetOrder.length > 0) {
 			// Use config.md order and filter to only types present in nodes
 			const nodesTypes = new Set();
-			(data.nodes || []).forEach(n => {
-				const t = getTraceType(n && n.trace_target);
+			(data.trace_tags || data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target, n && n.layer_id);
 				if (t && t !== 'Unknown') nodesTypes.add(t);
 			});
 			types = traceTargetOrder.filter(t => nodesTypes.has(t));
 		} else {
 			// Fallback: extract unique trace types from nodes in order of first appearance
 			const seenTypes = new Set();
-			(data.nodes || []).forEach(n => {
-				const t = getTraceType(n && n.trace_target);
+			(data.trace_tags || data.nodes || []).forEach(n => {
+				const t = getTraceType(n && n.trace_target, n && n.layer_id);
 				if (t && t !== 'Unknown' && !seenTypes.has(t)) {
 					seenTypes.add(t);
 					types.push(t);
@@ -1630,13 +1702,22 @@ function renderSankey(data) {
         annotateTraceTargets(data);
         annotateMatrixBadges();
         renderSummary(data);
+        renderHealth(data);
+        // Re-apply badge colors after renderHealth creates isolated/dangling badges
+        annotateMatrixBadges();
 
 		// Prepare nodes and links for full diagram
-		const sankeyNodes = data.nodes.map((d, i) => ({ ...d, index: i }));
+		const sankeyNodes = (data.trace_tags || data.nodes || []).map((d, i) => ({ ...d, index: i }));
 		const nodeIndexMap = new Map(sankeyNodes.map((node, i) => [node.id, i]));
 
 
-		const sankeyLinks = data.links.map(d => ({
+		// Derive links from trace_tags using from_tags array
+		const derivedLinks = (data.trace_tags || data.nodes || [])
+			.flatMap(tag => (tag.from_tags || [])
+				.filter(ft => ft && ft !== 'NONE')
+				.map(ft => ({ source: ft, target: tag.id })));
+
+		const sankeyLinks = derivedLinks.map(d => ({
 				...d,
 				source: nodeIndexMap.get(d.source),
 				target: nodeIndexMap.get(d.target)
@@ -1649,11 +1730,11 @@ function renderSankey(data) {
 		});
 
 		// Render full diagram
-        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, true, types);
+        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, types);
 
 		// Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
-		const directLinksRaw = Array.isArray(data.direct_links) ? data.direct_links : data.links;
-		const directLinks = directLinksRaw
+		// Use the same derived links for consistency with v0.2.0 format
+		const directLinks = derivedLinks
 				.map(d => ({
 						...d,
 						source: nodeIndexMap.get(d.source),
@@ -1664,1197 +1745,3 @@ function renderSankey(data) {
 		renderParallelSetsRequirements('sankey-diagram-type', sankeyNodes, directLinks, colorScale, getTraceType);
 }
 
-EOF
-}
-
-##
-# @brief   Generate HTML table header with sortable columns dynamically from TAG_INFO_TABLE
-# @param   $1 : TAG_INFO_TABLE (tag information with trace_target)
-# @return  HTML <thead> element with sort buttons
-_html_add_table_header() {
-	_TAG_INFO_TABLE="$1"
-	_sep="$SHTRACER_SEPARATOR"
-
-	printf '%s\n' '<thead>'
-	printf '%s\n' '  <tr>'
-
-	# Extract unique trace_target types and generate header columns
-	# Order follows appearance in TAG_INFO_TABLE (config.md trace target definition order)
-	{
-		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
-			cat "$_TAG_INFO_TABLE"
-		else
-			printf '%s\n' "$_TAG_INFO_TABLE"
-		fi
-	} | awk -F"$_sep" -v col_idx=0 '
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
-		{
-			if (NF >= 4 && $4 != "") {
-				trace_target = $4
-				col_name = get_last_segment(trace_target)
-				if (!(col_name in seen)) {
-					seen[col_name] = 1
-					cols[col_idx++] = col_name
-				}
-			}
-		}
-		END {
-			for (i = 0; i < col_idx; i++) {
-				printf "    <th>%s <a href=\"#\" onclick=\"sortTable(%d)\">sort</a></th>\n", cols[i], i
-			}
-		}
-	'
-
-	printf '%s\n' '  </tr>'
-	printf '%s\n' '</thead>'
-}
-
-##
-# @brief   Convert tag table rows to HTML table body
-# @param   $1 : TAG_TABLE_FILENAME
-# @return  HTML <tbody> element with table data
-_html_convert_tag_table() {
-	# Convert tag table rows into fixed layer columns based on tag->trace_target mapping.
-	# $1: TAG_TABLE_FILENAME (space-separated tags per line)
-	# $2: TAG_INFO_TABLE (tag<sep>line<sep>path<sep>trace_target)
-	_TAG_TABLE_FILENAME="$1"
-	_TAG_INFO_TABLE="$2"
-	_sep="$SHTRACER_SEPARATOR"
-	_nodata="$NODATA_STRING"
-
-	printf '%s\n' '<tbody>'
-	{
-		if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
-			cat "$_TAG_INFO_TABLE"
-		else
-			printf '%s\n' "$_TAG_INFO_TABLE"
-		fi
-		printf '%s\n' '__SHTRACER_TAG_INFO_END__'
-		cat "$_TAG_TABLE_FILENAME"
-	} | awk -v sep="$_sep" -v nodata="$_nodata" '
-        BEGIN {
-            ndims = 0
-            mode = 0
-        }
-        function get_last_segment(s,   n, parts) {
-            n = split(s, parts, ":")
-            return n > 0 ? parts[n] : s
-        }
-        function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-        function field1(s, delim,   p1) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return s
-            return substr(s, 1, p1 - 1)
-        }
-        function field2(s, delim,   rest, p1, p2) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return rest
-            return substr(rest, 1, p2 - 1)
-        }
-        function field3(s, delim,   rest, p1, p2, p3) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return rest
-            return substr(rest, 1, p3 - 1)
-        }
-        function field4(s, delim,   rest, p1, p2, p3) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return ""
-            return substr(rest, p3 + length(delim))
-        }
-        function type_from_trace_target(tt,   n, p, t) {
-            if (tt == "") return "Unknown"
-            n = split(tt, p, ":")
-            t = trim(p[n])
-            return t == "" ? "Unknown" : t
-        }
-        function escape_html(s,   t) {
-            t = s
-            gsub(/&/, "&amp;", t)
-            gsub(/</, "&lt;", t)
-            gsub(/>/, "&gt;", t)
-            gsub(/"/, "&quot;", t)
-            return t
-        }
-        function basename(path,   t) {
-            t = path
-            gsub(/.*\//, "", t)
-            return t
-        }
-        function ext_from_basename(base) {
-            if (match(base, /[.][^.]+$/)) return substr(base, RSTART + 1)
-            return "sh"
-        }
-        function fileid_from_basename(base,   t) {
-            t = base
-            gsub(/[.]/, "_", t)
-            return "Target_" t
-        }
-        function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
-            safeTyp = escape_html(typ)
-            safeTag = escape_html(tag)
-            safeId = escape_html(fileId)
-            safeExt = escape_html(ext)
-            return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-                "<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
-                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
-        }
-        $0 == "__SHTRACER_TAG_INFO_END__" {
-            mode = 1
-            next
-        }
-        mode == 0 {
-            if ($0 == "") next
-            tag = trim(field1($0, sep))
-            if (tag == "") next
-            line = trim(field2($0, sep))
-            path = trim(field3($0, sep))
-            trace_target = trim(field4($0, sep))
-            if (line == "" || line + 0 < 1) line = 1
-            typ = type_from_trace_target(trace_target)
-            tagType[tag] = typ
-            tagLine[tag] = line
-            base = basename(path)
-            tagExt[tag] = ext_from_basename(base)
-            tagFileId[tag] = fileid_from_basename(base)
-            # Build dims array dynamically
-            if (typ != "" && typ != "Unknown" && !(typ in dimIndex)) {
-                dims[++ndims] = typ
-                dimIndex[typ] = ndims
-            }
-            next
-        }
-        {
-            for (i = 1; i <= ndims; i++) { cell[i] = nodata; html[i] = "" }
-            nextSlot = 1
-            nt = split($0, tags, /[[:space:]]+/)
-            for (k = 1; k <= nt; k++) {
-                t = trim(tags[k])
-                if (t == "" || t == nodata) continue
-                typ = tagType[t]
-                if (typ == "") typ = "Unknown"
-                if (typ in dimIndex) {
-                    col = dimIndex[typ]
-                } else {
-                    while (nextSlot <= ndims && cell[nextSlot] != nodata) nextSlot++
-                    col = (nextSlot <= ndims) ? nextSlot : ndims
-                }
-                frag = badge(t, typ, tagLine[t], tagFileId[t], tagExt[t])
-                if (cell[col] == nodata) { cell[col] = t; html[col] = frag }
-                else { cell[col] = cell[col] " " t; html[col] = html[col] "<br>" frag }
-            }
-            printf "\n  <tr>\n"
-            for (i = 1; i <= ndims; i++) {
-                if (cell[i] == nodata) printf "    <td><span class=\"matrix-tag-badge matrix-tag-badge-nodata\">%s</span></td>\n", nodata
-                else printf "    <td>%s</td>\n", html[i]
-            }
-            printf "  </tr>"
-        }
-    '
-	printf '%s\n' '</tbody>'
-}
-
-##
-# @brief   Generate HTML cross-reference table from intermediate matrix file
-# @param   $1 : Cross-reference matrix file path (e.g., 06_cross_ref_matrix_REQ_ARC)
-# @param   $2 : HTML table ID (e.g., "tag-table-req-arc")
-# @param   $3 : TAG_INFO_TABLE file path (for tag type mapping)
-# @return  Complete HTML table with clickable badges
-_html_generate_cross_ref_table() {
-	_xref_file="$1"
-	_table_id="$2"
-	_tag_info_table="$3"
-	_sep="$SHTRACER_SEPARATOR"
-	_nodata="$NODATA_STRING"
-
-	# Error handling: file not readable
-	if [ ! -r "$_xref_file" ]; then
-		printf '<table id="%s" class="matrix-table"><tbody><tr><td>Error: Cross-reference file not found</td></tr></tbody></table>\n' "$_table_id"
-		return 1
-	fi
-
-	# Parse TAG_INFO_TABLE and intermediate file, then generate HTML table
-	{
-		# TAG_INFO_TABLE is a string containing the data, not a file path
-		printf '%s\n' "$_tag_info_table"
-		printf '%s\n' "__SHTRACER_TAG_INFO_END__"
-		cat "$_xref_file"
-	} | awk -v sep="$_sep" -v nodata="$_nodata" -v table_id="$_table_id" '
-		BEGIN {
-			mode = "tag_info"
-			row_count = 0
-			col_count = 0
-			row_prefix = ""
-			col_prefix = ""
-		}
-		function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
-		function type_from_trace_target(tt,   n, p, t) {
-			if (tt == "") return "Unknown"
-			n = split(tt, p, ":")
-			t = trim(p[n])
-			return t == "" ? "Unknown" : t
-		}
-		function field1(s, delim,   p1) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return s
-			return substr(s, 1, p1 - 1)
-		}
-		function field2(s, delim,   rest, p1, p2) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return rest
-			return substr(rest, 1, p2 - 1)
-		}
-		function field3(s, delim,   rest, p1, p2, p3) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return rest
-			return substr(rest, 1, p3 - 1)
-		}
-		function field4(s, delim,   rest, p1, p2, p3, p4) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return rest
-			return substr(rest, 1, p4 - 1)
-		}
-		function escape_html(s,   t) {
-			t = s
-			gsub(/&/, "&amp;", t)
-			gsub(/</, "&lt;", t)
-			gsub(/>/, "&gt;", t)
-			gsub(/"/, "&quot;", t)
-			return t
-		}
-		function basename(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)
-			return t
-		}
-		function ext_from_basename(base) {
-			if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
-			return "sh"
-		}
-		function fileid_from_basename(base,   t) {
-			t = base
-			gsub(/\./, "_", t)
-			return "Target_" t
-		}
-		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
-			safeTyp = escape_html(typ)
-			safeTag = escape_html(tag)
-			safeId = escape_html(fileId)
-			safeExt = escape_html(ext)
-			return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
-				"onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
-		}
-
-		# Read TAG_INFO_TABLE to build tag type mapping
-		$0 == "__SHTRACER_TAG_INFO_END__" {
-			mode = "xref_file"
-			next
-		}
-		mode == "tag_info" {
-			if ($0 == "") next
-			tag = trim(field1($0, sep))
-			if (tag == "") next
-			trace_target = trim(field4($0, sep))
-			typ = type_from_trace_target(trace_target)
-			tagType[tag] = typ
-			next
-		}
-
-		# Section markers in cross-reference file
-		/^\[METADATA\]/ { mode = "metadata"; next }
-		/^\[ROW_TAGS\]/ { mode = "row_tags"; next }
-		/^\[COL_TAGS\]/ { mode = "col_tags"; next }
-		/^\[MATRIX\]/ { mode = "matrix"; next }
-
-		# Parse metadata: row_prefix<sep>col_prefix<sep>timestamp
-		mode == "metadata" {
-			if ($0 == "") next
-			row_prefix = trim(field1($0, sep))
-			col_prefix = trim(field2($0, sep))
-			next
-		}
-
-		# Parse row tags: @TAG@<sep>/path/to/file<sep>line_num
-		mode == "row_tags" {
-			if ($0 == "") next
-			tag = trim(field1($0, sep))
-			file = trim(field2($0, sep))
-			line = trim(field3($0, sep))
-			if (tag == "") next
-			if (line == "" || line + 0 < 1) line = 1
-			typ = (tag in tagType) ? tagType[tag] : "Unknown"
-			row_tags[row_count] = tag
-			row_files[tag] = file
-			row_lines[tag] = line
-			row_types[tag] = typ
-			base = basename(file)
-			row_exts[tag] = ext_from_basename(base)
-			row_fileids[tag] = fileid_from_basename(base)
-			row_count++
-			next
-		}
-
-		# Parse col tags: same format as row tags
-		mode == "col_tags" {
-			if ($0 == "") next
-			tag = trim(field1($0, sep))
-			file = trim(field2($0, sep))
-			line = trim(field3($0, sep))
-			if (tag == "") next
-			if (line == "" || line + 0 < 1) line = 1
-			typ = (tag in tagType) ? tagType[tag] : "Unknown"
-			col_tags[col_count] = tag
-			col_files[tag] = file
-			col_lines[tag] = line
-			col_types[tag] = typ
-			base = basename(file)
-			col_exts[tag] = ext_from_basename(base)
-			col_fileids[tag] = fileid_from_basename(base)
-			col_count++
-			next
-		}
-
-		# Parse matrix: @ROW_TAG@<sep>@COL_TAG@
-		mode == "matrix" {
-			if ($0 == "") next
-			row_tag = trim(field1($0, sep))
-			col_tag = trim(field2($0, sep))
-			if (row_tag == "" || col_tag == "") next
-			matrix[row_tag "," col_tag] = 1
-			next
-		}
-
-		END {
-			# Generate HTML table
-			printf "<table id=\"%s\" class=\"matrix-table\">\n", table_id
-			printf "<thead>\n  <tr>\n"
-
-			# Header: first cell is empty (corner cell)
-			printf "    <th>.</th>\n"
-
-			# Column headers with badges
-			for (c = 0; c < col_count; c++) {
-				tag = col_tags[c]
-				typ = col_types[tag]
-				line = col_lines[tag]
-				fileid = col_fileids[tag]
-				ext = col_exts[tag]
-				badge_html = badge(tag, typ, line, fileid, ext)
-				printf "    <th>%s</th>\n", badge_html
-			}
-			printf "  </tr>\n</thead>\n"
-
-			# Table body
-			printf "<tbody>\n"
-			for (r = 0; r < row_count; r++) {
-				row_tag = row_tags[r]
-				row_typ = row_types[row_tag]
-				row_line = row_lines[row_tag]
-				row_fileid = row_fileids[row_tag]
-				row_ext = row_exts[row_tag]
-				row_badge = badge(row_tag, row_typ, row_line, row_fileid, row_ext)
-
-				printf "  <tr>\n"
-				printf "    <td>%s</td>\n", row_badge
-
-				# Data cells: "x" if link exists, empty otherwise
-				for (c = 0; c < col_count; c++) {
-					col_tag = col_tags[c]
-					key = row_tag "," col_tag
-					if (key in matrix) {
-						printf "    <td class=\"xref-link\">x</td>\n"
-					} else {
-						printf "    <td class=\"xref-empty\"></td>\n"
-					}
-				}
-				printf "  </tr>\n"
-			}
-			printf "</tbody>\n"
-			printf "</table>\n"
-		}
-	'
-}
-
-##
-# @brief   Insert file information into HTML with proper indentation
-# @param   $1 : HTML_CONTENT (template HTML to modify)
-# @param   $2 : INFORMATION (file list HTML)
-# @return  Modified HTML with inserted content and fixed indentation
-_html_insert_content_with_indentation() {
-	_html_insert_info_file="$(shtracer_tmpfile)" || {
-		error_exit 1 "_html_insert_content_with_indentation" "Failed to create temporary file"
-	}
-	trap 'rm -f "$_html_insert_info_file" 2>/dev/null || true' EXIT INT TERM
-
-	printf '%s' "$2" >"$_html_insert_info_file"
-
-	_html_insert_result=$(echo "$1" \
-		| awk -v info_file="$_html_insert_info_file" '
-			BEGIN {
-				idx = 0
-				while ((getline line < info_file) > 0) {
-					gsub(/\r$/, "", line)
-					lines[idx++] = line
-				}
-				close(info_file)
-			}
-			{
-				if (match($0, / *<!-- INSERT INFORMATION -->/)) {
-					print "<!-- SHTRACER INSERTED -->"
-					for (i = 0; i < idx; i++) {
-						print lines[i]
-					}
-					print "<!-- SHTRACER INSERTED -->"
-				} else {
-					print
-				}
-			}' \
-		| awk '
-			BEGIN {
-			    add_space = 0
-			}
-
-			/<!-- SHTRACER INSERTED -->/ {
-				if (add_space == 0) {
-					add_space = 1
-					add_space_count = previous_space_count + (previous_space_count == space_count ? 2 : 4)
-				} else {
-					add_space = 0
-					printf "%*s%s\n", add_space_count, "", $0
-					next
-				}
-			}
-
-			{
-				previous_space_count = space_count
-				match($0, /^[ \t]*/)
-				space_count = RLENGTH
-
-				if (add_space == 1) {
-					printf "%*s%s\n", add_space_count, "", $0
-				} else {
-					print $0
-				}
-			}
-		' \
-		| remove_lines_with_pattern '<!-- SHTRACER INSERTED -->')
-
-	rm -f "$_html_insert_info_file" 2>/dev/null || true
-	trap - EXIT INT TERM
-	echo "$_html_insert_result"
-}
-
-##
-# @brief Convert a template html file for output.html
-# @param $1 : TAG_TABLE_FILENAME
-# @param $2 : TAG_INFO_TABLE
-# @param $3 : TEMPLATE_HTML_DIR
-# @param $4 : JSON_FILE (optional)
-convert_template_html() {
-	(
-		profile_start "convert_template_html"
-
-		_TAG_TABLE_FILENAME="$1"
-		_TAG_INFO_TABLE="$2"
-		_TEMPLATE_HTML_DIR="$3"
-		_JSON_FILE="${4:-}"
-
-		profile_start "convert_template_html_read_json"
-		if [ -z "$_JSON_FILE" ]; then
-			_JSON_FILE="${OUTPUT_DIR%/}/output.json"
-		fi
-		profile_end "convert_template_html_read_json"
-
-		profile_start "convert_template_html_build_table"
-		_TABLE_HTML="$(_html_add_table_header "$_TAG_INFO_TABLE")"
-		_TABLE_HTML="$_TABLE_HTML$(_html_convert_tag_table "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE")"
-		profile_end "convert_template_html_build_table"
-
-		# Generate cross-reference tables for tab UI
-		profile_start "convert_template_html_build_xref_tables"
-		_XREF_DIR="${OUTPUT_DIR%/}/tags/"
-		_XREF_FILES=""
-		if [ -d "$_XREF_DIR" ]; then
-			for _f in "$_XREF_DIR"[0-9][0-9]_cross_ref_matrix_*; do
-				[ -f "$_f" ] || continue
-				_XREF_FILES="$_XREF_FILES$(basename "$_f")
-"
-			done
-		fi
-
-		# Generate tab structure
-		_TABS_HTML=""
-		_TABLES_HTML=""
-
-		# First tab: "All" (existing RTM)
-		_TABS_HTML='<button class="matrix-tab active" data-matrix="all" onclick="switchMatrixTab(event, '"'all'"')">All</button>'
-		_TABLES_HTML='<table id="tag-table-all" class="matrix-table active">'
-		_TABLES_HTML="$_TABLES_HTML$_TABLE_HTML"
-		_TABLES_HTML="$_TABLES_HTML</table>"
-
-		# Generate tabs for each cross-reference file
-		if [ -n "$_XREF_FILES" ]; then
-			for _xref_file in $_XREF_FILES; do
-				# Extract prefixes from filename: 06_cross_ref_matrix_REQ_ARC
-				_base_name="${_xref_file#*_cross_ref_matrix_}"
-				_row_prefix=$(printf '%s' "$_base_name" | cut -d'_' -f1)
-				_col_prefix=$(printf '%s' "$_base_name" | cut -d'_' -f2)
-
-				# Generate tab ID: "req-arc"
-				_tab_id=$(printf '%s-%s' "$_row_prefix" "$_col_prefix" | tr '[:upper:]' '[:lower:]')
-				_tab_label="$_row_prefix↔$_col_prefix"
-
-				# Append tab button
-				_TABS_HTML="$_TABS_HTML<button class=\"matrix-tab\" data-matrix=\"$_tab_id\" onclick=\"switchMatrixTab(event, '$_tab_id')\">$_tab_label</button>"
-
-				# Generate table
-				_table_html=$(_html_generate_cross_ref_table "${_XREF_DIR}${_xref_file}" "tag-table-$_tab_id" "$_TAG_INFO_TABLE")
-				_TABLES_HTML="$_TABLES_HTML$_table_html"
-			done
-		fi
-
-		# Combine into final structure
-		if [ -n "$_XREF_FILES" ]; then
-			# Tab UI mode: wrap in container
-			_MATRIX_CONTAINER_HTML="<div class=\"matrix-tabs-container\">"
-			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML<div class=\"matrix-tabs\" id=\"matrix-tab-buttons\">$_TABS_HTML</div>"
-			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML<div class=\"matrix-content\">$_TABLES_HTML</div>"
-			_MATRIX_CONTAINER_HTML="$_MATRIX_CONTAINER_HTML</div>"
-		else
-			# Backward compatibility: no cross-ref files, use old behavior
-			_MATRIX_CONTAINER_HTML="<table id=\"tag-table\">$_TABLE_HTML</table>"
-		fi
-		profile_end "convert_template_html_build_xref_tables"
-
-		# Extract trace target order from TAG_INFO_TABLE (same as table headers)
-		profile_start "convert_template_html_extract_order"
-		_TRACE_TARGET_ORDER="$(
-			{
-				if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
-					cat "$_TAG_INFO_TABLE"
-				else
-					printf '%s\n' "$_TAG_INFO_TABLE"
-				fi
-			} | awk -F"$SHTRACER_SEPARATOR" -v col_idx=0 '
-				function get_last_segment(s,   n, parts) {
-					n = split(s, parts, ":")
-					return n > 0 ? parts[n] : s
-				}
-				{
-					if (NF >= 4 && $4 != "") {
-						trace_target = $4
-						col_name = get_last_segment(trace_target)
-						if (!(col_name in seen)) {
-							seen[col_name] = 1
-							cols[col_idx++] = col_name
-						}
-					}
-				}
-				END {
-					for (i = 0; i < col_idx; i++) {
-						if (i > 0) printf ","
-						printf "\n  \"%s\"", cols[i]
-					}
-					if (col_idx > 0) printf "\n"
-				}
-			'
-		)"
-		profile_end "convert_template_html_extract_order"
-
-		profile_start "convert_template_html_insert_tag_table"
-		_tmp_table_html_file="$(shtracer_tmpfile)" || {
-			error_exit 1 "convert_template_html" "Failed to create temporary file"
-		}
-		printf '%s' "$_MATRIX_CONTAINER_HTML" >"$_tmp_table_html_file"
-		_tmp_trace_order_file="$(shtracer_tmpfile)" || {
-			error_exit 1 "convert_template_html" "Failed to create temporary file for trace order"
-		}
-		printf '%s' "$_TRACE_TARGET_ORDER" >"$_tmp_trace_order_file"
-		_HTML_CONTENT="$(
-			sed -e "s/'\\n'/'\\\\n'/g" <"${_TEMPLATE_HTML_DIR%/}/template.html" \
-				| awk -v table_html_file="$_tmp_table_html_file" -v json_file="$_JSON_FILE" -v trace_order_file="$_tmp_trace_order_file" '
-                    /^[ \t]*<!-- INSERT TABLE -->/ {
-                        print "<!-- SHTRACER INSERTED -->"
-                        while ((getline line < table_html_file) > 0) {
-                            gsub(/\r$/, "", line)
-                            print line
-                        }
-                        close(table_html_file)
-                        print "<!-- SHTRACER INSERTED -->"
-                        next
-                    }
-                    /^[ \t]*<!-- INSERT JSON DATA -->/ {
-                        # Output trace target order
-                        print "const traceTargetOrder = ["
-                        while ((getline ord_line < trace_order_file) > 0) {
-                            gsub(/\r$/, "", ord_line)
-                            print ord_line
-                        }
-                        close(trace_order_file)
-                        print "];"
-                        # Output JSON data
-                        print "const traceabilityData = "
-                        while ((getline j < json_file) > 0) {
-                            gsub(/\r$/, "", j)
-                            gsub(/<\/script>/, "<\\/script>", j)
-                            print j
-                        }
-                        close(json_file)
-                        print ";"
-                        next
-                    }
-                    { print }
-                '
-		)"
-		rm -f "$_tmp_table_html_file" "$_tmp_trace_order_file"
-		profile_end "convert_template_html_insert_tag_table" profile_start "_html_insert_content_with_indentation"
-		_HTML_CONTENT="$(_html_insert_content_with_indentation "$_HTML_CONTENT" "$_INFORMATION")"
-		profile_end "_html_insert_content_with_indentation"
-
-		echo "$_HTML_CONTENT"
-
-		profile_end "convert_template_html"
-	)
-}
-
-##
-# @brief   Build TAG_INFO_TABLE from shtracer JSON output
-# @param   $1 : JSON_FILE
-# @return  Echoes TAG_INFO_TABLE to stdout (tag<sep>line<sep>path per line)
-tag_info_table_from_json_file() {
-	_JSON_FILE="$1"
-	if [ -z "$_JSON_FILE" ] || [ ! -r "$_JSON_FILE" ]; then
-		error_exit 1 "tag_info_table_from_json_file" "JSON file not readable"
-	fi
-	_sep="${SHTRACER_SEPARATOR}"
-	_tmp_file="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	_tmp_sort="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	_tmp_config_order="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
-
-	# Extract trace target order from config.md (both ## and ### headings)
-	_config_path="$(extract_json_string_field "$_JSON_FILE" "config_path")"
-	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
-		awk '
-			/^##+ / {
-				heading = $0
-				sub(/^##+ /, "", heading)
-				sub(/[[:space:]]*$/, "", heading)
-				if (heading !~ /^[[:space:]]*$/ && !(heading in seen)) {
-					print ++order_idx, heading
-					seen[heading] = 1
-				}
-			}
-		' <"$_config_path" >"$_tmp_config_order"
-	fi
-
-	awk '
-		BEGIN {
-			in_nodes = 0
-			in_obj = 0
-		}
-		function grab_str(s, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*\""
-			if (match(s, r)) {
-				v = s
-				sub(".*" r, "", v)
-				sub("\".*", "", v)
-				return v
-			}
-			return ""
-		}
-		function grab_int(s, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*"
-			if (match(s, r)) {
-				v = s
-				sub(".*" r, "", v)
-				sub("[^0-9].*", "", v)
-				return v
-			}
-			return ""
-		}
-		{
-			line = $0
-			gsub(/[\{\}\[\],]/, "&\n", line)
-			n = split(line, a, /\n/)
-			for (i = 1; i <= n; i++) {
-				t = a[i]
-				if (t == "") { continue }
-
-				if (!in_nodes && t ~ /"nodes"[[:space:]]*:/) {
-					seen_nodes_key = 1
-				}
-				if (!in_nodes && seen_nodes_key && t ~ /\[/) {
-					in_nodes = 1
-					seen_nodes_key = 0
-				}
-
-				if (in_nodes && !in_obj && t ~ /\{/) {
-					in_obj = 1
-					id = ""
-					file = ""
-					ln = ""
-					idx = ""
-                    trace_target = ""
-                    type = ""
-				}
-
-				if (in_obj) {
-					v = grab_str(t, "id"); if (v != "") { id = v }
-					v = grab_str(t, "file"); if (v != "") { file = v }
-                    v = grab_str(t, "trace_target"); if (v != "") { trace_target = v }
-                    v = grab_str(t, "type"); if (v != "") { type = v }
-					v = grab_int(t, "line"); if (v != "") { ln = v }
-					v = grab_int(t, "index"); if (v != "") { idx = v }
-
-					if (t ~ /\}/) {
-						if (idx == "") { idx = 999999999 }
-						if (id != "" && file != "" && ln != "") {
-                            if (trace_target == "" && type != "") { trace_target = type }
-                            print idx "\t" id "\t" ln "\t" file "\t" trace_target
-						}
-						in_obj = 0
-					}
-				}
-
-				if (in_nodes && !in_obj && t ~ /\]/) {
-					in_nodes = 0
-				}
-			}
-		}
-	' <"$_JSON_FILE" \
-		| sort -k1,1n \
-			>"$_tmp_sort"
-
-	# Assign trace target order based on config.md heading order
-	awk -F '\t' -v sep="$_sep" -v config_order_file="$_tmp_config_order" '
-		BEGIN {
-			# Load config.md heading order
-			old_fs = FS
-			FS = " "
-			while ((getline line < config_order_file) > 0) {
-				split(line, parts, " ")
-				order_num = parts[1]
-				heading = parts[2]
-				for (i = 3; i in parts; i++) heading = heading " " parts[i]
-				config_order[heading] = order_num
-			}
-			close(config_order_file)
-			FS = old_fs
-		}
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
-		{
-			tag = $2
-			line = $3
-			file = $4
-			trace_target = $5
-
-			# Extract type from trace_target (last segment)
-			type = get_last_segment(trace_target)
-
-			# Get order from config.md
-			order = config_order[type]
-			if (order == "") order = 999
-
-			# Output with order prefix for sorting
-			print order "\t" tag "\t" line "\t" file "\t" trace_target
-		}
-	' <"$_tmp_sort" \
-		| sort -k1,1n \
-		| awk -F '\t' -v sep="$_sep" -v OFS="" '
-			!seen[$2]++ {
-				print $2, sep, $3, sep, $4, sep, $5
-			}
-		' >"$_tmp_file"
-
-	if [ -n "$_config_path" ]; then
-		printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
-	fi
-
-	cat "$_tmp_file"
-	rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true
-	trap - EXIT INT TERM
-}
-
-##
-# @brief   Build TAG_TABLE from shtracer JSON output (chains)
-# @param   $1 : JSON_FILE
-# @return  Echoes TAG_TABLE rows to stdout (space-separated tags per line)
-tag_table_from_json_file() {
-	_JSON_FILE="$1"
-	if [ -z "$_JSON_FILE" ] || [ ! -r "$_JSON_FILE" ]; then
-		error_exit 1 "tag_table_from_json_file" "JSON file not readable"
-	fi
-
-	awk '
-		BEGIN {
-			in_chains = 0
-			in_chain = 0
-			seen_chains_key = 0
-			out = ""
-		}
-		function grab_str(s,   v) {
-			v = s
-			sub(/^[[:space:]]*"/, "", v)
-			sub(/".*$/, "", v)
-			return v
-		}
-		{
-			line = $0
-			gsub(/[\{\}\[\],]/, "&\n", line)
-			n = split(line, a, /\n/)
-			for (i = 1; i <= n; i++) {
-				t = a[i]
-				if (t == "") { continue }
-
-				if (!in_chains && t ~ /"chains"[[:space:]]*:/) {
-					seen_chains_key = 1
-				}
-				if (!in_chains && seen_chains_key && t ~ /\[/) {
-					in_chains = 1
-					seen_chains_key = 0
-					continue
-				}
-
-				if (in_chains && !in_chain && t ~ /\[/) {
-					in_chain = 1
-					out = ""
-					continue
-				}
-
-				if (in_chain) {
-					if (t ~ /^[[:space:]]*"/) {
-						v = grab_str(t)
-						if (v != "") {
-							if (out == "") out = v
-							else out = out " " v
-						}
-					}
-					if (t ~ /\]/) {
-						if (out != "") print out
-						in_chain = 0
-						out = ""
-						continue
-					}
-				}
-
-				if (in_chains && !in_chain && t ~ /\]/) {
-					in_chains = 0
-				}
-			}
-		}
-	' <"$_JSON_FILE"
-}
-
-##
-# @brief Convert template js file for tracing targets
-# @param $1 : TAG_INFO_TABLE
-# @param $2 : TEMPLATE_ASSETS_DIR
-convert_template_js() {
-	(
-		profile_start "convert_template_js"
-		_TAG_INFO_TABLE="$1"
-		_TEMPLATE_ASSETS_DIR="$2"
-
-		_JS_CONTENTS="$(
-			echo "$_TAG_INFO_TABLE" | awk -F"$SHTRACER_SEPARATOR" '{ print $3 }' | sort -u \
-				| awk '
-                    function js_escape(s) {
-                        gsub(/\\/, "\\\\", s)
-                        gsub(/"/, "\\\"", s)
-                        gsub(/\t/, "\\t", s)
-                        gsub(/\r/, "\\r", s)
-                        gsub(/<\//, "<\\/", s)
-                        return s
-                    }
-                    function file_to_js_string(path,   line, out) {
-                        out = ""
-                        while ((getline line < path) > 0) {
-                            gsub(/\r$/, "", line)
-                            out = out js_escape(line) "\\n"
-                        }
-                        close(path)
-                        return out
-                    }
-                    {
-                        path = $0
-                        n = split($0, parts, "/")
-                        raw_filename = parts[n]
-                        filename = raw_filename
-                        extension_pos = match(raw_filename, /[.][^.]+$/)
-                        if (extension_pos) extension = substr(raw_filename, extension_pos + 1)
-                        else extension = "txt"
-
-                        gsub(/[.]/, "_", filename)
-                        gsub(/^/, "Target_", filename)
-
-                        contents = file_to_js_string(path)
-                        print "\t\"" js_escape(filename) "\": {"
-                        print "\t\tpath:\"" js_escape(path) "\","
-                        print "\t\tcontent:\"" contents "\","
-                        print "\t\textension:\"" js_escape(extension) "\""
-                        print "\t},"
-                    }'
-		)"
-		_viewer_emit_show_text_js_template | while read -r s; do
-			case "$s" in
-				*//\ js_contents*)
-					printf "%s\n" "$_JS_CONTENTS"
-					;;
-				*)
-					printf "%s\n" "$s"
-					;;
-			esac
-		done
-		profile_end "convert_template_js"
-	)
-}
-
-##
-# @brief  Make output files (html, js, css)
-# @param  $1 : TAG_TABLE_FILENAME
-# @param  $2 : TAGS
-make_html() {
-	(
-		_TEMPLATE_HTML_DIR="${SCRIPT_DIR%/}/scripts/main/template/"
-		_TEMPLTE_ASSETS_DIR="${_TEMPLATE_HTML_DIR%/}/assets/"
-		_OUTPUT_ASSETS_DIR="${OUTPUT_DIR%/}/assets/"
-
-		_TAG_TABLE_FILENAME="$1"
-		_TAG_INFO_TABLE="$(awk <"$2" -F"$SHTRACER_SEPARATOR" -v config_path="${CONFIG_PATH}" -v separator="$SHTRACER_SEPARATOR" '
-			BEGIN {
-				OFS = separator;
-			}
-			{
-                trace_target = $1;
-				tag = $2;
-				path = $5
-				line = $6
-                print tag, line, path, trace_target
-			}
-			END {
-                print "@CONFIG@", "1", config_path, ""
-			}')"
-
-		mkdir -p "${OUTPUT_DIR%/}/assets/"
-		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" "$_TEMPLATE_HTML_DIR" >"${OUTPUT_DIR%/}/output.html"
-		convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLTE_ASSETS_DIR" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
-		cat "${_TEMPLTE_ASSETS_DIR%/}/template.css" >"${_OUTPUT_ASSETS_DIR%/}/template.css"
-		_viewer_emit_traceability_diagrams_js >"${_OUTPUT_ASSETS_DIR%/}/traceability_diagrams.js"
-	)
-}
-
-print_usage() {
-	cat <<-USAGE 1>&2
-		Usage: shtracer_viewer.sh [--tag-table <tag_table_file>] [-i <json_file>]
-
-		Reads shtracer JSON from stdin (default) or from -i <json_file>,
-		and writes a single self-contained HTML document to stdout.
-
-		Examples:
-		  # JSON-only (viewer builds the tag table from JSON chains)
-		  ./shtracer ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh > output.html
-
-		  # Explicit tag-table path
-		    ./shtracer --debug ./sample/config.md --json | ./scripts/main/shtracer_viewer.sh --tag-table ./sample/shtracer_output/tags/04_tag_table > output.html
-
-		  # JSON file input
-		    ./scripts/main/shtracer_viewer.sh -i ./sample/shtracer_output/output.json > output.html
-	USAGE
-	exit 1
-}
-
-shtracer_viewer_main() {
-	JSON_FILE=""
-	TAG_TABLE_FILE=""
-
-	while [ $# -gt 0 ]; do
-		case "$1" in
-			-h | --help)
-				print_usage
-				;;
-			-i)
-				shift
-				[ $# -gt 0 ] || print_usage
-				JSON_FILE="$1"
-				;;
-			--tag-table)
-				shift
-				[ $# -gt 0 ] || print_usage
-				TAG_TABLE_FILE="$1"
-				;;
-			*)
-				print_usage
-				;;
-		esac
-		shift
-	done
-
-	# Determine repo root (SCRIPT_DIR in shtracer terminology)
-	_REPO_DIR="$(
-		unset CDPATH
-		cd "$(dirname "$0")/../.." && pwd -P
-	)"
-	SCRIPT_DIR="$_REPO_DIR"
-	export SCRIPT_DIR
-
-	# Source shared functions (must be sourced, not executed)
-	# shellcheck source=scripts/main/shtracer_util.sh
-	. "${SCRIPT_DIR%/}/scripts/main/shtracer_util.sh"
-
-	SHTRACER_SEPARATOR="${SHTRACER_SEPARATOR:=<shtracer_separator>}"
-	export SHTRACER_SEPARATOR
-
-	NODATA_STRING="${NODATA_STRING:=NONE}"
-	export NODATA_STRING
-
-	_TEMPLATE_DIR="${SCRIPT_DIR%/}/scripts/main/template"
-	_TEMPLATE_ASSETS_DIR="${_TEMPLATE_DIR%/}/assets"
-
-	_tmp_dir="$(shtracer_tmpdir)" || {
-		echo "[shtracer_viewer.sh][error]: failed to create temporary directory" 1>&2
-		exit 1
-	}
-	_json_tmp="${_tmp_dir%/}/input.json"
-	_html_tmp="${_tmp_dir%/}/base.html"
-	_tag_table_tmp="${_tmp_dir%/}/tag_table"
-	_show_text_tmp="${_tmp_dir%/}/show_text.js"
-	_trace_js_tmp="${_tmp_dir%/}/traceability_diagrams.js"
-
-	cleanup() {
-		rm -rf "$_tmp_dir" 2>/dev/null || true
-	}
-	trap cleanup EXIT INT TERM
-
-	if [ -n "$JSON_FILE" ]; then
-		[ -r "$JSON_FILE" ] || {
-			echo "[shtracer_viewer.sh][error]: json not readable: $JSON_FILE" 1>&2
-			exit 1
-		}
-		cat "$JSON_FILE" >"$_json_tmp"
-	else
-		if [ -t 0 ]; then
-			echo "[shtracer_viewer.sh][error]: no stdin; use -i <json_file>" 1>&2
-			exit 1
-		fi
-		cat >"$_json_tmp"
-	fi
-
-	if [ -z "$TAG_TABLE_FILE" ]; then
-		_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
-		if [ -n "$_config_path" ]; then
-			_config_dir="$(dirname "$_config_path")"
-			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
-			if [ -r "$_inferred_table" ]; then
-				TAG_TABLE_FILE="$_inferred_table"
-			fi
-		fi
-	fi
-
-	if [ -n "$TAG_TABLE_FILE" ] && [ ! -r "$TAG_TABLE_FILE" ]; then
-		echo "[shtracer_viewer.sh][error]: tag table not readable: $TAG_TABLE_FILE" 1>&2
-		exit 1
-	fi
-
-	if [ -z "$TAG_TABLE_FILE" ]; then
-		tag_table_from_json_file "$_json_tmp" >"$_tag_table_tmp"
-		if [ ! -s "$_tag_table_tmp" ]; then
-			echo "[shtracer_viewer.sh][error]: cannot build tag table from JSON (missing/empty chains)" 1>&2
-			exit 1
-		fi
-		TAG_TABLE_FILE="$_tag_table_tmp"
-	fi
-
-	_TAG_INFO_TABLE="$(tag_info_table_from_json_file "$_json_tmp")"
-
-	convert_template_html "$TAG_TABLE_FILE" "$_TAG_INFO_TABLE" "$_TEMPLATE_DIR" "$_json_tmp" >"$_html_tmp"
-	convert_template_js "$_TAG_INFO_TABLE" "$_TEMPLATE_ASSETS_DIR" >"$_show_text_tmp"
-	_viewer_emit_traceability_diagrams_js >"$_trace_js_tmp"
-
-	awk \
-		-v css_file="${_TEMPLATE_ASSETS_DIR%/}/template.css" \
-		-v show_text_file="$_show_text_tmp" \
-		-v trace_js_file="$_trace_js_tmp" \
-		'
-			function emit_file(path) {
-				while ((getline line < path) > 0) {
-					gsub(/\r$/, "", line)
-					print line
-				}
-				close(path)
-			}
-			{
-				if ($0 ~ /<link rel="stylesheet" href="\.\/assets\/template\.css">/) {
-					print "  <style>"
-					emit_file(css_file)
-					print "  </style>"
-					next
-				}
-				if ($0 ~ /<script src="\.\/assets\/show_text\.js"><\/script>/) {
-					print "  <script>"
-					emit_file(show_text_file)
-					print "  </script>"
-					next
-				}
-				if ($0 ~ /<script src="\.\/assets\/traceability_diagrams\.js"><\/script>/) {
-					print "  <script>"
-					emit_file(trace_js_file)
-					print "  </script>"
-					next
-				}
-				print
-			}
-		' <"$_html_tmp"
-}
-
-case "$0" in
-	*shtracer_viewer.sh | *shtracer_viewer)
-		shtracer_viewer_main "$@"
-		;;
-	*)
-		: # sourced
-		;;
-esac

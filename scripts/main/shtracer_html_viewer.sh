@@ -236,7 +236,21 @@ _html_convert_tag_table() {
             if (p3 <= 0) return rest
             return substr(rest, 1, p3 - 1)
         }
-        function field4(s, delim,   rest, p1, p2, p3) {
+        function field4(s, delim,   rest, p1, p2, p3, p4) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return ""
+            rest = substr(s, p1 + length(delim))
+            p2 = index(rest, delim)
+            if (p2 <= 0) return ""
+            rest = substr(rest, p2 + length(delim))
+            p3 = index(rest, delim)
+            if (p3 <= 0) return rest
+            rest = substr(rest, p3 + length(delim))
+            p4 = index(rest, delim)
+            if (p4 <= 0) return rest
+            return substr(rest, 1, p4 - 1)
+        }
+        function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
             p1 = index(s, delim)
             if (p1 <= 0) return ""
             rest = substr(s, p1 + length(delim))
@@ -245,7 +259,33 @@ _html_convert_tag_table() {
             rest = substr(rest, p2 + length(delim))
             p3 = index(rest, delim)
             if (p3 <= 0) return ""
-            return substr(rest, p3 + length(delim))
+            rest = substr(rest, p3 + length(delim))
+            p4 = index(rest, delim)
+            if (p4 <= 0) return rest
+            rest = substr(rest, p4 + length(delim))
+            p5 = index(rest, delim)
+            if (p5 <= 0) return rest
+            return substr(rest, 1, p5 - 1)
+        }
+        function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
+            p1 = index(s, delim)
+            if (p1 <= 0) return ""
+            rest = substr(s, p1 + length(delim))
+            p2 = index(rest, delim)
+            if (p2 <= 0) return ""
+            rest = substr(rest, p2 + length(delim))
+            p3 = index(rest, delim)
+            if (p3 <= 0) return ""
+            rest = substr(rest, p3 + length(delim))
+            p4 = index(rest, delim)
+            if (p4 <= 0) return ""
+            rest = substr(rest, p4 + length(delim))
+            p5 = index(rest, delim)
+            if (p5 <= 0) return rest
+            rest = substr(rest, p5 + length(delim))
+            p6 = index(rest, delim)
+            if (p6 <= 0) return rest
+            return substr(rest, 1, p6 - 1)
         }
         function type_from_trace_target(tt,   n, p, t) {
             if (tt == "") return "Unknown"
@@ -272,17 +312,24 @@ _html_convert_tag_table() {
         }
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
-        function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
+        function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
             safeTyp = escape_html(typ)
             safeTag = escape_html(tag)
             safeId = escape_html(fileId)
             safeExt = escape_html(ext)
+            desc = tagDescription[tag]
+            from_tags = tagFromTags[tag]
+            safeDesc = escape_html(desc)
+            gsub(/"/, "\\&quot;", safeDesc)
+            safeFromTags = escape_html(from_tags)
+            gsub(/"/, "\\&quot;", safeFromTags)
             return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-                "<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
-                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
+                "<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;, &quot;" safeTag "&quot;, &quot;" safeDesc "&quot;, &quot;" safeTyp "&quot;, &quot;" safeFromTags "&quot;)\" " \
+                "onmouseover=\"showTooltip(event, &quot;" safeId "&quot;, &quot;" safeTag "&quot;, " line ", &quot;" safeTyp "&quot;, &quot;" safeDesc "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
         }
         $0 == "__SHTRACER_TAG_INFO_END__" {
             mode = 1
@@ -295,10 +342,14 @@ _html_convert_tag_table() {
             line = trim(field2($0, sep))
             path = trim(field3($0, sep))
             trace_target = trim(field4($0, sep))
+            description = trim(field5($0, sep))
+            from_tags_raw = trim(field6($0, sep))
             if (line == "" || line + 0 < 1) line = 1
             typ = type_from_trace_target(trace_target)
             tagType[tag] = typ
             tagLine[tag] = line
+            tagDescription[tag] = description
+            tagFromTags[tag] = from_tags_raw
 			base = basename(path)
 			tagExt[tag] = ext_from_basename(base)
 			tagFileId[tag] = fileid_from_path(path)
@@ -421,6 +472,43 @@ _html_generate_cross_ref_table() {
 			if (p4 <= 0) return rest
 			return substr(rest, 1, p4 - 1)
 		}
+		function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return ""
+			rest = substr(rest, p3 + length(delim))
+			p4 = index(rest, delim)
+			if (p4 <= 0) return ""
+			rest = substr(rest, p4 + length(delim))
+			p5 = index(rest, delim)
+			if (p5 <= 0) return rest
+			return substr(rest, 1, p5 - 1)
+		}
+		function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return ""
+			rest = substr(rest, p3 + length(delim))
+			p4 = index(rest, delim)
+			if (p4 <= 0) return ""
+			rest = substr(rest, p4 + length(delim))
+			p5 = index(rest, delim)
+			if (p5 <= 0) return ""
+			rest = substr(rest, p5 + length(delim))
+			p6 = index(rest, delim)
+			if (p6 <= 0) return rest
+			return substr(rest, 1, p6 - 1)
+		}
 		function escape_html(s,   t) {
 			t = s
 			gsub(/&/, "&amp;", t)
@@ -440,16 +528,23 @@ _html_generate_cross_ref_table() {
 		}
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
-		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
+		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
 			safeTyp = escape_html(typ)
 			safeTag = escape_html(tag)
 			safeId = escape_html(fileId)
 			safeExt = escape_html(ext)
+			desc = tagDescription[tag]
+			from_tags = tagFromTags[tag]
+			safeDesc = escape_html(desc)
+			gsub(/"/, "\\&quot;", safeDesc)
+			safeFromTags = escape_html(from_tags)
+			gsub(/"/, "\\&quot;", safeFromTags)
 			return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
+				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;, &quot;" safeTag "&quot;, &quot;" safeDesc "&quot;, &quot;" safeTyp "&quot;, &quot;" safeFromTags "&quot;)\" " \
 				"onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
 		}
 
@@ -463,8 +558,12 @@ _html_generate_cross_ref_table() {
 			tag = trim(field1($0, sep))
 			if (tag == "") next
 			trace_target = trim(field4($0, sep))
+			description = trim(field5($0, sep))
+			from_tags_raw = trim(field6($0, sep))
 			typ = type_from_trace_target(trace_target)
 			tagType[tag] = typ
+			tagDescription[tag] = description
+			tagFromTags[tag] = from_tags_raw
 			next
 		}
 
@@ -670,12 +769,49 @@ _html_generate_cross_ref_table_from_json() {
 			if (p4 <= 0) return rest
 			return substr(rest, 1, p4 - 1)
 		}
+		function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return ""
+			rest = substr(rest, p3 + length(delim))
+			p4 = index(rest, delim)
+			if (p4 <= 0) return ""
+			rest = substr(rest, p4 + length(delim))
+			p5 = index(rest, delim)
+			if (p5 <= 0) return rest
+			return substr(rest, 1, p5 - 1)
+		}
+		function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
+			p1 = index(s, delim)
+			if (p1 <= 0) return ""
+			rest = substr(s, p1 + length(delim))
+			p2 = index(rest, delim)
+			if (p2 <= 0) return ""
+			rest = substr(rest, p2 + length(delim))
+			p3 = index(rest, delim)
+			if (p3 <= 0) return ""
+			rest = substr(rest, p3 + length(delim))
+			p4 = index(rest, delim)
+			if (p4 <= 0) return ""
+			rest = substr(rest, p4 + length(delim))
+			p5 = index(rest, delim)
+			if (p5 <= 0) return ""
+			rest = substr(rest, p5 + length(delim))
+			p6 = index(rest, delim)
+			if (p6 <= 0) return rest
+			return substr(rest, 1, p6 - 1)
+		}
 		function escape_html(s,   t) {
 			t = s
-			gsub(/&/, "\\&amp;", t)
-			gsub(/</, "\\&lt;", t)
-			gsub(/>/, "\\&gt;", t)
-			gsub(/"/, "\\&quot;", t)
+			gsub(/&/, "&amp;", t)
+			gsub(/</, "&lt;", t)
+			gsub(/>/, "&gt;", t)
+			gsub(/"/, "&quot;", t)
 			return t
 		}
 		function basename(path,   t) {
@@ -689,16 +825,23 @@ _html_generate_cross_ref_table_from_json() {
 		}
 		function fileid_from_path(path,   t) {
 			t = path
-			gsub(/[^A-Za-z0-9]/, "_", t)
+			gsub(/.*\//, "", t)  # Extract basename only
+			gsub(/\./, "_", t)   # Replace dots with underscores
 			return "Target_" t
 		}
-		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt) {
+		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
 			safeTyp = escape_html(typ)
 			safeTag = escape_html(tag)
 			safeId = escape_html(fileId)
 			safeExt = escape_html(ext)
+			desc = tagDescription[tag]
+			from_tags = tagFromTags[tag]
+			safeDesc = escape_html(desc)
+			gsub(/"/, "\\&quot;", safeDesc)
+			safeFromTags = escape_html(from_tags)
+			gsub(/"/, "\\&quot;", safeFromTags)
 			return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;)\" " \
+				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;, &quot;" safeTag "&quot;, &quot;" safeDesc "&quot;, &quot;" safeTyp "&quot;, &quot;" safeFromTags "&quot;)\" " \
 				"onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
 		}
 		function extract_json_string(line, key,   r, v) {
@@ -737,10 +880,14 @@ _html_generate_cross_ref_table_from_json() {
 			line_num = trim(field2($0, sep))
 			file_path = trim(field3($0, sep))
 			trace_target = trim(field4($0, sep))
+			description = trim(field5($0, sep))
+			from_tags_raw = trim(field6($0, sep))
 			typ = type_from_trace_target(trace_target)
 			tagType[tag] = typ
 			tagLine[tag] = line_num
 			tagFile[tag] = file_path
+			tagDescription[tag] = description
+			tagFromTags[tag] = from_tags_raw
 			next
 		}
 
@@ -988,8 +1135,7 @@ convert_template_html() {
 
 		_TAG_TABLE_FILENAME="$1"
 		_TAG_INFO_TABLE="$2"
-		_TEMPLATE_HTML_DIR="$3"
-		_JSON_FILE="${4:-}"
+		_JSON_FILE="${3:-}"
 
 		profile_start "convert_template_html_read_json"
 		if [ -z "$_JSON_FILE" ]; then
@@ -1485,6 +1631,18 @@ tag_info_table_from_json_file() {
 					v = grab_int(t, "layer_id"); if (v != "") { layer_id = v }
 					v = grab_int(t, "line"); if (v != "") { ln = v }
 					v = grab_int(t, "index"); if (v != "") { idx = v }
+					v = grab_str(t, "description"); if (v != "") { desc = v }
+
+					# Collect from_tags array elements
+					if (t ~ /"from_tags"[[:space:]]*:/) { in_from_tags = 1; from_tags = ""; from_tag_sep = "" }
+					if (in_from_tags && t ~ /"@[^"]*@"/) {
+						v = grab_str(t, "");
+						if (v ~ /@[^@]*@/ && v != "NONE") {
+							from_tags = from_tags from_tag_sep v
+							from_tag_sep = ","
+						}
+					}
+					if (in_from_tags && t ~ /\]/) { in_from_tags = 0 }
 
 					if (t ~ /\}/) {
 						if (idx == "") { idx = 999999999 }
@@ -1492,9 +1650,11 @@ tag_info_table_from_json_file() {
 						file = file_map[file_id]
 						trace_target = layer_map[layer_id]
 						if (id != "" && file != "" && ln != "") {
-							print idx "\t" id "\t" ln "\t" file "\t" trace_target
+							print idx "\t" id "\t" ln "\t" file "\t" trace_target "\t" desc "\t" from_tags
 						}
 						in_obj = 0
+						desc = ""
+						from_tags = ""
 					}
 				}
 
@@ -1532,6 +1692,8 @@ tag_info_table_from_json_file() {
 			line = $3
 			file = $4
 			trace_target = $5
+			desc = $6
+			from_tags = $7
 
 			# Extract type from trace_target (last segment)
 			type = get_last_segment(trace_target)
@@ -1541,13 +1703,13 @@ tag_info_table_from_json_file() {
 			if (order == "") order = 999
 
 			# Output with order prefix for sorting
-			print order "\t" tag "\t" line "\t" file "\t" trace_target
+			print order "\t" tag "\t" line "\t" file "\t" trace_target "\t" desc "\t" from_tags
 		}
 	' <"$_tmp_sort" \
 		| sort -k1,1n \
 		| awk -F '\t' -v sep="$_sep" -v OFS="" '
 			!seen[$2]++ {
-				print $2, sep, $3, sep, $4, sep, $5
+				print $2, sep, $3, sep, $4, sep, $5, sep, $6, sep, $7
 			}
 		' >"$_tmp_file"
 
@@ -1661,9 +1823,12 @@ convert_template_js() {
 						close(path)
 						return out
 					}
-					function file_id_from_path(path,   t) {
-						t = path
-						gsub(/[^A-Za-z0-9]/, "_", t)
+					function file_id_from_path(path,   t, n, parts) {
+						# Extract basename only
+						n = split(path, parts, "/")
+						t = parts[n]
+						# Replace dots with underscores
+						gsub(/\./, "_", t)
 						return "Target_" t
 					}
 					{
@@ -1717,10 +1882,12 @@ make_html() {
 				tag = $2;
 				path = $5
 				line = $6
-                print tag, line, path, trace_target
+				description = ($7 != "" ? $7 : "")
+				from_tags = ($8 != "" ? $8 : "")
+                print tag, line, path, trace_target, description, from_tags
 			}
 			END {
-                print "@CONFIG@", "1", config_path, ""
+                print "@CONFIG@", "1", config_path, "", "", ""
 			}')"
 
 		mkdir -p "${OUTPUT_DIR%/}/assets/"
@@ -1810,18 +1977,17 @@ shtracer_viewer_main() {
 	}
 	trap cleanup EXIT INT TERM
 
-	if [ -n "$JSON_FILE" ]; then
+	if [ ! -t 0 ]; then
+		cat >"$_json_tmp"
+	elif [ -n "$JSON_FILE" ]; then
 		[ -r "$JSON_FILE" ] || {
 			echo "[shtracer_html_viewer.sh][error]: json not readable: $JSON_FILE" 1>&2
 			exit 1
 		}
 		cat "$JSON_FILE" >"$_json_tmp"
 	else
-		if [ -t 0 ]; then
-			echo "[shtracer_html_viewer.sh][error]: no stdin; use -i <json_file>" 1>&2
-			exit 1
-		fi
-		cat >"$_json_tmp"
+		echo "[shtracer_html_viewer.sh][error]: no stdin; use -i <json_file>" 1>&2
+		exit 1
 	fi
 
 	if [ -z "$TAG_TABLE_FILE" ]; then
