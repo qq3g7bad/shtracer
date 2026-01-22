@@ -3,19 +3,25 @@
 # This script can be executed (JSON -> single HTML to stdout) or sourced (unit tests).
 
 ##
-# @brief  Get template HTML content with external override support
-# @return Template HTML content via stdout
+# @brief  Generic template loader with external override support
+# @param  $1 : Filename (e.g., "template.html", "template.css", "show_text.js")
+# @param  $2 : Subdirectory under SHTRACER_TEMPLATE_DIR (empty for root, "assets" for assets)
+# @return Template content via stdout
 # @details
 #   Resolution priority:
-#   1. $SHTRACER_TEMPLATE_DIR/template.html (if set)
-#   2. $HOME/.shtracer/template.html
-#   3. scripts/main/templates/template.html (bundled)
+#   1. $SHTRACER_TEMPLATE_DIR/<subdir>/<filename> (if set)
+#   2. $HOME/.shtracer/<subdir>/<filename>
+#   3. scripts/main/templates/<filename> (bundled)
 #   Environment: SHTRACER_SCRIPT_DIR can be set to override script directory detection
-# @tag    @IMP3.10@ (FROM: @ARC3.2@)
-_viewer_get_template_html() {
-	_custom_template=""
-	# Try to determine script directory (handles both execution and sourcing)
-	# Priority: SHTRACER_SCRIPT_DIR env var (required when sourced), $0 (when executed)
+# @tag    @IMP3.12@ (FROM: @ARC3.2@)
+_viewer_get_template() {
+	_filename="${1:-}"
+	_subdir="${2:-}"
+	_template_path=""
+
+	[ -z "$_filename" ] && return 1
+
+	# Determine script directory
 	if [ -n "${SHTRACER_SCRIPT_DIR:-}" ]; then
 		_script_dir="$SHTRACER_SCRIPT_DIR"
 	elif [ -f "$0" ]; then
@@ -24,115 +30,57 @@ _viewer_get_template_html() {
 		_script_dir=""
 	fi
 
-	# Priority 1: SHTRACER_TEMPLATE_DIR environment variable
-	if [ -n "${SHTRACER_TEMPLATE_DIR:-}" ] \
-		&& [ -f "${SHTRACER_TEMPLATE_DIR%/}/template.html" ]; then
-		_custom_template="${SHTRACER_TEMPLATE_DIR%/}/template.html"
-	# Priority 2: User home directory
-	elif [ -n "${HOME:-}" ] && [ -f "${HOME}/.shtracer/template.html" ]; then
-		_custom_template="${HOME}/.shtracer/template.html"
-	# Priority 3: Bundled templates directory
-	elif [ -n "$_script_dir" ] && [ -f "${_script_dir}/templates/template.html" ]; then
-		_custom_template="${_script_dir}/templates/template.html"
+	# Build relative path (with optional subdir)
+	if [ -n "$_subdir" ]; then
+		_rel_path="${_subdir}/${_filename}"
+	else
+		_rel_path="$_filename"
 	fi
 
-	# Use external template if found, otherwise error
-	if [ -n "$_custom_template" ]; then
-		cat "$_custom_template"
+	# Priority 1: SHTRACER_TEMPLATE_DIR environment variable
+	if [ -n "${SHTRACER_TEMPLATE_DIR:-}" ] \
+		&& [ -f "${SHTRACER_TEMPLATE_DIR%/}/${_rel_path}" ]; then
+		_template_path="${SHTRACER_TEMPLATE_DIR%/}/${_rel_path}"
+	# Priority 2: User home directory
+	elif [ -n "${HOME:-}" ] && [ -f "${HOME}/.shtracer/${_rel_path}" ]; then
+		_template_path="${HOME}/.shtracer/${_rel_path}"
+	# Priority 3: Bundled templates directory
+	elif [ -n "$_script_dir" ] && [ -f "${_script_dir}/templates/${_filename}" ]; then
+		_template_path="${_script_dir}/templates/${_filename}"
+	fi
+
+	if [ -n "$_template_path" ]; then
+		cat "$_template_path"
 	else
-		echo "[shtracer_html_viewer.sh][error]: template.html not found" >&2
+		echo "[shtracer_html_viewer.sh][error]: ${_filename} not found" >&2
 		return 1
 	fi
 }
 
 ##
+# @brief  Get template HTML content with external override support
+# @return Template HTML content via stdout
+# @tag    @IMP3.10@ (FROM: @ARC3.2@)
+_viewer_get_template_html() {
+	_viewer_get_template "template.html" ""
+}
+
+##
 # @brief  Get template CSS content with external override support
 # @return Template CSS content via stdout
-# @details
-#   Resolution priority:
-#   1. $SHTRACER_TEMPLATE_DIR/assets/template.css (if set)
-#   2. $HOME/.shtracer/assets/template.css
-#   3. scripts/main/templates/template.css (bundled)
-#   4. Embedded heredoc (fallback)
 # @tag    @IMP3.11@ (FROM: @ARC3.2@)
 _viewer_get_template_css() {
-	_custom_css=""
-	# Try to determine script directory (handles both execution and sourcing)
-	# Priority: SHTRACER_SCRIPT_DIR env var (required when sourced), $0 (when executed)
-	if [ -n "${SHTRACER_SCRIPT_DIR:-}" ]; then
-		_script_dir="$SHTRACER_SCRIPT_DIR"
-	elif [ -f "$0" ]; then
-		_script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-	else
-		_script_dir=""
-	fi
-
-	# Priority 1: SHTRACER_TEMPLATE_DIR environment variable
-	if [ -n "${SHTRACER_TEMPLATE_DIR:-}" ] \
-		&& [ -f "${SHTRACER_TEMPLATE_DIR%/}/assets/template.css" ]; then
-		_custom_css="${SHTRACER_TEMPLATE_DIR%/}/assets/template.css"
-	# Priority 2: User home directory
-	elif [ -n "${HOME:-}" ] && [ -f "${HOME}/.shtracer/assets/template.css" ]; then
-		_custom_css="${HOME}/.shtracer/assets/template.css"
-	# Priority 3: Bundled templates directory
-	elif [ -n "$_script_dir" ] && [ -f "${_script_dir}/templates/template.css" ]; then
-		_custom_css="${_script_dir}/templates/template.css"
-	fi
-
-	if [ -n "$_custom_css" ]; then
-		cat "$_custom_css"
-	else
-		echo "[shtracer_html_viewer.sh][error]: template.css not found" >&2
-		return 1
-	fi
+	_viewer_get_template "template.css" "assets"
 }
 
 ##
 # @brief  Get JavaScript template content with external override support
 # @param  $1 : JavaScript template filename (e.g., "show_text.js", "traceability_diagrams.js")
 # @return Template JavaScript content via stdout
-# @details
-#   Resolution priority:
-#   1. $SHTRACER_TEMPLATE_DIR/assets/<filename> (if set)
-#   2. $HOME/.shtracer/assets/<filename>
-#   3. scripts/main/templates/<filename> (bundled)
-#   4. Embedded heredoc (fallback)
 _viewer_get_template_js() {
 	_js_filename="${1:-}"
-	_custom_js=""
-	# Try to determine script directory (handles both execution and sourcing)
-	# Priority: SHTRACER_SCRIPT_DIR env var (required when sourced), $0 (when executed)
-	if [ -n "${SHTRACER_SCRIPT_DIR:-}" ]; then
-		_script_dir="$SHTRACER_SCRIPT_DIR"
-	elif [ -f "$0" ]; then
-		_script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-	else
-		_script_dir=""
-	fi
-
-	if [ -z "$_js_filename" ]; then
-		return 1
-	fi
-
-	# Priority 1: SHTRACER_TEMPLATE_DIR environment variable
-	if [ -n "${SHTRACER_TEMPLATE_DIR:-}" ] \
-		&& [ -f "${SHTRACER_TEMPLATE_DIR%/}/assets/${_js_filename}" ]; then
-		_custom_js="${SHTRACER_TEMPLATE_DIR%/}/assets/${_js_filename}"
-	# Priority 2: User home directory
-	elif [ -n "${HOME:-}" ] && [ -f "${HOME}/.shtracer/assets/${_js_filename}" ]; then
-		_custom_js="${HOME}/.shtracer/assets/${_js_filename}"
-	# Priority 3: Bundled templates directory
-	elif [ -n "$_script_dir" ] && [ -f "${_script_dir}/templates/${_js_filename}" ]; then
-		_custom_js="${_script_dir}/templates/${_js_filename}"
-	fi
-
-	# Use external template if found, otherwise error
-	if [ -n "$_custom_js" ]; then
-		cat "$_custom_js"
-	else
-		echo "[shtracer_html_viewer.sh][error]: ${_js_filename} not found" >&2
-		return 1
-	fi
+	[ -z "$_js_filename" ] && return 1
+	_viewer_get_template "$_js_filename" "assets"
 }
 
 ##

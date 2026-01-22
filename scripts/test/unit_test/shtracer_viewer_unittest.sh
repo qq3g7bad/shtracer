@@ -11,10 +11,11 @@ fi
 SHUNIT_PARENT="${SCRIPT_DIR%/}/$(basename -- "$0")"
 export SHUNIT_PARENT
 
-cd "${SCRIPT_DIR}" || exit 1
-
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
+
+cd "${TEST_ROOT}" || exit 1
+
 export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
 
 # shellcheck source=../../main/shtracer_html_viewer.sh
@@ -181,8 +182,8 @@ test_make_html_with_valid_inputs() {
 test_shtracer_viewer_single_file_output() {
 	(
 		# Arrange ---------
-		SHTRACER_VIEWER="../main/shtracer_html_viewer.sh"
-		SCRIPT_DIR="../../"
+		SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
+		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
 		mkdir -p "$OUTPUT_DIR/test_dir"
 		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"

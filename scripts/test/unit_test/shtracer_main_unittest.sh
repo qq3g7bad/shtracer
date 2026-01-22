@@ -263,6 +263,20 @@ test_parse_arguments_test() {
 }
 
 ##
+# @brief  Test for parse_arguments with --test (long form)
+# @tag    @UT1.11.1@ (FROM: @IMP1.3@)
+test_parse_arguments_test_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "--test"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "TEST"
+	)
+}
+
+##
 # @brief  Test for parse_arguments with undefined option
 # @tag    @UT1.12@ (FROM: @IMP1.3@)
 test_parse_arguments_undefined_option() {
@@ -301,6 +315,20 @@ test_parse_arguments_verify_mode() {
 		load_functions
 		# Act -------------
 		parse_arguments "$SELF_PATH" "-v"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --verify (long form)
+# @tag    @UT1.14.1@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_mode_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "$SELF_PATH" "--verify"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -393,6 +421,20 @@ test_parse_arguments_verify_before_config() {
 		load_functions
 		# Act -------------
 		parse_arguments "-v" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --verify before config (flexible order, long form)
+# @tag    @UT1.26.1@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_before_config_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "--verify" "$SELF_PATH"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)

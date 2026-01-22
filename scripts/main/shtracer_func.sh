@@ -872,6 +872,50 @@ print_summary_direct_links() {
 }
 
 ##
+# @brief  Check if a verification file contains issues
+# @param  $1 : File path to check
+# @param  $2 : Issue type ("isolated" requires NODATA_STRING check, others just line count)
+# @return 0 if no issues, 1 if issues found
+_check_verification_file() {
+	_file="$1"
+	_type="$2"
+
+	[ -r "$_file" ] || return 0
+
+	_line_count="$(wc <"$_file" -l)"
+	[ "$_line_count" -eq 0 ] && return 0
+
+	# For isolated tags, also check if content is just NODATA_STRING
+	if [ "$_type" = "isolated" ]; then
+		[ "$(cat "$_file")" = "$NODATA_STRING" ] && return 0
+	fi
+
+	return 1
+}
+
+##
+# @brief  Calculate verification status bitmask
+# @param  $1 : Isolated file path
+# @param  $2 : Duplicated file path
+# @param  $3 : Dangling file path
+# @return 0-7 bitmask (1=isolated, 2=duplicate, 4=dangling)
+_calculate_verification_bitmask() {
+	_code=0
+
+	if ! _check_verification_file "$1" "isolated"; then
+		_code=$((_code + 1))
+	fi
+	if ! _check_verification_file "$2" "duplicated"; then
+		_code=$((_code + 2))
+	fi
+	if ! _check_verification_file "$3" "dangling"; then
+		_code=$((_code + 4))
+	fi
+
+	return "$_code"
+}
+
+##
 # @brief  Display tag verification results (isolated, duplicated, and dangling tags)
 # @param  $1 : filenames of verification output
 # @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
@@ -881,49 +925,24 @@ print_verification_result() {
 	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
 	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
 
-	_has_isolated="0"
-	_has_duplicated="0"
-	_has_dangling="0"
-
-	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
+	# Print details for each issue type
+	if ! _check_verification_file "$_TAG_TABLE_ISOLATED" "isolated"; then
 		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
 		printf "Format: NONE tag file line\n" 1>&2
 		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-		_has_isolated="1"
 	fi
-	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
+	if ! _check_verification_file "$_TAG_TABLE_DUPLICATED" "duplicated"; then
 		printf "[shtracer][error][print_verification_result]: Following tags are duplicated\n" 1>&2
 		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-		_has_duplicated="1"
 	fi
-	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
+	if ! _check_verification_file "$_TAG_TABLE_DANGLING" "dangling"; then
 		printf "[shtracer][error][print_verification_result]: Following tags have non-existent FROM tags\n" 1>&2
 		printf "Format: child_tag dangling_parent_tag file line\n" 1>&2
 		cat <"$_TAG_TABLE_DANGLING" 1>&2
-		_has_dangling="1"
 	fi
 
-	# Return specific codes using bitmask:
-	# 0 = no issues
-	# 1 = isolated tags only
-	# 2 = duplicate tags only
-	# 3 = isolated + duplicate
-	# 4 = dangling only
-	# 5 = isolated + dangling
-	# 6 = duplicate + dangling
-	# 7 = all three issues
-	_code=0
-	if [ "$_has_isolated" = "1" ]; then
-		_code=$((_code + 1))
-	fi
-	if [ "$_has_duplicated" = "1" ]; then
-		_code=$((_code + 2))
-	fi
-	if [ "$_has_dangling" = "1" ]; then
-		_code=$((_code + 4))
-	fi
-
-	return "$_code"
+	# Return bitmask
+	_calculate_verification_bitmask "$_TAG_TABLE_ISOLATED" "$_TAG_TABLE_DUPLICATED" "$_TAG_TABLE_DANGLING"
 }
 
 ##
@@ -936,32 +955,58 @@ get_verification_status() {
 	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
 	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
 
-	_has_isolated="0"
-	_has_duplicated="0"
-	_has_dangling="0"
+	_calculate_verification_bitmask "$_TAG_TABLE_ISOLATED" "$_TAG_TABLE_DUPLICATED" "$_TAG_TABLE_DANGLING"
+}
 
-	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
-		_has_isolated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
-		_has_duplicated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
-		_has_dangling="1"
-	fi
+##
+# ============================================================================
+# JSON Generation Helper Functions
+# ============================================================================
+##
 
-	_code=0
-	if [ "$_has_isolated" = "1" ]; then
-		_code=$((_code + 1))
-	fi
-	if [ "$_has_duplicated" = "1" ]; then
-		_code=$((_code + 2))
-	fi
-	if [ "$_has_dangling" = "1" ]; then
-		_code=$((_code + 4))
-	fi
+##
+# @brief  Emit JSON metadata section
+# @param  $1 : Version string (SHTRACER_VERSION)
+# @param  $2 : Timestamp (ISO 8601 format)
+# @param  $3 : Config path
+# @return JSON metadata section to stdout
+# @tag    @IMP2.6.3@ (FROM: @ARC2.6@)
+_json_emit_metadata() {
+	_version="$1"
+	_timestamp="$2"
+	_config_path="$3"
 
-	return "$_code"
+	printf '{\n'
+	printf '  "metadata": {\n'
+	printf '    "version": "%s",\n' "$_version"
+	printf '    "generated": "%s",\n' "$_timestamp"
+	printf '    "config_path": "%s"\n' "$_config_path"
+	printf '  },\n'
+}
+
+##
+# @brief  Emit JSON chains array from tag table
+# @param  $1 : TAG_TABLE file path (04_tag_table)
+# @return JSON chains array to stdout
+# @tag    @IMP2.6.4@ (FROM: @ARC2.6@)
+_json_emit_chains() {
+	_tag_table="$1"
+
+	printf '  "chains": [\n'
+	awk '
+	BEGIN { first=1 }
+	{
+		if (!first) printf ",\n"
+		first=0
+		printf "    ["
+		for (i=1; i<=NF; i++) {
+			if (i > 1) printf ", "
+			printf "\"%s\"", $i
+		}
+		printf "]"
+	}
+	' "$_tag_table"
+	printf '\n  ],\n'
 }
 
 ##
@@ -993,12 +1038,8 @@ make_json() {
 
 	# Start JSON structure
 	{
-		printf '{\n'
-		printf '  "metadata": {\n'
-		printf '    "version": "%s",\n' "$SHTRACER_VERSION"
-		printf '    "generated": "%s",\n' "$_TIMESTAMP"
-		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
-		printf '  },\n'
+		# Emit metadata section
+		_json_emit_metadata "$SHTRACER_VERSION" "$_TIMESTAMP" "$_CONFIG_PATH"
 
 		printf '  "verificationErrors": '
 		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
@@ -1630,22 +1671,8 @@ END { printf "\n" }
 
 		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tags)
 
-		# Generate chains array from tag table (unchanged)
-		printf '  "chains": [\n'
-		awk '
-		BEGIN { first=1 }
-		{
-			if (!first) printf ",\n"
-			first=0
-			printf "    ["
-			for (i=1; i<=NF; i++) {
-				if (i > 1) printf ", "
-				printf "\"%s\"", $i
-			}
-			printf "]"
-		}
-		' "$_TAG_TABLE"
-		printf '\n  ],\n'
+		# Generate chains array from tag table
+		_json_emit_chains "$_TAG_TABLE"
 
 		# STEP 8: Generate cross-reference matrix files for backward compatibility
 		# Note: Cross_references removed from JSON schema, but matrix files still

@@ -26,12 +26,11 @@ Traditional requirements traceability tools are **heavy, proprietary, and hard t
 
 - Pure POSIX shell—works on Linux, macOS, Windows (Git Bash/WSL)
 - No Python, Node.js, or runtime environments required
-- Clone and run: `./shtracer ./sample/config.md`
 
 **📝 Developer-Friendly**
 
 - Write requirements in **plain Markdown**—no proprietary formats
-- Simple `@TAG@` syntax in comments: `<!-- @REQ-001@ -->`
+- Simple tag syntax in comments: e.g. `<!-- @REQ-001@ -->` (Tag syntax is written in the config file)
 - Version control friendly: diffs are readable, merges are clean
 
 **🔄 Automated Maintenance**
@@ -109,24 +108,33 @@ test_authenticate_user() {
 ./shtracer ./sample/config.md
 ```
 
-### 3. Integrate with CI/CD
+**Output (JSON snippet)**:
 
-```yaml
-# .github/workflows/traceability.yml
-- name: Validate traceability
-  run: |
-    ./shtracer config.md | jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")]' > incomplete.json
-    if [ "$(cat incomplete.json)" != "[]" ]; then
-      echo "❌ Found incomplete traceability chains"
-      exit 1
-    fi
+```json
+{
+  "metadata": {
+    "version": "0.1.3",
+    "generated": "2025-12-27T03:57:27Z",
+    "config_path": "/path/to/config.md"
+  },
+  "files": [
+    {"layer": "Requirement", "file": "requirements.md", "total": 10, "upstream_count": 0, "downstream_count": 8, "upstream_percent": 0, "downstream_percent": 80, "version": "git:abc123"},
+    {"layer": "Architecture", "file": "architecture.md", "total": 5, "upstream_count": 5, "downstream_count": 3, "upstream_percent": 100, "downstream_percent": 60, "version": "git:def456"}
+  ],
+  "nodes": [
+    {"id": "@REQ-001@", "description": "User authentication", "line": 15, "file_id": 0},
+    {"id": "@ARCH-101@", "description": "Auth service design", "line": 42, "file_id": 1}
+  ],
+  "chains": [
+    ["@REQ-001@", "@ARCH-101@", "@IMPL-201@", "@TEST-301@", "NONE"]
+  ],
+  "links": [
+    {"source": "@REQ-001@", "target": "@ARCH-101@"}
+  ]
+}
 ```
 
----
-
-## 📷 Screenshots
-
-### Interactive HTML Report
+### 3. (Optioanal) Interactive HTML Report
 
 #### Coverage
 
@@ -140,24 +148,6 @@ test_authenticate_user() {
 
 ![matrix](./docs/img/matrix.png)
 
-*Visualize requirement flows from requirements to tests. Click badges to jump to source files.*
-
-**New: Interactive Tab UI for Cross-Reference Tables**
-
-The HTML viewer now includes a tab-based interface to explore traceability relationships at different levels:
-
-- **All** - Complete traceability matrix (requirements → architecture → implementation → tests)
-- **REQ↔ARC** - Requirements vs Architecture cross-reference
-- **ARC↔IMP** - Architecture vs Implementation cross-reference
-- **IMP↔UT** - Implementation vs Unit Tests cross-reference
-- **UT↔IT** - Unit Tests vs Integration Tests cross-reference
-
-**Features:**
-
-- 🔗 **Clickable tags** - All tags link to source files (opens on right side)
-- 📊 **Sparse matrices** - "x" markers show direct traceability links between adjacent levels
-- 🔄 **Dynamic generation** - Tabs automatically adapt to your config.md structure
-
 ---
 
 ## ⚙️ Usage
@@ -168,11 +158,15 @@ The HTML viewer now includes a tab-based interface to explore traceability relat
 # Generate traceability artifacts (tag table + JSON files)
 ./shtracer ./sample/config.md
 
-# Export structured JSON to stdout (CI/CD friendly)
-./shtracer --json ./sample/config.md
-
-# Generate standalone HTML report
+# Generate standalone HTML report (Method 1: Use option)
 ./shtracer --html ./sample/config.md > report.html
+# Generate standalone HTML report (Method 2: Use viewer)
+./shtracer ./sample/config.md | ./scripts/main/shtracer_html_viewer.sh > report.html
+
+# Generate markdown report (Method 1: Use option)
+./shtracer --markdown ./sample/config.md > report.md
+# Generate markdown report (Method 2: Use viewer)
+./shtracer ./sample/config.md | ./scripts/main/shtracer_markdown_viewer.sh > report.md
 
 # Rename tags across entire project
 ./shtracer -c @OLD-TAG@ @NEW-TAG@ ./sample/config.md
@@ -186,111 +180,32 @@ The HTML viewer now includes a tab-based interface to explore traceability relat
 
 ### Configuration File Format
 
-The `config.md` file defines which files to trace and how to organize traceability links. It uses markdown format with structured properties for each traceability target.
+The `config.md` file defines which files to trace and how to organize traceability links. Each section header defines a traceability level (e.g., `## Requirement`, `## Architecture`), and properties specify paths, tag patterns, and filters.
 
-**Example `config.md`:**
+**Quick Example:**
 
 ```markdown
-# config.md
-
 ## Requirement
-
-* **PATH**: "./docs/01_requirements.md"
-  * **BRIEF**: "Describes requirements as specifications."
-  * **TAG FORMAT**: `@REQ[0-9\.]+@`
-  * **TAG LINE FORMAT**: `<!--.*-->`
-  * **TAG-TITLE OFFSET**: 1
-
-## Architecture
-
-* **PATH**: "./docs/02_architecture.md"
-  * **BRIEF**: "Describes the structure of this project."
-  * **TAG FORMAT**: `@ARC[0-9\.]+@`
-  * **TAG LINE FORMAT**: `<!--.*-->`
-  * **TAG-TITLE OFFSET**: 1
+* **PATH**: "./docs/requirements.md"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
 
 ## Implementation
-
 * **PATH**: "./src/"
-  * **EXTENSION FILTER**: "*.sh"
-  * **TAG FORMAT**: `@IMP[0-9\.]+@`
-  * **TAG LINE FORMAT**: `#.*`
-  * **BRIEF**: "Implementation files"
-
-## Unit test
-
-* **PATH**: "./tests/"
-  * **EXTENSION FILTER**: "*.sh"
-  * **IGNORE FILTER**: "integration*"
-  * **TAG FORMAT**: `@UT[0-9\.]+@`
-  * **TAG LINE FORMAT**: `#.*`
-  * **BRIEF**: "Unit test files"
+* **EXTENSION FILTER**: "*.sh"
+* **TAG FORMAT**: `@IMP[0-9\.]+@`
+* **TAG LINE FORMAT**: `#.*`
 ```
 
-**Key Points:**
+**Key Properties:**
 
-- Each section header (`## Requirement`, `## Architecture`, etc.) defines a traceability level
-- `**PATH**`: File or directory path (relative to config file location)
-- `**TAG FORMAT**`: ERE (Extended Regular Expression) pattern for tags, enclosed in backticks
-- `**TAG LINE FORMAT**`: ERE pattern for lines containing tags (e.g., `#.*` for shell comments, `<!--.*-->` for markdown)
+- `**PATH**`: File or directory path (relative to config file)
+- `**TAG FORMAT**`: ERE regex pattern for tags (in backticks)
+- `**TAG LINE FORMAT**`: ERE pattern for lines containing tags (`#.*` for shell, `<!--.*-->` for markdown)
 - `**EXTENSION FILTER**`: Optional file extension filter (e.g., `*.sh`)
 - `**IGNORE FILTER**`: Optional ignore pattern using `|` for multiple conditions
-- `**TAG-TITLE OFFSET**`: Optional offset between tag and title (default: 1)
-- `**BRIEF**`: Optional description of the traceability target
 
-For a complete example, see [`./sample/config.md`](./sample/config.md).
-
-### Cross-Reference Tables
-
-**Automatically generated for every traceability run** (when using normal mode), cross-reference tables show the relationships between adjacent traceability levels in an easy-to-read matrix format.
-
-**Generated tables** (based on your `config.md` structure):
-
-- `output/cross_reference/01_REQ_ARC.md` - Requirements vs Architecture
-- `output/cross_reference/02_ARC_IMP.md` - Architecture vs Implementation
-- `output/cross_reference/03_IMP_UT.md` - Implementation vs Unit Tests
-- `output/cross_reference/04_IMP_IT.md` - Implementation vs Integration Tests
-
-**Example output:**
-
-```markdown
-# Cross-Reference Table: REQ vs ARC
-
-**Legend**:
-- Row headers: REQ tags
-- Column headers: ARC tags
-- `x` indicates a traceability link exists
-- Click tag IDs to navigate to source location
-
-. | [@ARC1.1@](../docs/02_architecture.md#L64) | [@ARC2.1@](../docs/02_architecture.md#L122) |
---- | --- | --- |
-[@REQ1.1@](../docs/01_requirements.md#L6) |   | x |
-[@REQ1.2@](../docs/01_requirements.md#L14) |   | x |
-[@REQ2.1@](../docs/01_requirements.md#L77) |   | x |
-
----
-
-**Statistics**:
-- Total REQ tags: 24
-- Total ARC tags: 10
-- Total links: 28
-- Coverage: 100.0% (10/10 ARC tags have upstream links)
-- Orphaned REQ tags: 2 (no links)
-```
-
-**Key features:**
-
-- **Clickable hyperlinks**: Each tag ID links directly to the source file and line number (GitHub/GitLab compatible)
-- **Coverage statistics**: See at a glance which requirements are fully traced and which are orphaned
-- **Sparse matrix**: Empty cells indicate no direct traceability link
-- **Dynamic generation**: Tables adapt automatically to your `config.md` structure
-
-**Use cases:**
-
-- Quick visual verification of traceability coverage
-- Gap analysis for requirements without downstream implementation
-- Documentation for compliance audits
-- Inclusion in design review documents
+📖 **See [`./sample/config.md`](./sample/config.md) for a complete working example.**
 
 ---
 
@@ -300,107 +215,36 @@ For a complete example, see [`./sample/config.md`](./sample/config.md).
 Usage: shtracer <configfile> [options]
 
 Options:
-  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
-  -v, --verify                     Verify mode: detect duplicate or isolated tags
-  -t, --test                       Test mode: execute unit tests
-  --html                           Export a single HTML document to stdout (JSON -> viewer)
-  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
-  --summary                        Print traceability summary to stdout (direct links only)
-  --debug                          Keep  and output tag table to stderr
+  --html                           Generate standalone HTML report to stdout
+  --markdown                       Generate markdown report to stdout
+  --summary                        Print traceability summary (direct links only)
+  -c <old_tag> <new_tag>           Rename/swap tags across all traced files
+  -v                               Verify mode: detect duplicate or orphaned tags
+  -t                               Run unit tests
   -h, --help                       Show this help message
 
 Examples:
-  1. Normal mode (JSON output)
-     $ ./shtracer ./sample/config.md
-     $ ./shtracer ./sample/config.md > output.json
+  # Generate traceability matrix
+  ./shtracer ./sample/config.md
 
-  2. Change mode (swap or rename tags)
-     $ ./shtracer -c old_tag new_tag ./sample/config.md
+  # CI/CD pipeline integration
+  ./shtracer ./sample/config.md | jq '.chains'
 
-  3. Verify mode (check for duplicate or isolated tags)
-     $ ./shtracer -v ./sample/config.md
+  # Create HTML report
+  ./shtracer --html ./sample/config.md > report.html
 
-  4. Test mode
-     $ ./shtracer -t
-     $ ./shtracer --test
+  # Refactor: rename tags across entire project
+  ./shtracer -c @OLD-001@ @NEW-001@ ./sample/config.md
 
-  5. Summary mode
-     $ ./shtracer --summary ./sample/config.md
-
-  6. HTML mode
-     $ ./shtracer --html ./sample/config.md > output.html
-
-  7. Markdown mode
-     $ ./shtracer --markdown ./sample/config.md > report.md
-
-  8. Debug mode (JSON + tag table to stderr)
-     $ ./shtracer --debug ./sample/config.md > output.json
-
-Note:
-  - Arguments can be specified in any order.
-  - Only one option can be used at a time.
+  # Quality check: find broken traceability
+  ./shtracer -v ./sample/config.md
 ```
 
 ---
 
 ## 💡 Use Cases
 
-### 1️⃣ **Continuous Compliance Validation**
-
-Enforce traceability in your CI pipeline with **specific exit codes**:
-
-```yaml
-# GitHub Actions example
-jobs:
-  traceability:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Verify traceability
-        run: |
-          chmod +x ./shtracer
-
-          # Run verification mode
-          ./shtracer -v config.md
-          exit_code=$?
-
-          # Handle specific error types
-          case $exit_code in
-            0)
-              echo "✅ All traceability checks passed"
-              ;;
-            20)
-              echo "❌ Found isolated tags (no downstream references)"
-              exit 1
-              ;;
-            21)
-              echo "❌ Found duplicate tags"
-              exit 1
-              ;;
-            22)
-              echo "❌ Found both isolated and duplicate tags"
-              exit 1
-              ;;
-            *)
-              echo "❌ Verification failed with exit code $exit_code"
-              exit 1
-              ;;
-          esac
-
-      - name: Check JSON output for completeness
-        run: |
-          ./shtracer config.md > trace.json
-
-          # Ensure all requirements are traced to tests
-          incomplete=$(jq '[.chains[] | select(. | length < 5 and .[0] != "NONE")] | length' trace.json)
-          if [ "$incomplete" -gt 0 ]; then
-            echo "❌ Found $incomplete incomplete trace chains"
-            exit 1
-          fi
-```
-
-**Available Exit Codes for CI/CD:**
+### Available Exit Codes for CI/CD
 
 - `0` - Success
 - `1` - Invalid usage or arguments
@@ -412,7 +256,7 @@ jobs:
 - `21` - Found duplicate tags (verify mode)
 - `22` - Found both isolated and duplicate tags (verify mode)
 
-### 2️⃣ **Automated Documentation**
+### Automated Documentation
 
 Generate up-to-date traceability reports on every commit:
 
@@ -423,173 +267,54 @@ git add docs/traceability.html
 git commit -m "docs: update traceability matrix [skip ci]"
 ```
 
-### 3️⃣ **Requirements Refactoring (Change Mode)**
+---
 
-Safely rename requirements across your entire project:
+## 🔄 Pipeline Architecture & Custom Integration
+
+### Architecture Overview
+
+```mermaid
+flowchart LR
+    A[shtracer<br/>Backend] -->|JSON| B{Processors}
+    B -->|Built-in| C[shtracer_html_viewer.sh]
+    B -->|Built-in| D[shtracer_markdown_viewer.sh]
+    B -->|Standard| E[jq]
+    B -->|Custom| F[Your Tool]
+    C --> G[Interactive HTML]
+    D --> H[Markdown Report]
+    E --> I[Filtered Data]
+    F --> J[Custom Output]
+
+    style A fill:#e1f5ff,stroke:#01579b
+    style B fill:#fff3e0,stroke:#e65100
+    style C fill:#f3e5f5,stroke:#4a148c
+    style D fill:#f3e5f5,stroke:#4a148c
+    style E fill:#e8f5e9,stroke:#1b5e20
+    style F fill:#fce4ec,stroke:#880e4f
+```
+
+**Key Concepts:**
+
+- **shtracer core** = Backend (generates JSON only)
+- **Viewers** = Independent filters (consume JSON from stdin/file)
+- **You** = Can build custom tools using the JSON API
+
+### Using Viewers as Filters
+
+Viewers can be invoked via flags (convenience) or as standalone filters (composability):
 
 ```bash
-# Rename REQ-001 to REQ-AUTH-001 everywhere
-./shtracer -c @REQ-001@ @REQ-AUTH-001@ config.md
+# Method 1: Using built-in flags (convenience)
+./shtracer --html ./sample/config.md > report.html
+./shtracer --markdown ./sample/config.md > report.md
+
+# Method 2: Explicit pipeline (composability)
+./shtracer ./sample/config.md | ./scripts/main/shtracer_html_viewer.sh > report.html
+./shtracer ./sample/config.md | ./scripts/main/shtracer_markdown_viewer.sh > report.md
+
+# Method 3: Custom processing before viewing
+./shtracer ./sample/config.md | jq '.nodes |= map(select(.trace_target == ":Requirement"))' | ./scripts/main/shtracer_html_viewer.sh > filtered.html
 ```
-
-**Use cases:**
-
-- Renaming requirements during refactoring
-- Swapping test case identifiers
-- Reorganizing architecture tags
-
-### 4️⃣ **Quality Audits (Verify Mode)**
-
-Detect traceability issues before they become problems:
-
-```bash
-# Run verification mode
-./shtracer -v config.md
-
-# View health indicators in markdown report
-./shtracer --markdown config.md > report.md
-
-# View health indicators in HTML report
-./shtracer --html config.md > report.html
-
-# Query health data programmatically
-./shtracer config.md | jq '.health.isolated_tag_list'
-./shtracer config.md | jq '.health.dangling_reference_list'
-```
-
-**Detects:**
-
-<details>
-<summary><strong>Duplicate Tags</strong></summary>
-
-Tags that appear in multiple locations with the same identifier.
-
-```markdown
-<!-- file1.md -->
-<!-- @REQ-001@ -->
-## Feature A
-
-<!-- file2.md -->
-<!-- @REQ-001@ -->  <!-- ❌ Duplicate! -->
-## Feature B
-```
-
-**Exit code:** `21` (verify mode)
-
-</details>
-
-<details>
-<summary><strong>Isolated Tags</strong></summary>
-
-Tags with no downstream traceability - nothing references them via `(FROM: @TAG@)` syntax.
-
-```markdown
-<!-- architecture.md -->
-<!-- @ARC-999@ -->  <!-- ⚠️ Nothing references this -->
-## Isolated Component
-
-<!-- Expected but missing: -->
-<!-- # @IMP-X.X@ (FROM: @ARC-999@) in implementation files -->
-```
-
-**Why it matters:**
-
-- Indicates unused specifications
-- Incomplete implementation
-- Orphaned requirements that should be traced
-
-**How to fix:**
-
-- Add implementation/test tags that reference the isolated tag
-- Remove the isolated tag if no longer needed
-- Update FROM: references to connect to the traceability chain
-
-**Exit code:** `20` (verify mode)
-
-**Where to find:**
-
-- Markdown report: "Isolated Tags" section with file:line references
-- HTML report: "Traceability Health" section with clickable links
-- JSON output: `health.isolated_tag_list` array
-
-</details>
-
-<details>
-<summary><strong>Dangling References</strong></summary>
-
-Tags that reference non-existent parent tags via `(FROM: @PARENT@)` syntax.
-
-```markdown
-<!-- implementation.sh -->
-# @IMP1.1@ (FROM: @ARC-999@)  <!-- ❌ @ARC-999@ doesn't exist! -->
-function my_feature() {
-    ...
-}
-```
-
-**Why it matters:**
-
-- Indicates broken traceability links
-- Typos in tag references
-- Deleted/renamed requirements without updating references
-
-**How to fix:**
-
-- Correct the FROM: reference to point to the right parent tag
-- Create the missing parent tag if it should exist
-- Remove the FROM: reference if it's no longer needed
-
-**Exit code:** `23` (verify mode)
-
-**Where to find:**
-
-- Markdown report: "Dangling References" table showing child → missing parent
-- HTML report: "Traceability Health" section with interactive table
-- JSON output: `health.dangling_reference_list` array
-
-**Example JSON:**
-
-```json
-{
-  "health": {
-    "dangling_references": 2,
-    "dangling_reference_list": [
-      {
-        "child_tag": "@IMP1.1@",
-        "missing_parent": "@ARC-999@",
-        "file_id": 2,
-        "line": 69
-      }
-    ]
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Exit Codes for CI/CD Integration</strong></summary>
-
-Use exit codes to fail builds when traceability issues are detected:
-
-- `20` - Isolated tags found
-- `21` - Duplicate tags found
-- `23` - Dangling references found
-- `25` - Duplicate tags and dangling references found
-- `26` - Multiple issues found (combinations of isolated, duplicate, and dangling)
-
-**Example CI pipeline:**
-
-```bash
-# Fail build if any traceability issues exist
-./shtracer -v config.md
-if [ $? -ne 0 ]; then
-    echo "❌ Traceability issues detected!"
-    exit 1
-fi
-```
-
-</details>
 
 ---
 
@@ -629,3 +354,11 @@ shfmt -w -i 2 -ci -bn ./shtracer ./scripts/main/*.sh
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## 🌐 Learn More
+
+- 📖 [Requirements Traceability Matrix (Wikipedia)](https://en.wikipedia.org/wiki/Traceability_matrix)
+- 🐚 [POSIX Shell Specification](https://pubs.opengroup.org/onlinepubs/9699919799/)
+- 🔗 [GitHub Repository](https://github.com/qq3g7bad/shtracer)

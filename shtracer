@@ -24,9 +24,11 @@ EXIT_VIEWER_FAILED=13       # Viewer script execution failed
 # VERIFICATION ERRORS (20-29)
 EXIT_ISOLATED_TAGS=20      # Found isolated tags (no downstream references)
 EXIT_DUPLICATE_TAGS=21     # Found duplicate tags
+EXIT_BOTH_ISSUES=22        # Found both isolated and duplicate tags
 EXIT_DANGLING_TAGS=23      # Found dangling FROM tag references
+EXIT_ISOLATED_DANGLING=24  # Found isolated tags and dangling references
 EXIT_DUPLICATE_DANGLING=25 # Found duplicate tags and dangling references
-EXIT_ALL_ISSUES=26         # Found multiple issues (combinations of isolated, duplicate, and dangling)
+EXIT_ALL_ISSUES=26         # Found all three issues (isolated, duplicate, and dangling)
 #
 # SYSTEM ERRORS (30-39)
 EXIT_INTERNAL_ERROR=30   # Internal error (directory change, etc.)
@@ -89,7 +91,7 @@ print_usage() {
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
 		  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
 		  --summary                        Print traceability summary to stdout (direct links only)
-		  --debug                          Keep ${OUTPUT_DIR} for debugging
+		  --debug                          Keep ${OUTPUT_DIR} and output tag table to stderr
 		  -h, --help                       Show this help message
 
 		Examples:
@@ -117,7 +119,7 @@ print_usage() {
 		  7. Markdown mode
 		     $ ./shtracer --markdown ./sample/config.md > report.md
 
-		  8. Debug mode (keep output directory)
+		  8. Debug mode (JSON + tag table to stderr)
 		     $ ./shtracer --debug ./sample/config.md > output.json
 
 		Note:
@@ -154,7 +156,8 @@ parse_arguments() {
 	if [ "$#" -eq 1 ]; then
 		case "$1" in
 			-h | -v | --verify | --help | --version)
-				# Note: -v/--verify alone prints usage (config required)
+				# Note: -v/--verify alone prints usage (backward compatibility)
+				# -v/--verify with config file activates verify mode
 				print_usage
 				;;
 			-t | --test)
@@ -189,7 +192,7 @@ parse_arguments() {
 				-v | --verify)
 					_found_option=$((_found_option + 1))
 					_opt_mode="VERIFY"
-					_opt_flag="--verify"
+					_opt_flag="$1"
 					shift
 					;;
 				-c)
@@ -485,46 +488,49 @@ main_routine() {
 		fi
 	fi
 
-	if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
-		if print_verification_result "$_VERIFICATION_FILENAME"; then
+	if print_verification_result "$_VERIFICATION_FILENAME"; then
+		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
 			# Verification passed - no issues found
 			_cleanup_output_dir
 			return 0
 		else
-			# Verification failed - capture the return code (0-7 bitmask)
-			_verification_status=$?
+			# Default output: JSON
+			cat "$_JSON_OUTPUT_FILE"
+			# Debug mode: also output tag table to stderr
+			if [ "$SHTRACER_DEBUG" = 'true' ]; then
+				echo "[shtracer][debug]: Tag table output:" >&2
+				cat "$_TAG_TABLE_FILENAME" >&2
+			fi
+			_cleanup_output_dir
+			return 0
+		fi
+	else
+		# Verification failed - capture the return code (0-7 bitmask)
+		_verification_status=$?
+		if [ "$SHTRACER_MODE" = 'VERIFY' ]; then
 			_cleanup_output_dir
 			# Map verification result to specific exit codes
 			# Bitmask: 1=isolated, 2=duplicate, 4=dangling
 			case "$_verification_status" in
 				1) error_exit "$EXIT_ISOLATED_TAGS" "main_routine" "Verification failed: found isolated tags" ;;
 				2) error_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "Verification failed: found duplicate tags" ;;
-				3) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found multiple issues (isolated and duplicate tags)" ;;
+				3) error_exit "$EXIT_BOTH_ISSUES" "main_routine" "Verification failed: found both isolated and duplicate tags" ;;
 				4) error_exit "$EXIT_DANGLING_TAGS" "main_routine" "Verification failed: found dangling FROM tag references" ;;
-				5) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found multiple issues (isolated tags and dangling references)" ;;
+				5) error_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "Verification failed: found isolated tags and dangling references" ;;
 				6) error_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "Verification failed: found duplicate tags and dangling references" ;;
 				7) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed: found all issues (isolated, duplicate, and dangling)" ;;
 				*) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed with unknown error" ;;
 			esac
-		fi
-	else
-		if get_verification_status "$_VERIFICATION_FILENAME"; then
-			# Default output: JSON
-			cat "$_JSON_OUTPUT_FILE"
-			_cleanup_output_dir
-			return 0
 		else
-			# Verification failed - capture the return code (0-7 bitmask)
-			_verification_status=$?
-			# Output JSON even when verification errors exist
-			cat "$_JSON_OUTPUT_FILE"
+			# In normal mode, suppress table output when verification errors exist
+			# Only show error messages (already printed to stderr by print_verification_result)
 			_cleanup_output_dir
 			case "$_verification_status" in
 				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
 				2) warn_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "found duplicate tags" ;;
-				3) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found multiple issues (isolated and duplicate tags)" ;;
+				3) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "found both isolated and duplicate tags" ;;
 				4) warn_exit "$EXIT_DANGLING_TAGS" "main_routine" "found dangling FROM tag references" ;;
-				5) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found multiple issues (isolated tags and dangling references)" ;;
+				5) warn_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "found isolated tags and dangling references" ;;
 				6) warn_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "found duplicate tags and dangling references" ;;
 				7) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found all issues (isolated, duplicate, and dangling)" ;;
 				*) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "verification issues detected" ;;
