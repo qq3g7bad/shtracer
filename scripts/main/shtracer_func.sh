@@ -437,15 +437,18 @@ _verify_dangling_fromtags() {
 # @param   $3 : Output file path for isolated tags
 # @return  None (writes to file)
 _detect_isolated_tags() {
-	# Get all tags that appear in tag pairs (both columns, excluding NONE)
-	# A tag is isolated only if it has NO connections (not in FROM or TO column)
+	# Get all tags that appear in valid tag pairs (both FROM and TO must be non-NONE)
+	# A tag is isolated only if it has NO valid bidirectional connections
+	# Tags with only "NONE -> tag" connections are considered isolated
 	_connected_tags="$(shtracer_tmpfile)" || return 1
 	_all_tags="$(shtracer_tmpfile)" || return 1
 	_isolated_ids="$(shtracer_tmpfile)" || return 1
 
 	awk <"$1" '{
-		if ($1 != "'"$NODATA_STRING"'") print $1
-		if ($2 != "'"$NODATA_STRING"'") print $2
+		if ($1 != "'"$NODATA_STRING"'" && $2 != "'"$NODATA_STRING"'") {
+			print $1
+			print $2
+		}
 	}' | sort -u >"$_connected_tags"
 
 	# Get all tags from tag extraction (second column is tag ID)
@@ -2163,8 +2166,8 @@ _generate_cross_reference_matrix_files() {
 		in_files && /^  \],?$/ { in_files=0; next }
 		in_files && /^    \{/ { in_file_obj=1; file_id=""; file=""; next }
 		in_files && in_file_obj && /^    \},?$/ { if (file_id != "") file_map[file_id]=file; in_file_obj=0; next }
-		in_file_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_file_obj && /"file":/ { match($0, /"file": "([^"]+)"/, arr); file = arr[1] }
+		in_file_obj && /"file_id":/ { line=$0; sub(/.*"file_id": */, "", line); sub(/,.*$/, "", line); file_id = line }
+		in_file_obj && /"file":/ { line=$0; sub(/.*"file": *"/, "", line); sub(/".*$/, "", line); file = line }
 
 		/"layers": \[/ { in_layers=1; next }
 		in_layers && /^  \],?$/ { in_layers=0; next }
@@ -2177,9 +2180,9 @@ _generate_cross_reference_matrix_files() {
 			}
 			in_layer_obj=0; next
 		}
-		in_layer_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_layer_obj && /"name":/ { match($0, /"name": "([^"]+)"/, arr); name = arr[1] }
-		in_layer_obj && /"pattern":/ { match($0, /"pattern": "([^"]+)"/, arr); pattern = arr[1] }
+		in_layer_obj && /"layer_id":/ { line=$0; sub(/.*"layer_id": */, "", line); sub(/,.*$/, "", line); layer_id = line }
+		in_layer_obj && /"name":/ { line=$0; sub(/.*"name": *"/, "", line); sub(/".*$/, "", line); name = line }
+		in_layer_obj && /"pattern":/ { line=$0; sub(/.*"pattern": *"/, "", line); sub(/".*$/, "", line); pattern = line }
 
 		/"trace_tags": \[/ { in_trace_tags=1; next }
 		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
@@ -2212,12 +2215,12 @@ _generate_cross_reference_matrix_files() {
 			}
 			in_tag_obj=0; next
 		}
-		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
+		in_tag_obj && /"id":/ { line=$0; sub(/.*"id": *"/, "", line); sub(/".*$/, "", line); tag_id = line }
 		in_tag_obj && /"from_tags":/ {
 			from_tags_count = 0
 			delete from_tags
-			if (match($0, /\[(.*)\]/, arr)) {
-				raw = arr[1]
+			line=$0; sub(/.*\[/, "", line); sub(/\].*$/, "", line); raw = line
+			if (raw != "") {
 				n_ft = split(raw, ft_arr, ",")
 				for (k = 1; k <= n_ft; k++) {
 					t = ft_arr[k]
@@ -2228,9 +2231,9 @@ _generate_cross_reference_matrix_files() {
 				}
 			}
 		}
-		in_tag_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_tag_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_tag_obj && /"line":/ { match($0, /"line": ([0-9]+)/, arr); line = arr[1] }
+		in_tag_obj && /"layer_id":/ { line=$0; sub(/.*"layer_id": */, "", line); sub(/,.*$/, "", line); layer_id = line }
+		in_tag_obj && /"file_id":/ { line=$0; sub(/.*"file_id": */, "", line); sub(/,.*$/, "", line); file_id = line }
+		in_tag_obj && /"line":/ { line=$0; sub(/.*"line": */, "", line); sub(/,.*$/, "", line); line = line }
 
 		END {
 			if (layer_count < 2) exit

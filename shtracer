@@ -522,19 +522,29 @@ main_routine() {
 				*) error_exit "$EXIT_ALL_ISSUES" "main_routine" "Verification failed with unknown error" ;;
 			esac
 		else
-			# In normal mode, suppress table output when verification errors exist
-			# Only show error messages (already printed to stderr by print_verification_result)
+			# In normal mode, verification warnings don't cause failure
+			# Warnings already printed to stderr by print_verification_result
+			# Output JSON even when verification warnings exist
+			cat "$_JSON_OUTPUT_FILE"
+			# Debug mode: also output tag table to stderr
+			if [ "$SHTRACER_DEBUG" = 'true' ]; then
+				echo "[shtracer][debug]: Tag table output:" >&2
+				cat "$_TAG_TABLE_FILENAME" >&2
+			fi
 			_cleanup_output_dir
+			# Print warning message based on verification status
 			case "$_verification_status" in
-				1) warn_exit "$EXIT_ISOLATED_TAGS" "main_routine" "found isolated tags" ;;
-				2) warn_exit "$EXIT_DUPLICATE_TAGS" "main_routine" "found duplicate tags" ;;
-				3) warn_exit "$EXIT_BOTH_ISSUES" "main_routine" "found both isolated and duplicate tags" ;;
-				4) warn_exit "$EXIT_DANGLING_TAGS" "main_routine" "found dangling FROM tag references" ;;
-				5) warn_exit "$EXIT_ISOLATED_DANGLING" "main_routine" "found isolated tags and dangling references" ;;
-				6) warn_exit "$EXIT_DUPLICATE_DANGLING" "main_routine" "found duplicate tags and dangling references" ;;
-				7) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "found all issues (isolated, duplicate, and dangling)" ;;
-				*) warn_exit "$EXIT_ALL_ISSUES" "main_routine" "verification issues detected" ;;
+				1) echo "[${0##*/}][warn][main_routine]: found isolated tags" 1>&2 ;;
+				2) echo "[${0##*/}][warn][main_routine]: found duplicate tags" 1>&2 ;;
+				3) echo "[${0##*/}][warn][main_routine]: found both isolated and duplicate tags" 1>&2 ;;
+				4) echo "[${0##*/}][warn][main_routine]: found dangling FROM tag references" 1>&2 ;;
+				5) echo "[${0##*/}][warn][main_routine]: found isolated tags and dangling references" 1>&2 ;;
+				6) echo "[${0##*/}][warn][main_routine]: found duplicate tags and dangling references" 1>&2 ;;
+				7) echo "[${0##*/}][warn][main_routine]: found all issues (isolated, duplicate, and dangling)" 1>&2 ;;
+				*) echo "[${0##*/}][warn][main_routine]: verification issues detected" 1>&2 ;;
 			esac
+			# Exit with success in normal mode (warnings are informational only)
+			return 0
 		fi
 	fi
 }

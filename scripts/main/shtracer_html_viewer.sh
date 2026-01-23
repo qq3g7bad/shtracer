@@ -1196,16 +1196,16 @@ convert_template_html() {
 						BEGIN { in_source = 0 }
 						/"source_layer"/ { in_source = 1 }
 						in_source && /"name"[[:space:]]*:/ {
-							match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
-							if (arr[1] != "") { print arr[1]; exit }
+							line=$0; sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line)
+							if (line != "") { print line; exit }
 						}
 					')
 					_target_name=$(printf '%s\n' "$_current_obj" | awk '
 						BEGIN { in_target = 0 }
 						/"target_layer"/ { in_target = 1 }
 						in_target && /"name"[[:space:]]*:/ {
-							match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
-							if (arr[1] != "") { print arr[1]; exit }
+							line=$0; sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line)
+							if (line != "") { print line; exit }
 						}
 					')
 
