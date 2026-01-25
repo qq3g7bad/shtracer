@@ -652,7 +652,7 @@ test_main_routine_normal_mode_with_duplicate_tags() {
 		assertEquals "Should exit with duplicate tags code" "$EXIT_DUPLICATE_TAGS" "$_EXIT_CODE"
 
 		# Should show duplicate tag warning message
-		echo "$_RETURN" | grep -q "\[shtracer\]\[error\]\[print_verification_result\]: Following tags are duplicated"
+		echo "$_RETURN" | grep -q "\[shtracer\]\[error\]\[duplicated_tags\]"
 		assertEquals "Should show duplicated tags message" 0 "$?"
 
 		# Should show the duplicate tag in error output

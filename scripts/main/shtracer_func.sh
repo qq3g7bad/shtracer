@@ -897,68 +897,92 @@ _check_verification_file() {
 }
 
 ##
-# @brief  Calculate verification status bitmask
-# @param  $1 : Isolated file path
-# @param  $2 : Duplicated file path
-# @param  $3 : Dangling file path
-# @return 0-7 bitmask (1=isolated, 2=duplicate, 4=dangling)
-_calculate_verification_bitmask() {
-	_code=0
+# @brief  Print isolated tag errors in one-line format
+# @param  $1 : ISOLATED file path
+# @return None (prints to stderr)
+_print_isolated_errors() {
+	_isolated_file="$1"
+	[ -r "$_isolated_file" ] || return 0
+	[ -s "$_isolated_file" ] || return 0
 
-	if ! _check_verification_file "$1" "isolated"; then
-		_code=$((_code + 1))
-	fi
-	if ! _check_verification_file "$2" "duplicated"; then
-		_code=$((_code + 2))
-	fi
-	if ! _check_verification_file "$3" "dangling"; then
-		_code=$((_code + 4))
-	fi
-
-	return "$_code"
+	# Read detailed file and emit one line per error
+	# Format: NONE tag file line → [shtracer][error][isolated_tags] tag file line
+	while IFS=' ' read -r _none _tag _file _line; do
+		[ "$_none" = "$NODATA_STRING" ] || continue
+		printf "[shtracer][error][isolated_tags] %s %s %s\n" "$_tag" "$_file" "$_line" 1>&2
+	done <"$_isolated_file"
 }
 
 ##
-# @brief  Display tag verification results (isolated, duplicated, and dangling tags)
-# @param  $1 : filenames of verification output
-# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
+# @brief  Print duplicate tag errors in one-line format
+# @param  $1 : DUPLICATED file path (just tag IDs)
+# @param  $2 : TAG_OUTPUT_DATA file path (01_tags with full tag info)
+# @return None (prints to stderr)
+_print_duplicated_errors() {
+	_dup_file="$1"
+	_tag_data="$2"
+
+	[ -r "$_dup_file" ] || return 0
+	[ -s "$_dup_file" ] || return 0
+	[ -r "$_tag_data" ] || return 0
+
+	# Process each unique duplicate tag using awk (avoids subshell issues)
+	awk -F"$SHTRACER_SEPARATOR" -v dup_file="$_dup_file" '
+		BEGIN {
+			# Read duplicate tag IDs into array
+			while ((getline < dup_file) > 0) {
+				if ($0 != "") {
+					dup_tags[$0] = 1
+				}
+			}
+			close(dup_file)
+		}
+		{
+			# Check if this tag ID is in the duplicates list
+			tag_id = $2
+			file = $5
+			line = $6
+			if (tag_id in dup_tags) {
+				printf "[shtracer][error][duplicated_tags] %s %s %s\n", tag_id, file, line
+			}
+		}
+	' "$_tag_data" 1>&2
+}
+
+##
+# @brief  Print dangling tag errors in one-line format
+# @param  $1 : DANGLING file path
+# @return None (prints to stderr)
+_print_dangling_errors() {
+	_dangling_file="$1"
+	[ -r "$_dangling_file" ] || return 0
+	[ -s "$_dangling_file" ] || return 0
+
+	# Read detailed file and emit one line per error
+	# Format: child_tag parent_tag file line → [shtracer][error][dangling_tags] child parent file line
+	while IFS=' ' read -r _child _parent _file _line; do
+		printf "[shtracer][error][dangling_tags] %s %s %s %s\n" "$_child" "$_parent" "$_file" "$_line" 1>&2
+	done <"$_dangling_file"
+}
+
+##
+# @brief  Display tag verification results in one-line-per-error format
+# @param  $1 : TAG_OUTPUT_DATA file path (01_tags with full tag info)
+# @param  $2 : ISOLATED file path
+# @param  $3 : DUPLICATED file path
+# @param  $4 : DANGLING file path
+# @return None (prints to stderr only, no return code)
 # @tag    @IMP2.5@ (FROM: @ARC2.5@)
 print_verification_result() {
-	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
+	_tag_data="$1"
+	_isolated_file="$2"
+	_duplicated_file="$3"
+	_dangling_file="$4"
 
-	# Print details for each issue type
-	if ! _check_verification_file "$_TAG_TABLE_ISOLATED" "isolated"; then
-		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
-		printf "Format: NONE tag file line\n" 1>&2
-		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-	fi
-	if ! _check_verification_file "$_TAG_TABLE_DUPLICATED" "duplicated"; then
-		printf "[shtracer][error][print_verification_result]: Following tags are duplicated\n" 1>&2
-		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-	fi
-	if ! _check_verification_file "$_TAG_TABLE_DANGLING" "dangling"; then
-		printf "[shtracer][error][print_verification_result]: Following tags have non-existent FROM tags\n" 1>&2
-		printf "Format: child_tag dangling_parent_tag file line\n" 1>&2
-		cat <"$_TAG_TABLE_DANGLING" 1>&2
-	fi
-
-	# Return bitmask
-	_calculate_verification_bitmask "$_TAG_TABLE_ISOLATED" "$_TAG_TABLE_DUPLICATED" "$_TAG_TABLE_DANGLING"
-}
-
-##
-# @brief  Get verification status without printing details
-# @param  $1 : filenames of verification output
-# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
-# @tag    @IMP2.7@ (FROM: @ARC2.5@)
-get_verification_status() {
-	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
-
-	_calculate_verification_bitmask "$_TAG_TABLE_ISOLATED" "$_TAG_TABLE_DUPLICATED" "$_TAG_TABLE_DANGLING"
+	# Print errors in one-line format (all detected issues)
+	_print_isolated_errors "$_isolated_file"
+	_print_duplicated_errors "$_duplicated_file" "$_tag_data"
+	_print_dangling_errors "$_dangling_file"
 }
 
 ##

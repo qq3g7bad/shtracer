@@ -107,11 +107,11 @@ Exit codes are defined as constants for CI/CD integration:
 
 **Verification Errors (20-29)**
 
-* `EXIT_ISOLATED_TAGS=20` - Found isolated tags
-* `EXIT_DUPLICATE_TAGS=21` - Found duplicate tags
-* `EXIT_DANGLING_TAGS=23` - Found dangling FROM tag references
-* `EXIT_DUPLICATE_DANGLING=25` - Found duplicate tags and dangling references
-* `EXIT_ALL_ISSUES=26` - Found multiple issues (combinations of isolated, duplicate, and dangling)
+* `EXIT_ISOLATED_TAGS=20` - Found isolated tags (lowest priority)
+* `EXIT_DUPLICATE_TAGS=21` - Found duplicate tags (highest priority)
+* `EXIT_DANGLING_TAGS=22` - Found dangling FROM tag references
+
+Note: If multiple issues exist, all are reported to stderr but exit code reflects highest-priority error (21 > 22 > 20)
 
 **System Errors (30-39)**
 
@@ -222,12 +222,13 @@ The following cases are invalid.
 * [ ] From tags that have no upstream tags.
 * [ ] Duplicated tags.
 
-Returns specific exit codes:
+Outputs errors to stderr in one-line-per-error format:
 
-* Return `1` if only isolated tags found
-* Return `2` if only duplicate tags found
-* Return `3` if both isolated and duplicate tags found
-* Return `0` if no issues found
+* `[shtracer][error][isolated_tags] @TAG@ /path/file.sh line` - Isolated tag (no upstream/downstream)
+* `[shtracer][error][duplicated_tags] @TAG@ /path/file.sh line` - Duplicate tag occurrence
+* `[shtracer][error][dangling_tags] @CHILD@ @PARENT@ /path/file.sh line` - Dangling FROM reference
+
+All detected issues are reported, enabling easy filtering with grep/awk/cut for CI/CD integration.
 
 <!-- @ARC2.6@ (FROM: @REQ3.1@) -->
 #### Generate JSON output
