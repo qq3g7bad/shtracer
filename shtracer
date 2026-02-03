@@ -66,6 +66,10 @@ export OUTPUT_DIR
 load_functions() {
 	_PREVIOUS_DIR="$(pwd)"
 	cd "${SCRIPT_DIR}" || error_exit "$EXIT_INTERNAL_ERROR" "load_functions" "Cannot change current directory"
+
+	_UTIL_SCRIPT_DIR="${SCRIPT_DIR}/scripts/main"
+	export _UTIL_SCRIPT_DIR
+
 	# shellcheck source=scripts/main/shtracer_util.sh
 	. "./scripts/main/shtracer_util.sh"
 	# shellcheck source=scripts/main/shtracer_func.sh
