@@ -263,6 +263,20 @@ test_parse_arguments_test() {
 }
 
 ##
+# @brief  Test for parse_arguments with --test (long form)
+# @tag    @UT1.11.1@ (FROM: @IMP1.3@)
+test_parse_arguments_test_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "--test"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "TEST"
+	)
+}
+
+##
 # @brief  Test for parse_arguments with undefined option
 # @tag    @UT1.12@ (FROM: @IMP1.3@)
 test_parse_arguments_undefined_option() {
@@ -301,6 +315,20 @@ test_parse_arguments_verify_mode() {
 		load_functions
 		# Act -------------
 		parse_arguments "$SELF_PATH" "-v"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --verify (long form)
+# @tag    @UT1.14.1@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_mode_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "$SELF_PATH" "--verify"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -393,6 +421,20 @@ test_parse_arguments_verify_before_config() {
 		load_functions
 		# Act -------------
 		parse_arguments "-v" "$SELF_PATH"
+		# Assert ----------
+		assertEquals "$SHTRACER_MODE" "VERIFY"
+	)
+}
+
+##
+# @brief  Test for parse_arguments with --verify before config (flexible order, long form)
+# @tag    @UT1.26.1@ (FROM: @IMP1.3@)
+test_parse_arguments_verify_before_config_long() {
+	(
+		# Arrange ---------
+		load_functions
+		# Act -------------
+		parse_arguments "--verify" "$SELF_PATH"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -610,7 +652,7 @@ test_main_routine_normal_mode_with_duplicate_tags() {
 		assertEquals "Should exit with duplicate tags code" "$EXIT_DUPLICATE_TAGS" "$_EXIT_CODE"
 
 		# Should show duplicate tag warning message
-		echo "$_RETURN" | grep -q "\[shtracer\]\[error\]\[print_verification_result\]: Following tags are duplicated"
+		echo "$_RETURN" | grep -q "\[shtracer\]\[error\]\[duplicated_tags\]"
 		assertEquals "Should show duplicated tags message" 0 "$?"
 
 		# Should show the duplicate tag in error output

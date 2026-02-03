@@ -361,13 +361,14 @@ test_print_verification_result_no_errors() {
 		touch "$OUTPUT_DIR/verified/isolated"
 		touch "$OUTPUT_DIR/verified/duplicated"
 		touch "$OUTPUT_DIR/verified/dangling"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
+		touch "$OUTPUT_DIR/verified/tag_data"
 
 		# Act -------------
-		print_verification_result "$_INPUT"
+		_output=$(print_verification_result "$OUTPUT_DIR/verified/tag_data" "$OUTPUT_DIR/verified/isolated" "$OUTPUT_DIR/verified/duplicated" "$OUTPUT_DIR/verified/dangling" 2>&1)
 
 		# Assert ----------
-		assertEquals 0 "$?"
+		# No errors should be printed
+		assertEquals "" "$_output"
 	)
 }
 
@@ -378,16 +379,18 @@ test_print_verification_result_with_isolated() {
 	(
 		# Arrange ---------
 		mkdir -p "$OUTPUT_DIR/verified"
-		echo "@ISOLATED_TAG@" >"$OUTPUT_DIR/verified/isolated"
+		echo "NONE @ISOLATED_TAG@ /path/file.sh 42" >"$OUTPUT_DIR/verified/isolated"
 		touch "$OUTPUT_DIR/verified/duplicated"
 		touch "$OUTPUT_DIR/verified/dangling"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
+		touch "$OUTPUT_DIR/verified/tag_data"
 
 		# Act -------------
-		print_verification_result "$_INPUT" 2>/dev/null
+		_output=$(print_verification_result "$OUTPUT_DIR/verified/tag_data" "$OUTPUT_DIR/verified/isolated" "$OUTPUT_DIR/verified/duplicated" "$OUTPUT_DIR/verified/dangling" 2>&1)
 
 		# Assert ----------
-		assertEquals 1 "$?"
+		# Should print one-line error for isolated tag
+		echo "$_output" | grep -q '\[shtracer\]\[error\]\[isolated_tags\] @ISOLATED_TAG@ /path/file.sh 42'
+		assertEquals 0 "$?"
 	)
 }
 
@@ -400,15 +403,21 @@ test_print_verification_result_with_duplicated() {
 		mkdir -p "$OUTPUT_DIR/verified"
 		touch "$OUTPUT_DIR/verified/isolated"
 		echo "@DUPLICATE_TAG@" >"$OUTPUT_DIR/verified/duplicated"
-		echo "@DUPLICATE_TAG@" >>"$OUTPUT_DIR/verified/duplicated"
 		touch "$OUTPUT_DIR/verified/dangling"
-		_INPUT="$OUTPUT_DIR/verified/isolated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/duplicated${SHTRACER_SEPARATOR}$OUTPUT_DIR/verified/dangling"
+
+		# Create tag data with two occurrences of @DUPLICATE_TAG@
+		cat >"$OUTPUT_DIR/verified/tag_data" <<EOF
+Requirement${SHTRACER_SEPARATOR}@DUPLICATE_TAG@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Desc${SHTRACER_SEPARATOR}/path/file1.sh${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}v1
+Requirement${SHTRACER_SEPARATOR}@DUPLICATE_TAG@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Desc${SHTRACER_SEPARATOR}/path/file2.sh${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}v1
+EOF
 
 		# Act -------------
-		print_verification_result "$_INPUT" 2>/dev/null
+		_output=$(print_verification_result "$OUTPUT_DIR/verified/tag_data" "$OUTPUT_DIR/verified/isolated" "$OUTPUT_DIR/verified/duplicated" "$OUTPUT_DIR/verified/dangling" 2>&1)
 
 		# Assert ----------
-		assertEquals 2 "$?"
+		# Should print two one-line errors for duplicate tag (one per occurrence)
+		_count=$(echo "$_output" | grep -c '\[duplicated_tags\] @DUPLICATE_TAG@')
+		assertEquals 2 "$_count"
 	)
 }
 

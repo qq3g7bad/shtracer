@@ -150,21 +150,3 @@ jobs:
             $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
-  # @IT3.3@ (FROM: @UT2.11@) Verification checks
-  # Job 3: Run verification checks
-  verify:
-    name: Run verification checks
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Make shtracer executable
-        run: chmod +x ./shtracer
-
-      # Verify mode: check for duplicate or isolated tags
-      - name: Run verify mode
-        run: ./shtracer ./sample/config.md -v

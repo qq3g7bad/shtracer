@@ -1,5 +1,6 @@
 # Generated output
 sample/*output/
+.claude/
 
 # Editor/IDE files
 .vimconf

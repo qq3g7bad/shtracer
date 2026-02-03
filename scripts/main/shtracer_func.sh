@@ -437,15 +437,18 @@ _verify_dangling_fromtags() {
 # @param   $3 : Output file path for isolated tags
 # @return  None (writes to file)
 _detect_isolated_tags() {
-	# Get all tags that appear in tag pairs (both columns, excluding NONE)
-	# A tag is isolated only if it has NO connections (not in FROM or TO column)
+	# Get all tags that appear in valid tag pairs (both FROM and TO must be non-NONE)
+	# A tag is isolated only if it has NO valid bidirectional connections
+	# Tags with only "NONE -> tag" connections are considered isolated
 	_connected_tags="$(shtracer_tmpfile)" || return 1
 	_all_tags="$(shtracer_tmpfile)" || return 1
 	_isolated_ids="$(shtracer_tmpfile)" || return 1
 
 	awk <"$1" '{
-		if ($1 != "'"$NODATA_STRING"'") print $1
-		if ($2 != "'"$NODATA_STRING"'") print $2
+		if ($1 != "'"$NODATA_STRING"'" && $2 != "'"$NODATA_STRING"'") {
+			print $1
+			print $2
+		}
 	}' | sort -u >"$_connected_tags"
 
 	# Get all tags from tag extraction (second column is tag ID)
@@ -872,96 +875,165 @@ print_summary_direct_links() {
 }
 
 ##
-# @brief  Display tag verification results (isolated, duplicated, and dangling tags)
-# @param  $1 : filenames of verification output
-# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
-# @tag    @IMP2.5@ (FROM: @ARC2.5@)
-print_verification_result() {
-	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
+# @brief  Check if a verification file contains issues
+# @param  $1 : File path to check
+# @param  $2 : Issue type ("isolated" requires NODATA_STRING check, others just line count)
+# @return 0 if no issues, 1 if issues found
+_check_verification_file() {
+	_file="$1"
+	_type="$2"
 
-	_has_isolated="0"
-	_has_duplicated="0"
-	_has_dangling="0"
+	[ -r "$_file" ] || return 0
 
-	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
-		printf "[shtracer][error][print_verification_result]: Following tags are isolated\n" 1>&2
-		printf "Format: NONE tag file line\n" 1>&2
-		cat <"$_TAG_TABLE_ISOLATED" 1>&2
-		_has_isolated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
-		printf "[shtracer][error][print_verification_result]: Following tags are duplicated\n" 1>&2
-		cat <"$_TAG_TABLE_DUPLICATED" 1>&2
-		_has_duplicated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
-		printf "[shtracer][error][print_verification_result]: Following tags have non-existent FROM tags\n" 1>&2
-		printf "Format: child_tag dangling_parent_tag file line\n" 1>&2
-		cat <"$_TAG_TABLE_DANGLING" 1>&2
-		_has_dangling="1"
+	_line_count="$(wc <"$_file" -l)"
+	[ "$_line_count" -eq 0 ] && return 0
+
+	# For isolated tags, also check if content is just NODATA_STRING
+	if [ "$_type" = "isolated" ]; then
+		[ "$(cat "$_file")" = "$NODATA_STRING" ] && return 0
 	fi
 
-	# Return specific codes using bitmask:
-	# 0 = no issues
-	# 1 = isolated tags only
-	# 2 = duplicate tags only
-	# 3 = isolated + duplicate
-	# 4 = dangling only
-	# 5 = isolated + dangling
-	# 6 = duplicate + dangling
-	# 7 = all three issues
-	_code=0
-	if [ "$_has_isolated" = "1" ]; then
-		_code=$((_code + 1))
-	fi
-	if [ "$_has_duplicated" = "1" ]; then
-		_code=$((_code + 2))
-	fi
-	if [ "$_has_dangling" = "1" ]; then
-		_code=$((_code + 4))
-	fi
-
-	return "$_code"
+	return 1
 }
 
 ##
-# @brief  Get verification status without printing details
-# @param  $1 : filenames of verification output
-# @return 0-7 based on which issues are found (bitmask: 1=isolated, 2=duplicate, 4=dangling)
-# @tag    @IMP2.7@ (FROM: @ARC2.5@)
-get_verification_status() {
-	_TAG_TABLE_ISOLATED="$(extract_field "$1" 1 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DUPLICATED="$(extract_field "$1" 2 "$SHTRACER_SEPARATOR")"
-	_TAG_TABLE_DANGLING="$(extract_field "$1" 3 "$SHTRACER_SEPARATOR")"
+# @brief  Print isolated tag errors in one-line format
+# @param  $1 : ISOLATED file path
+# @return None (prints to stderr)
+_print_isolated_errors() {
+	_isolated_file="$1"
+	[ -r "$_isolated_file" ] || return 0
+	[ -s "$_isolated_file" ] || return 0
 
-	_has_isolated="0"
-	_has_duplicated="0"
-	_has_dangling="0"
+	# Read detailed file and emit one line per error
+	# Format: NONE tag file line → [shtracer][error][isolated_tags] tag file line
+	while IFS=' ' read -r _none _tag _file _line; do
+		[ "$_none" = "$NODATA_STRING" ] || continue
+		printf "[shtracer][error][isolated_tags] %s %s %s\n" "$_tag" "$_file" "$_line" 1>&2
+	done <"$_isolated_file"
+}
 
-	if [ "$(wc <"$_TAG_TABLE_ISOLATED" -l)" -ne 0 ] && [ "$(cat "$_TAG_TABLE_ISOLATED")" != "$NODATA_STRING" ]; then
-		_has_isolated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DUPLICATED" -l)" -ne 0 ]; then
-		_has_duplicated="1"
-	fi
-	if [ "$(wc <"$_TAG_TABLE_DANGLING" -l)" -ne 0 ]; then
-		_has_dangling="1"
-	fi
+##
+# @brief  Print duplicate tag errors in one-line format
+# @param  $1 : DUPLICATED file path (just tag IDs)
+# @param  $2 : TAG_OUTPUT_DATA file path (01_tags with full tag info)
+# @return None (prints to stderr)
+_print_duplicated_errors() {
+	_dup_file="$1"
+	_tag_data="$2"
 
-	_code=0
-	if [ "$_has_isolated" = "1" ]; then
-		_code=$((_code + 1))
-	fi
-	if [ "$_has_duplicated" = "1" ]; then
-		_code=$((_code + 2))
-	fi
-	if [ "$_has_dangling" = "1" ]; then
-		_code=$((_code + 4))
-	fi
+	[ -r "$_dup_file" ] || return 0
+	[ -s "$_dup_file" ] || return 0
+	[ -r "$_tag_data" ] || return 0
 
-	return "$_code"
+	# Process each unique duplicate tag using awk (avoids subshell issues)
+	awk -F"$SHTRACER_SEPARATOR" -v dup_file="$_dup_file" '
+		BEGIN {
+			# Read duplicate tag IDs into array
+			while ((getline < dup_file) > 0) {
+				if ($0 != "") {
+					dup_tags[$0] = 1
+				}
+			}
+			close(dup_file)
+		}
+		{
+			# Check if this tag ID is in the duplicates list
+			tag_id = $2
+			file = $5
+			line = $6
+			if (tag_id in dup_tags) {
+				printf "[shtracer][error][duplicated_tags] %s %s %s\n", tag_id, file, line
+			}
+		}
+	' "$_tag_data" 1>&2
+}
+
+##
+# @brief  Print dangling tag errors in one-line format
+# @param  $1 : DANGLING file path
+# @return None (prints to stderr)
+_print_dangling_errors() {
+	_dangling_file="$1"
+	[ -r "$_dangling_file" ] || return 0
+	[ -s "$_dangling_file" ] || return 0
+
+	# Read detailed file and emit one line per error
+	# Format: child_tag parent_tag file line → [shtracer][error][dangling_tags] child parent file line
+	while IFS=' ' read -r _child _parent _file _line; do
+		printf "[shtracer][error][dangling_tags] %s %s %s %s\n" "$_child" "$_parent" "$_file" "$_line" 1>&2
+	done <"$_dangling_file"
+}
+
+##
+# @brief  Display tag verification results in one-line-per-error format
+# @param  $1 : TAG_OUTPUT_DATA file path (01_tags with full tag info)
+# @param  $2 : ISOLATED file path
+# @param  $3 : DUPLICATED file path
+# @param  $4 : DANGLING file path
+# @return None (prints to stderr only, no return code)
+# @tag    @IMP2.5@ (FROM: @ARC2.5@)
+print_verification_result() {
+	_tag_data="$1"
+	_isolated_file="$2"
+	_duplicated_file="$3"
+	_dangling_file="$4"
+
+	# Print errors in one-line format (all detected issues)
+	_print_isolated_errors "$_isolated_file"
+	_print_duplicated_errors "$_duplicated_file" "$_tag_data"
+	_print_dangling_errors "$_dangling_file"
+}
+
+##
+# ============================================================================
+# JSON Generation Helper Functions
+# ============================================================================
+##
+
+##
+# @brief  Emit JSON metadata section
+# @param  $1 : Version string (SHTRACER_VERSION)
+# @param  $2 : Timestamp (ISO 8601 format)
+# @param  $3 : Config path
+# @return JSON metadata section to stdout
+# @tag    @IMP2.6.3@ (FROM: @ARC2.6@)
+_json_emit_metadata() {
+	_version="$1"
+	_timestamp="$2"
+	_config_path="$3"
+
+	printf '{\n'
+	printf '  "metadata": {\n'
+	printf '    "version": "%s",\n' "$_version"
+	printf '    "generated": "%s",\n' "$_timestamp"
+	printf '    "config_path": "%s"\n' "$_config_path"
+	printf '  },\n'
+}
+
+##
+# @brief  Emit JSON chains array from tag table
+# @param  $1 : TAG_TABLE file path (04_tag_table)
+# @return JSON chains array to stdout
+# @tag    @IMP2.6.4@ (FROM: @ARC2.6@)
+_json_emit_chains() {
+	_tag_table="$1"
+
+	printf '  "chains": [\n'
+	awk '
+	BEGIN { first=1 }
+	{
+		if (!first) printf ",\n"
+		first=0
+		printf "    ["
+		for (i=1; i<=NF; i++) {
+			if (i > 1) printf ", "
+			printf "\"%s\"", $i
+		}
+		printf "]"
+	}
+	' "$_tag_table"
+	printf '\n  ],\n'
 }
 
 ##
@@ -993,12 +1065,8 @@ make_json() {
 
 	# Start JSON structure
 	{
-		printf '{\n'
-		printf '  "metadata": {\n'
-		printf '    "version": "%s",\n' "$SHTRACER_VERSION"
-		printf '    "generated": "%s",\n' "$_TIMESTAMP"
-		printf '    "config_path": "%s"\n' "$_CONFIG_PATH"
-		printf '  },\n'
+		# Emit metadata section
+		_json_emit_metadata "$SHTRACER_VERSION" "$_TIMESTAMP" "$_CONFIG_PATH"
 
 		printf '  "verificationErrors": '
 		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
@@ -1630,22 +1698,8 @@ END { printf "\n" }
 
 		# STEP 7: Links array REMOVED (can be derived from trace_tags[].from_tags)
 
-		# Generate chains array from tag table (unchanged)
-		printf '  "chains": [\n'
-		awk '
-		BEGIN { first=1 }
-		{
-			if (!first) printf ",\n"
-			first=0
-			printf "    ["
-			for (i=1; i<=NF; i++) {
-				if (i > 1) printf ", "
-				printf "\"%s\"", $i
-			}
-			printf "]"
-		}
-		' "$_TAG_TABLE"
-		printf '\n  ],\n'
+		# Generate chains array from tag table
+		_json_emit_chains "$_TAG_TABLE"
 
 		# STEP 8: Generate cross-reference matrix files for backward compatibility
 		# Note: Cross_references removed from JSON schema, but matrix files still
@@ -2136,8 +2190,8 @@ _generate_cross_reference_matrix_files() {
 		in_files && /^  \],?$/ { in_files=0; next }
 		in_files && /^    \{/ { in_file_obj=1; file_id=""; file=""; next }
 		in_files && in_file_obj && /^    \},?$/ { if (file_id != "") file_map[file_id]=file; in_file_obj=0; next }
-		in_file_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_file_obj && /"file":/ { match($0, /"file": "([^"]+)"/, arr); file = arr[1] }
+		in_file_obj && /"file_id":/ { line=$0; sub(/.*"file_id": */, "", line); sub(/,.*$/, "", line); file_id = line }
+		in_file_obj && /"file":/ { line=$0; sub(/.*"file": *"/, "", line); sub(/".*$/, "", line); file = line }
 
 		/"layers": \[/ { in_layers=1; next }
 		in_layers && /^  \],?$/ { in_layers=0; next }
@@ -2150,9 +2204,9 @@ _generate_cross_reference_matrix_files() {
 			}
 			in_layer_obj=0; next
 		}
-		in_layer_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_layer_obj && /"name":/ { match($0, /"name": "([^"]+)"/, arr); name = arr[1] }
-		in_layer_obj && /"pattern":/ { match($0, /"pattern": "([^"]+)"/, arr); pattern = arr[1] }
+		in_layer_obj && /"layer_id":/ { line=$0; sub(/.*"layer_id": */, "", line); sub(/,.*$/, "", line); layer_id = line }
+		in_layer_obj && /"name":/ { line=$0; sub(/.*"name": *"/, "", line); sub(/".*$/, "", line); name = line }
+		in_layer_obj && /"pattern":/ { line=$0; sub(/.*"pattern": *"/, "", line); sub(/".*$/, "", line); pattern = line }
 
 		/"trace_tags": \[/ { in_trace_tags=1; next }
 		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
@@ -2185,12 +2239,12 @@ _generate_cross_reference_matrix_files() {
 			}
 			in_tag_obj=0; next
 		}
-		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
+		in_tag_obj && /"id":/ { line=$0; sub(/.*"id": *"/, "", line); sub(/".*$/, "", line); tag_id = line }
 		in_tag_obj && /"from_tags":/ {
 			from_tags_count = 0
 			delete from_tags
-			if (match($0, /\[(.*)\]/, arr)) {
-				raw = arr[1]
+			line=$0; sub(/.*\[/, "", line); sub(/\].*$/, "", line); raw = line
+			if (raw != "") {
 				n_ft = split(raw, ft_arr, ",")
 				for (k = 1; k <= n_ft; k++) {
 					t = ft_arr[k]
@@ -2201,9 +2255,9 @@ _generate_cross_reference_matrix_files() {
 				}
 			}
 		}
-		in_tag_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_tag_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_tag_obj && /"line":/ { match($0, /"line": ([0-9]+)/, arr); line = arr[1] }
+		in_tag_obj && /"layer_id":/ { line=$0; sub(/.*"layer_id": */, "", line); sub(/,.*$/, "", line); layer_id = line }
+		in_tag_obj && /"file_id":/ { line=$0; sub(/.*"file_id": */, "", line); sub(/,.*$/, "", line); file_id = line }
+		in_tag_obj && /"line":/ { line=$0; sub(/.*"line": */, "", line); sub(/,.*$/, "", line); line = line }
 
 		END {
 			if (layer_count < 2) exit
