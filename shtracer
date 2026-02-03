@@ -468,7 +468,8 @@ main_routine() {
 				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 			fi
 			# Pass OUTPUT_DIR to viewer so it can access intermediate files (cross-reference matrices)
-			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
+			# Strip carriage returns to ensure consistent LF-only line endings (fixes WSL/Windows CRLF issues)
+			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_html_viewer.sh" <"$_JSON_OUTPUT_FILE" | tr -d '\r'; then
 				_cleanup_output_dir
 				error_exit "$EXIT_VIEWER_FAILED" "main_routine" "Viewer script execution failed"
 			fi
@@ -482,7 +483,8 @@ main_routine() {
 				error_exit "$EXIT_VIEWER_NOT_FOUND" "main_routine" "Markdown viewer script not found: ${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 			fi
 			# Pass OUTPUT_DIR to viewer for accessing intermediate files
-			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh" <"$_JSON_OUTPUT_FILE"; then
+			# Strip carriage returns to ensure consistent LF-only line endings (fixes WSL/Windows CRLF issues)
+			if ! OUTPUT_DIR="$OUTPUT_DIR" sh "${SCRIPT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh" <"$_JSON_OUTPUT_FILE" | tr -d '\r'; then
 				_cleanup_output_dir
 				error_exit "$EXIT_VIEWER_FAILED" "main_routine" "Markdown viewer script execution failed"
 			fi
