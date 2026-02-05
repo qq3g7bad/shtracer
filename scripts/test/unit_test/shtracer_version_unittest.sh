@@ -209,6 +209,200 @@ test_format_version_info_short_empty() {
 	assertEquals "" "$_result"
 }
 
+##
+# @brief Test get_file_version_info with uncommitted changes
+# @note  File is tracked but has local modifications
+#
+test_get_file_version_info_uncommitted_changes() {
+	# Skip if git not available
+	if ! command -v git >/dev/null 2>&1; then
+		startSkipping
+		return
+	fi
+
+	# Create test git repo with committed file
+	_test_dir="${TEMP_DIR}/git_uncommitted"
+	mkdir -p "$_test_dir"
+	(
+		cd "$_test_dir" || return 1
+		git init >/dev/null 2>&1
+		git config user.email "test@example.com"
+		git config user.name "Test User"
+		echo "original content" >test_file.md
+		git add test_file.md >/dev/null 2>&1
+		git commit -m "Initial commit" >/dev/null 2>&1
+
+		# Modify file without committing
+		echo "modified content" >>test_file.md
+	)
+
+	# Act - should return last COMMITTED version, not modified version
+	_result="$(get_file_version_info "$_test_dir/test_file.md")"
+
+	# Assert - should still start with "git:" (uses last commit)
+	assertContains "$_result" "git:"
+
+	# Assert - hash should be 7 chars
+	_hash_part="${_result#git:}"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
+}
+
+##
+# @brief Test get_file_version_info in detached HEAD state
+# @note  Git repo is in detached HEAD (not on any branch)
+#
+test_get_file_version_info_detached_head() {
+	# Skip if git not available
+	if ! command -v git >/dev/null 2>&1; then
+		startSkipping
+		return
+	fi
+
+	# Create test git repo
+	_test_dir="${TEMP_DIR}/git_detached"
+	mkdir -p "$_test_dir"
+	(
+		cd "$_test_dir" || return 1
+		git init >/dev/null 2>&1
+		git config user.email "test@example.com"
+		git config user.name "Test User"
+		echo "test content" >test_file.md
+		git add test_file.md >/dev/null 2>&1
+		git commit -m "First commit" >/dev/null 2>&1
+
+		# Create detached HEAD by checking out the commit directly
+		_commit_hash="$(git rev-parse HEAD)"
+		git checkout "$_commit_hash" >/dev/null 2>&1
+	)
+
+	# Act
+	_result="$(get_file_version_info "$_test_dir/test_file.md")"
+
+	# Assert - should work in detached HEAD state
+	assertContains "$_result" "git:"
+
+	# Assert - hash should be 7 chars
+	_hash_part="${_result#git:}"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
+}
+
+##
+# @brief Test get_file_version_info in shallow clone
+# @note  Git repo is a shallow clone (--depth 1)
+#
+test_get_file_version_info_shallow_clone() {
+	# Skip if git not available
+	if ! command -v git >/dev/null 2>&1; then
+		startSkipping
+		return
+	fi
+
+	# Create test git repo with multiple commits
+	_orig_dir="${TEMP_DIR}/git_original"
+	_shallow_dir="${TEMP_DIR}/git_shallow"
+	mkdir -p "$_orig_dir"
+	(
+		cd "$_orig_dir" || return 1
+		git init >/dev/null 2>&1
+		git config user.email "test@example.com"
+		git config user.name "Test User"
+
+		echo "version 1" >test_file.md
+		git add test_file.md >/dev/null 2>&1
+		git commit -m "Commit 1" >/dev/null 2>&1
+
+		echo "version 2" >>test_file.md
+		git add test_file.md >/dev/null 2>&1
+		git commit -m "Commit 2" >/dev/null 2>&1
+
+		echo "version 3" >>test_file.md
+		git add test_file.md >/dev/null 2>&1
+		git commit -m "Commit 3" >/dev/null 2>&1
+	)
+
+	# Create shallow clone
+	git clone --depth 1 "file://$_orig_dir" "$_shallow_dir" >/dev/null 2>&1
+
+	# Act
+	_result="$(get_file_version_info "$_shallow_dir/test_file.md")"
+
+	# Assert - should work with shallow clone
+	assertContains "$_result" "git:"
+
+	# Assert - hash should be 7 chars
+	_hash_part="${_result#git:}"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
+}
+
+##
+# @brief Test get_file_version_info with git submodules
+# @note  Parent repo contains a git submodule
+#
+test_get_file_version_info_git_submodules() {
+	# Skip if git not available
+	if ! command -v git >/dev/null 2>&1; then
+		startSkipping
+		return
+	fi
+
+	# Create submodule repo
+	_submodule_dir="${TEMP_DIR}/git_submodule"
+	mkdir -p "$_submodule_dir"
+	(
+		cd "$_submodule_dir" || return 1
+		git init >/dev/null 2>&1
+		git config user.email "test@example.com"
+		git config user.name "Test User"
+		echo "submodule content" >sub_file.md
+		git add sub_file.md >/dev/null 2>&1
+		git commit -m "Submodule commit" >/dev/null 2>&1
+	)
+
+	# Create parent repo with submodule
+	_parent_dir="${TEMP_DIR}/git_parent"
+	mkdir -p "$_parent_dir"
+	(
+		cd "$_parent_dir" || return 1
+		git init >/dev/null 2>&1
+		git config user.email "test@example.com"
+		git config user.name "Test User"
+
+		# Add submodule
+		git submodule add "file://$_submodule_dir" submodule >/dev/null 2>&1 || true
+		git commit -m "Add submodule" >/dev/null 2>&1 || true
+
+		# Create file in parent
+		echo "parent content" >parent_file.md
+		git add parent_file.md >/dev/null 2>&1
+		git commit -m "Parent commit" >/dev/null 2>&1
+	)
+
+	# Act - test both parent and submodule files
+	_parent_result="$(get_file_version_info "$_parent_dir/parent_file.md")"
+
+	# Assert - parent file should have git version
+	assertContains "Parent file should have git version" "$_parent_result" "git:"
+
+	# Test submodule file if submodule was successfully created
+	if [ -f "$_parent_dir/submodule/sub_file.md" ]; then
+		_submodule_result="$(get_file_version_info "$_parent_dir/submodule/sub_file.md")"
+
+		# Submodule file should have SOME version (git: or mtime:)
+		# Note: Behavior may vary - submodule is separate git repo
+		case "$_submodule_result" in
+			git:* | mtime:*)
+				assertTrue "Submodule file should have version info" true
+				;;
+			*)
+				fail "Submodule file should have git: or mtime: version"
+				;;
+		esac
+	fi
+}
+
 # Load shunit2
 # shellcheck source=../shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"

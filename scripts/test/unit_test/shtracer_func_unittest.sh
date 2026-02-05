@@ -550,5 +550,896 @@ EOF
 	)
 }
 
+# ============================================================================
+# File Version Tracking Tests (Phase 1.3)
+# ============================================================================
+
+##
+# @brief Test create_file_versions_table with valid tags file
+# @tag @UT2.8.1@
+test_create_file_versions_table_valid() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/tags"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_OUTPUT_FILE="$OUTPUT_DIR/tags/05_file_versions"
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}git:abc1234
+Requirement${SHTRACER_SEPARATOR}@REQ2@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 2${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}15${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}git:abc1234
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}git:def5678
+EOF
+
+		# Act -------------
+		create_file_versions_table "$_TAGS_FILE" "$_OUTPUT_FILE"
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success" 0 "$_STATUS"
+		assertTrue "Output file should exist" "[ -f '$_OUTPUT_FILE' ]"
+
+		# Should have 2 unique file entries (req.md and arch.md)
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		assertEquals "Should have 2 unique files" 2 "$_LINE_COUNT"
+
+		# Should contain version info
+		grep -q "git:abc1234" "$_OUTPUT_FILE"
+		assertEquals "Should contain git hash for req.md" 0 $?
+
+		grep -q "git:def5678" "$_OUTPUT_FILE"
+		assertEquals "Should contain git hash for arch.md" 0 $?
+	)
+}
+
+##
+# @brief Test create_file_versions_table with multiple files per layer
+# @tag @UT2.8.2@
+test_create_file_versions_table_multiple_files() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/tags"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_OUTPUT_FILE="$OUTPUT_DIR/tags/05_file_versions"
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req1.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Requirement${SHTRACER_SEPARATOR}@REQ2@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 2${SHTRACER_SEPARATOR}req2.md${SHTRACER_SEPARATOR}15${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v2
+Requirement${SHTRACER_SEPARATOR}@REQ3@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 3${SHTRACER_SEPARATOR}req1.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Act -------------
+		create_file_versions_table "$_TAGS_FILE" "$_OUTPUT_FILE"
+
+		# Assert ----------
+		# Should have 2 unique files (req1.md and req2.md)
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		assertEquals "Should have 2 unique files" 2 "$_LINE_COUNT"
+	)
+}
+
+##
+# @brief Test create_file_versions_table with empty tags file
+# @tag @UT2.8.3@
+test_create_file_versions_table_empty() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/tags"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_OUTPUT_FILE="$OUTPUT_DIR/tags/05_file_versions"
+		touch "$_TAGS_FILE"
+
+		# Act -------------
+		create_file_versions_table "$_TAGS_FILE" "$_OUTPUT_FILE"
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success" 0 "$_STATUS"
+		assertTrue "Output file should exist" "[ -f '$_OUTPUT_FILE' ]"
+
+		# Should be empty
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		assertEquals "Should have 0 lines" 0 "$_LINE_COUNT"
+	)
+}
+
+##
+# @brief Test create_file_versions_table with unreadable file
+# @tag @UT2.8.4@
+test_create_file_versions_table_unreadable() {
+	# Arrange ---------
+	mkdir -p "$OUTPUT_DIR/tags"
+	_OUTPUT_FILE="$OUTPUT_DIR/tags/05_file_versions"
+
+	# Act ----------
+	# Run in subshell to capture exit code (error_exit calls exit)
+	(create_file_versions_table "/nonexistent/file" "$_OUTPUT_FILE" 2>/dev/null)
+	_STATUS=$?
+
+	# Assert ----------
+	assertNotEquals "Should return error" 0 "$_STATUS"
+}
+
+# ============================================================================
+# Cross-Reference Table Generation Tests (Phase 1.2)
+# ============================================================================
+
+##
+# @brief Test _extract_layer_hierarchy with simple config
+# @tag @UT2.7.1@
+test_extract_layer_hierarchy_simple() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+
+		# Create minimal config table with two layers
+		# Format: :Section<sep>path<sep>brief<sep>tag_line<sep>ext<sep>tag_format<sep>offset<sep>ignore
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Requirements${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Architecture${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		# Act -------------
+		_RESULT=$(_extract_layer_hierarchy "$_CONFIG_TABLE")
+
+		# Assert ----------
+		assertEquals "Should return success" 0 $?
+		assertNotNull "Result should not be empty" "$_RESULT"
+
+		# Should have two layers
+		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l)
+		assertEquals "Should have 2 layers" 2 "$_LINE_COUNT"
+
+		# Should contain Requirement layer
+		echo "$_RESULT" | grep -q "Requirement"
+		assertEquals "Should contain Requirement layer" 0 $?
+
+		# Should contain Architecture layer
+		echo "$_RESULT" | grep -q "Architecture"
+		assertEquals "Should contain Architecture layer" 0 $?
+	)
+}
+
+##
+# @brief Test _extract_layer_hierarchy with three layers
+# @tag @UT2.7.2@
+test_extract_layer_hierarchy_three_layers() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Implementation${SHTRACER_SEPARATOR}./impl.sh${SHTRACER_SEPARATOR}Impl${SHTRACER_SEPARATOR}#.*${SHTRACER_SEPARATOR}*.sh${SHTRACER_SEPARATOR}\`@IMP[0-9\.]+@\`${SHTRACER_SEPARATOR}0${SHTRACER_SEPARATOR}
+EOF
+
+		# Act -------------
+		_RESULT=$(_extract_layer_hierarchy "$_CONFIG_TABLE")
+
+		# Assert ----------
+		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l)
+		assertEquals "Should have 3 layers" 3 "$_LINE_COUNT"
+	)
+}
+
+##
+# @brief Test _extract_layer_hierarchy with empty config
+# @tag @UT2.7.3@
+test_extract_layer_hierarchy_empty_config() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		touch "$_CONFIG_TABLE"
+
+		# Act -------------
+		_RESULT=$(_extract_layer_hierarchy "$_CONFIG_TABLE")
+
+		# Assert ----------
+		assertEquals "Should return success" 0 $?
+		assertEquals "Result should be empty" "" "$_RESULT"
+	)
+}
+
+##
+# @brief Test _extract_layer_hierarchy with unreadable file
+# @tag @UT2.7.4@
+test_extract_layer_hierarchy_unreadable() {
+	(
+		# Act -------------
+		_RESULT=$(_extract_layer_hierarchy "/nonexistent/file" 2>/dev/null)
+
+		# Assert ----------
+		assertEquals "Should return error" 1 $?
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with single layer pair
+# @tag @UT2.7.5@
+test_make_cross_reference_tables_single_pair() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Requirement 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Architecture 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		# Act -------------
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success" 0 "$_STATUS"
+
+		# Check that at least one cross-ref matrix file was created
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertTrue "Should create at least one matrix file" "[ $_MATRIX_FILES -ge 1 ]"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with multiple layer pairs
+# @tag @UT2.7.6@
+test_make_cross_reference_tables_multiple_pairs() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Implementation${SHTRACER_SEPARATOR}./impl.sh${SHTRACER_SEPARATOR}Impl${SHTRACER_SEPARATOR}#.*${SHTRACER_SEPARATOR}*.sh${SHTRACER_SEPARATOR}\`@IMP[0-9\.]+@\`${SHTRACER_SEPARATOR}0${SHTRACER_SEPARATOR}
+EOF
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Implementation${SHTRACER_SEPARATOR}@IMP1@${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}Impl 1${SHTRACER_SEPARATOR}impl.sh${SHTRACER_SEPARATOR}30${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+@ARC1@${SHTRACER_SEPARATOR}@IMP1@
+EOF
+
+		# Act -------------
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success" 0 "$_STATUS"
+
+		# Should create 2 matrix files (REQ->ARC and ARC->IMP)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "0*_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertEquals "Should create 2 matrix files" 2 "$_MATRIX_FILES"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with orphaned tags
+# @tag @UT2.7.7@
+test_make_cross_reference_tables_orphaned_tags() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		# Tags with no relationships
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Requirement${SHTRACER_SEPARATOR}@REQ2@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 2${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}15${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		# Empty tag pairs - no relationships
+		touch "$_TAG_PAIRS_FILE"
+
+		# Act -------------
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success even with orphaned tags" 0 "$_STATUS"
+
+		# Matrix file should still be created (may be empty)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertTrue "Should create matrix file even with orphaned tags" "[ $_MATRIX_FILES -ge 1 ]"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with empty config
+# @tag @UT2.7.8@
+test_make_cross_reference_tables_empty_config() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		# Empty config table
+		touch "$_CONFIG_TABLE"
+		touch "$_TAGS_FILE"
+		touch "$_TAG_PAIRS_FILE"
+
+		# Act -------------
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE" 2>&1)
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return success with empty config" 0 "$_STATUS"
+
+		# Should output warning about no layers
+		echo "$_RESULT" | grep -q "warn\|No traceability layers"
+		assertEquals "Should warn about no layers" 0 $?
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with unreadable files
+# @tag @UT2.7.9@
+test_make_cross_reference_tables_unreadable_files() {
+	(
+		# Arrange ---------
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="/nonexistent/file"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		touch "$_TAGS_FILE"
+		touch "$_TAG_PAIRS_FILE"
+
+		# Act -------------
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE" 2>&1)
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals "Should return error for unreadable files" 1 "$_STATUS"
+
+		# Should output error message
+		echo "$_RESULT" | grep -q "error\|Cannot read"
+		assertEquals "Should show error message" 0 $?
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with missing intermediate layers
+# @tag @UT2.7.10@
+test_make_cross_reference_tables_missing_intermediate() {
+	(
+		# Arrange: REQ -> ARC -> IMP, but skip ARC layer
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Implementation${SHTRACER_SEPARATOR}./impl.sh${SHTRACER_SEPARATOR}Impl${SHTRACER_SEPARATOR}#.*${SHTRACER_SEPARATOR}*.sh${SHTRACER_SEPARATOR}\`@IMP[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		# IMP1 references REQ1 directly (skipping ARC layer)
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Requirement 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Implementation${SHTRACER_SEPARATOR}@IMP1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Implementation 1${SHTRACER_SEPARATOR}impl.sh${SHTRACER_SEPARATOR}30${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@IMP1@
+EOF
+
+		# Act
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle missing intermediate layers" 0 "$_STATUS"
+
+		# Should create matrix for REQ->IMP pair
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertTrue "Should create cross-ref matrix" "[ $_MATRIX_FILES -ge 1 ]"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with files containing no tags
+# @tag @UT2.7.11@
+test_make_cross_reference_tables_files_with_no_tags() {
+	(
+		# Arrange: Config points to files but no tags found
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		# Empty tags file (no tags found)
+		touch "$_TAGS_FILE"
+		touch "$_TAG_PAIRS_FILE"
+
+		# Act
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle empty tags gracefully" 0 "$_STATUS"
+
+		# No matrix files should be created (no layer pairs)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertEquals "Should not create matrix for empty tags" 0 "$_MATRIX_FILES"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with special characters in paths
+# @tag @UT2.7.12@
+test_make_cross_reference_tables_special_char_paths() {
+	(
+		# Arrange: Paths with spaces and special characters
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./my docs/req file.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch & design.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}my docs/req file.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch & design.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		# Act
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle special chars in paths" 0 "$_STATUS"
+
+		# Should create matrix
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertTrue "Should create cross-ref matrix" "[ $_MATRIX_FILES -ge 1 ]"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables with UTF-8 tag titles
+# @tag @UT2.7.13@
+test_make_cross_reference_tables_utf8_titles() {
+	(
+		# Arrange: Tags with UTF-8 characters in titles
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		# UTF-8 titles: accented chars, Greek letters, math symbols, emoji
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Requirement #1: Café & Naïve Implementation 🔒${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Architecture α: Data Flow (∑ ≥ β) 📐${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		# Act
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle UTF-8 titles" 0 "$_STATUS"
+
+		# Verify matrix files were created
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		assertTrue "Should create cross-ref matrix with UTF-8" "[ $_MATRIX_FILES -ge 1 ]"
+	)
+}
+
+##
+# @brief Test make_cross_reference_tables directory structure creation
+# @tag @UT2.7.14@
+test_make_cross_reference_tables_directory_structure() {
+	(
+		# Arrange
+		mkdir -p "$OUTPUT_DIR/config" "$OUTPUT_DIR/tags"
+		_CONFIG_TABLE="$OUTPUT_DIR/config/01_config_table"
+		_TAGS_FILE="$OUTPUT_DIR/tags/01_tags"
+		_TAG_PAIRS_FILE="$OUTPUT_DIR/tags/02_tag_pairs"
+
+		cat >"$_CONFIG_TABLE" <<EOF
+:Requirement${SHTRACER_SEPARATOR}./req.md${SHTRACER_SEPARATOR}Req${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@REQ[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+:Architecture${SHTRACER_SEPARATOR}./arch.md${SHTRACER_SEPARATOR}Arch${SHTRACER_SEPARATOR}<!--.*-->${SHTRACER_SEPARATOR}*.md${SHTRACER_SEPARATOR}\`@ARC[0-9\.]+@\`${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}
+EOF
+
+		cat >"$_TAGS_FILE" <<EOF
+Requirement${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}$NODATA_STRING${SHTRACER_SEPARATOR}Req 1${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+Architecture${SHTRACER_SEPARATOR}@ARC1@${SHTRACER_SEPARATOR}@REQ1@${SHTRACER_SEPARATOR}Arch 1${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20${SHTRACER_SEPARATOR}extra${SHTRACER_SEPARATOR}v1
+EOF
+
+		cat >"$_TAG_PAIRS_FILE" <<EOF
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		# Remove any existing cross-reference files
+		rm -f "$OUTPUT_DIR/tags/06_cross_ref_matrix_"*
+
+		# Act
+		_RESULT=$(make_cross_reference_tables "$_CONFIG_TABLE" "$_TAGS_FILE" "$_TAG_PAIRS_FILE")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should create directory structure" 0 "$_STATUS"
+
+		# Verify matrix files are created in correct location
+		assertTrue "Matrix files should exist in tags/ dir" "[ -f '$OUTPUT_DIR/tags/06_cross_ref_matrix_'* ]"
+
+		# Verify naming pattern
+		_MATRIX_FILE=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" | head -1)
+		case "$_MATRIX_FILE" in
+			"$OUTPUT_DIR/tags/06_cross_ref_matrix_"*)
+				assertTrue "Matrix file follows naming convention" true
+				;;
+			*)
+				fail "Matrix file should match pattern: 06_cross_ref_matrix_*"
+				;;
+		esac
+	)
+}
+
+# ============================================================================
+# Phase 1.4: Markdown Formatting Utilities Tests
+# ============================================================================
+
+##
+# @brief Test markdown_cross_reference with empty matrix (no tags)
+# @tag @UT2.9.1@
+test_markdown_cross_reference_empty() {
+	(
+		# Arrange: Create matrix file with no tags
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_REQ_ARC"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+[COL_TAGS]
+[MATRIX]
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle empty matrix" 0 "$_STATUS"
+		assertTrue "Should create output directory" "[ -d '$OUTPUT_DIR/cross_reference' ]"
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with single row
+# @tag @UT2.9.2@
+test_markdown_cross_reference_single_row() {
+	(
+		# Arrange: Matrix with one requirement and one architecture
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_Requirement_Architecture"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should process single row" 0 "$_STATUS"
+
+		# Verify markdown file was created
+		_MD_FILE=$(find "$OUTPUT_DIR/cross_reference" -name "*.md" | head -1)
+		assertTrue "Should create markdown file" "[ -f '$_MD_FILE' ]"
+
+		# Verify markdown contains tag
+		grep -q "@REQ1@" "$_MD_FILE"
+		assertEquals "Markdown should contain REQ tag" 0 $?
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with multiple rows
+# @tag @UT2.9.3@
+test_markdown_cross_reference_multiple_rows() {
+	(
+		# Arrange: Matrix with multiple requirements and architectures
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_Requirement_Architecture"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10
+@REQ2@${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}20
+@REQ3@${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}30
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}40
+@ARC2@${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}50
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+@REQ2@${SHTRACER_SEPARATOR}@ARC2@
+@REQ3@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should process multiple rows" 0 "$_STATUS"
+
+		# Verify markdown file contains all tags
+		_MD_FILE=$(find "$OUTPUT_DIR/cross_reference" -name "*.md" | head -1)
+		grep -q "@REQ1@" "$_MD_FILE"
+		assertEquals "Should contain REQ1" 0 $?
+		grep -q "@REQ2@" "$_MD_FILE"
+		assertEquals "Should contain REQ2" 0 $?
+		grep -q "@REQ3@" "$_MD_FILE"
+		assertEquals "Should contain REQ3" 0 $?
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with special characters in tags
+# @tag @UT2.9.4@
+test_markdown_cross_reference_special_chars() {
+	(
+		# Arrange: Tags with markdown special chars (|, \, *, [, ])
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_Requirement_Architecture"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}path/with|pipe.md${SHTRACER_SEPARATOR}10
+@REQ2@${SHTRACER_SEPARATOR}path/with[bracket].md${SHTRACER_SEPARATOR}20
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}arch*.md${SHTRACER_SEPARATOR}30
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH" 2>&1)
+		_STATUS=$?
+
+		# Assert - should not crash with special chars
+		assertEquals "Should handle special chars" 0 "$_STATUS"
+
+		# Verify markdown file was created
+		_MD_FILE=$(find "$OUTPUT_DIR/cross_reference" -name "*.md" 2>/dev/null | head -1)
+		assertTrue "Should create markdown file" "[ -f '$_MD_FILE' ]"
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with UTF-8 content
+# @tag @UT2.9.5@
+test_markdown_cross_reference_utf8_content() {
+	(
+		# Arrange: Tags with UTF-8 characters
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_Requirement_Architecture"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}café.md${SHTRACER_SEPARATOR}10
+@REQ2@${SHTRACER_SEPARATOR}naïve_α.md${SHTRACER_SEPARATOR}20
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}design_β.md${SHTRACER_SEPARATOR}30
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle UTF-8 content" 0 "$_STATUS"
+
+		# Verify markdown file was created
+		_MD_FILE=$(find "$OUTPUT_DIR/cross_reference" -name "*.md" | head -1)
+		assertTrue "Should create markdown with UTF-8" "[ -f '$_MD_FILE' ]"
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with very long file paths
+# @tag @UT2.9.6@
+test_markdown_cross_reference_long_paths() {
+	(
+		# Arrange: Tags with very long file paths
+		mkdir -p "$OUTPUT_DIR/tags"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_Requirement_Architecture"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+
+		_LONG_PATH="very/long/path/to/some/deeply/nested/directory/structure/with/many/levels/requirement.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}$_LONG_PATH${SHTRACER_SEPARATOR}100
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}50
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH")
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should handle long paths" 0 "$_STATUS"
+
+		# Verify markdown file was created
+		_MD_FILE=$(find "$OUTPUT_DIR/cross_reference" -name "*.md" | head -1)
+		assertTrue "Should create markdown file" "[ -f '$_MD_FILE' ]"
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with nonexistent tags directory
+# @tag @UT2.9.7@
+test_markdown_cross_reference_invalid_dir() {
+	(
+		# Arrange: Point to nonexistent directory
+		_TAGS_DIR="/nonexistent/tags/directory"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$_TAGS_DIR" "$_CONFIG_PATH" 2>&1)
+		_STATUS=$?
+
+		# Assert - should fail gracefully
+		assertNotEquals "Should fail with invalid directory" 0 "$_STATUS"
+		echo "$_RESULT" | grep -q "error"
+		assertEquals "Should output error message" 0 $?
+	)
+}
+
+##
+# @brief Test markdown_cross_reference with no matrix files
+# @tag @UT2.9.8@
+test_markdown_cross_reference_no_matrix_files() {
+	(
+		# Arrange: Tags directory exists but no matrix files
+		mkdir -p "$OUTPUT_DIR/tags"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_RESULT=$(markdown_cross_reference "$OUTPUT_DIR/tags" "$_CONFIG_PATH" 2>&1)
+		_STATUS=$?
+
+		# Assert - should succeed but warn
+		assertEquals "Should succeed with no matrices" 0 "$_STATUS"
+		echo "$_RESULT" | grep -q "warn"
+		assertEquals "Should output warning" 0 $?
+	)
+}
+
+##
+# @brief Test _generate_markdown_table basic formatting
+# @tag @UT2.9.9@
+test_generate_markdown_table_formatting() {
+	(
+		# Arrange
+		mkdir -p "$OUTPUT_DIR/tags" "$OUTPUT_DIR/cross_reference"
+		_MATRIX_FILE="$OUTPUT_DIR/tags/06_cross_ref_matrix_REQ_ARC"
+		_CONFIG_PATH="$OUTPUT_DIR/config.md"
+		_OUTPUT_MD="$OUTPUT_DIR/cross_reference/test_output.md"
+
+		cat >"$_MATRIX_FILE" <<EOF
+[METADATA]
+@REQ[0-9\.]+@${SHTRACER_SEPARATOR}@ARC[0-9\.]+@
+[ROW_TAGS]
+@REQ1@${SHTRACER_SEPARATOR}req.md${SHTRACER_SEPARATOR}10
+[COL_TAGS]
+@ARC1@${SHTRACER_SEPARATOR}arch.md${SHTRACER_SEPARATOR}20
+[MATRIX]
+@REQ1@${SHTRACER_SEPARATOR}@ARC1@
+EOF
+
+		echo "dummy config" >"$_CONFIG_PATH"
+
+		# Act
+		_generate_markdown_table "$_MATRIX_FILE" "$_CONFIG_PATH" "$_OUTPUT_MD"
+		_STATUS=$?
+
+		# Assert
+		assertEquals "Should generate markdown table" 0 "$_STATUS"
+		assertTrue "Output file should exist" "[ -f '$_OUTPUT_MD' ]"
+
+		# Verify markdown table structure (should contain table markers)
+		grep -q "|" "$_OUTPUT_MD"
+		assertEquals "Should contain table pipes" 0 $?
+	)
+}
+
 # shellcheck source=shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"

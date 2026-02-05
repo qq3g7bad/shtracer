@@ -692,6 +692,598 @@ test_remove_lines_with_pattern_special_chars() {
 	assertEquals "$expected" "$result"
 }
 
+# ============================================================================
+# Phase 5.5: File Version Info Tests
+# ============================================================================
+
+##
+# @brief Test get_file_version_info with a git-tracked file
+#
+test_get_file_version_info_git_file() {
+	# Use the shtracer script itself which is in a git repo
+	_git_file="${SHTRACER_ROOT_DIR}/shtracer"
+	if [ -f "$_git_file" ]; then
+		result=$(get_file_version_info "$_git_file")
+		# Result should be "git:XXXXXXX" (7-char hash)
+		case "$result" in
+			git:??????*)
+				assertTrue "Should return git hash" true
+				;;
+			*)
+				fail "Expected git:XXXXXXX format, got: $result"
+				;;
+		esac
+	else
+		# Skip if file doesn't exist
+		startSkipping
+	fi
+}
+
+##
+# @brief Test get_file_version_info with a non-git file
+#
+test_get_file_version_info_non_git_file() {
+	# Create a file outside any git repo
+	_test_file="$TEMP_DIR/non_git_file.txt"
+	echo "test content" >"$_test_file"
+
+	# Move to temp dir to ensure not in git repo context
+	(
+		cd "$TEMP_DIR" || exit 1
+		result=$(get_file_version_info "$_test_file")
+
+		# Should fall back to mtime format
+		case "$result" in
+			mtime:*)
+				assertTrue "Should return mtime format" true
+				;;
+			unknown)
+				# Also acceptable if stat/date not available
+				assertTrue "Unknown is acceptable fallback" true
+				;;
+			*)
+				fail "Expected mtime:ISO8601 or unknown, got: $result"
+				;;
+		esac
+	)
+}
+
+##
+# @brief Test get_file_version_info with non-existent file
+#
+test_get_file_version_info_nonexistent() {
+	result=$(get_file_version_info "/nonexistent/file.txt")
+	status=$?
+
+	assertEquals "unknown" "$result"
+	assertEquals "Should return error status" 1 "$status"
+}
+
+##
+# @brief Test format_version_info_short with git format
+#
+test_format_version_info_short_git() {
+	result=$(format_version_info_short "git:abc1234")
+	assertEquals "abc1234" "$result"
+}
+
+##
+# @brief Test format_version_info_short with mtime format
+#
+test_format_version_info_short_mtime() {
+	result=$(format_version_info_short "mtime:2025-12-26T10:30:45Z")
+	assertEquals "2025-12-26 10:30" "$result"
+}
+
+##
+# @brief Test format_version_info_short with unknown format
+#
+test_format_version_info_short_unknown() {
+	result=$(format_version_info_short "unknown")
+	assertEquals "unknown" "$result"
+}
+
+##
+# @brief Test format_version_info_short with arbitrary format
+#
+test_format_version_info_short_other() {
+	result=$(format_version_info_short "some_other_value")
+	assertEquals "some_other_value" "$result"
+}
+
+# ============================================================================
+# Phase 6: Temporary File/Directory Handling Tests
+# ============================================================================
+
+##
+# @brief Test _shtracer_tmp_base_dir returns TMPDIR when set
+#
+test_shtracer_tmp_base_dir_with_tmpdir() {
+	# Save original TMPDIR
+	_orig_tmpdir="${TMPDIR:-}"
+
+	# Set custom TMPDIR
+	export TMPDIR="$TEMP_DIR/custom_tmp"
+	mkdir -p "$TMPDIR"
+
+	result=$(_shtracer_tmp_base_dir)
+	assertEquals "$TEMP_DIR/custom_tmp" "$result"
+
+	# Restore original TMPDIR
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test _shtracer_tmp_base_dir returns /tmp when TMPDIR is unset
+#
+test_shtracer_tmp_base_dir_default() {
+	# Save and unset TMPDIR
+	_orig_tmpdir="${TMPDIR:-}"
+	unset TMPDIR
+
+	result=$(_shtracer_tmp_base_dir)
+	assertEquals "/tmp" "$result"
+
+	# Restore original TMPDIR
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	fi
+}
+
+##
+# @brief Test _shtracer_tmp_base_dir strips trailing slash from TMPDIR
+#
+test_shtracer_tmp_base_dir_strips_trailing_slash() {
+	_orig_tmpdir="${TMPDIR:-}"
+
+	export TMPDIR="$TEMP_DIR/custom_tmp/"
+	mkdir -p "$TEMP_DIR/custom_tmp"
+
+	result=$(_shtracer_tmp_base_dir)
+	assertEquals "$TEMP_DIR/custom_tmp" "$result"
+
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile creates a file successfully
+#
+test_shtracer_tmpfile_creates_file() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpfile)
+	status=$?
+
+	assertEquals "shtracer_tmpfile should return success" 0 "$status"
+	assertTrue "File should exist: $result" "[ -f '$result' ]"
+
+	# Cleanup
+	rm -f "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile creates unique files
+#
+test_shtracer_tmpfile_unique_files() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	file1=$(shtracer_tmpfile)
+	file2=$(shtracer_tmpfile)
+
+	assertNotEquals "Files should have unique paths" "$file1" "$file2"
+
+	# Cleanup
+	rm -f "$file1" "$file2"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile creates files with secure permissions (0600)
+#
+test_shtracer_tmpfile_secure_permissions() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpfile)
+
+	# Get file permissions (platform-independent approach)
+	if stat -c '%a' "$result" >/dev/null 2>&1; then
+		# GNU stat (Linux)
+		perms=$(stat -c '%a' "$result")
+	else
+		# BSD stat (macOS)
+		perms=$(stat -f '%Lp' "$result")
+	fi
+
+	assertEquals "File permissions should be 600" "600" "$perms"
+
+	# Cleanup
+	rm -f "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile uses custom TMPDIR
+#
+test_shtracer_tmpfile_uses_tmpdir() {
+	_orig_tmpdir="${TMPDIR:-}"
+
+	custom_tmp="$TEMP_DIR/my_custom_tmp"
+	mkdir -p "$custom_tmp"
+	export TMPDIR="$custom_tmp"
+
+	result=$(shtracer_tmpfile)
+
+	# Verify file is in custom TMPDIR
+	case "$result" in
+		"$custom_tmp"/*) assertTrue "File should be in TMPDIR" true ;;
+		*) fail "File should be in $custom_tmp, got: $result" ;;
+	esac
+
+	# Cleanup
+	rm -f "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile file naming pattern
+#
+test_shtracer_tmpfile_naming_pattern() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpfile)
+
+	# Filename should match pattern: shtracer.<pid>.<counter>
+	filename=$(basename "$result")
+	case "$filename" in
+		shtracer.*.*)
+			assertTrue "Filename matches expected pattern" true
+			;;
+		*)
+			fail "Filename should match 'shtracer.<pid>.<n>' pattern, got: $filename"
+			;;
+	esac
+
+	# Cleanup
+	rm -f "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile concurrent creation (sequential for testing)
+#
+test_shtracer_tmpfile_sequential_creation() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	# Create multiple temp files in sequence
+	files=""
+	for _ in 1 2 3 4 5; do
+		file=$(shtracer_tmpfile)
+		files="$files $file"
+	done
+
+	# Verify all files exist and are unique
+	count=0
+	for file in $files; do
+		assertTrue "File should exist: $file" "[ -f '$file' ]"
+		count=$((count + 1))
+	done
+	assertEquals "Should have created 5 files" 5 "$count"
+
+	# Cleanup
+	for file in $files; do
+		rm -f "$file"
+	done
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir creates a directory successfully
+#
+test_shtracer_tmpdir_creates_directory() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpdir)
+	status=$?
+
+	assertEquals "shtracer_tmpdir should return success" 0 "$status"
+	assertTrue "Directory should exist: $result" "[ -d '$result' ]"
+
+	# Cleanup
+	rmdir "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir creates unique directories
+#
+test_shtracer_tmpdir_unique_directories() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	dir1=$(shtracer_tmpdir)
+	dir2=$(shtracer_tmpdir)
+
+	assertNotEquals "Directories should have unique paths" "$dir1" "$dir2"
+
+	# Cleanup
+	rmdir "$dir1" "$dir2"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir creates directories with secure permissions (0700)
+#
+test_shtracer_tmpdir_secure_permissions() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpdir)
+
+	# Get directory permissions (platform-independent approach)
+	if stat -c '%a' "$result" >/dev/null 2>&1; then
+		# GNU stat (Linux)
+		perms=$(stat -c '%a' "$result")
+	else
+		# BSD stat (macOS)
+		perms=$(stat -f '%Lp' "$result")
+	fi
+
+	assertEquals "Directory permissions should be 700" "700" "$perms"
+
+	# Cleanup
+	rmdir "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir directory naming pattern (ends with .d)
+#
+test_shtracer_tmpdir_naming_pattern() {
+	_orig_tmpdir="${TMPDIR:-}"
+	export TMPDIR="$TEMP_DIR"
+
+	result=$(shtracer_tmpdir)
+
+	# Directory name should match pattern: shtracer.<pid>.<counter>.d
+	dirname=$(basename "$result")
+	case "$dirname" in
+		shtracer.*.*.d)
+			assertTrue "Directory name matches expected pattern" true
+			;;
+		*)
+			fail "Directory should match 'shtracer.<pid>.<n>.d' pattern, got: $dirname"
+			;;
+	esac
+
+	# Cleanup
+	rmdir "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir uses custom TMPDIR
+#
+test_shtracer_tmpdir_uses_tmpdir() {
+	_orig_tmpdir="${TMPDIR:-}"
+
+	custom_tmp="$TEMP_DIR/my_custom_tmp_dir"
+	mkdir -p "$custom_tmp"
+	export TMPDIR="$custom_tmp"
+
+	result=$(shtracer_tmpdir)
+
+	# Verify directory is in custom TMPDIR
+	case "$result" in
+		"$custom_tmp"/*) assertTrue "Directory should be in TMPDIR" true ;;
+		*) fail "Directory should be in $custom_tmp, got: $result" ;;
+	esac
+
+	# Cleanup
+	rmdir "$result"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpfile handles permission denied gracefully
+# @note  Creates read-only directory and verifies function fails appropriately
+#
+test_shtracer_tmpfile_permission_denied() {
+	_orig_tmpdir="${TMPDIR:-}"
+
+	# Create a read-only directory
+	readonly_dir="$TEMP_DIR/readonly_tmp"
+	mkdir -p "$readonly_dir"
+	chmod 500 "$readonly_dir"
+	export TMPDIR="$readonly_dir"
+
+	# Attempt to create tmpfile (should fail)
+	result=$(shtracer_tmpfile 2>/dev/null)
+	exit_code=$?
+
+	# Should fail with non-zero exit code
+	assertNotEquals "Should fail with permission denied" 0 "$exit_code"
+	assertEquals "Should return empty string on failure" "" "$result"
+
+	# Cleanup
+	chmod 700 "$readonly_dir"
+	rmdir "$readonly_dir"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir handles permission denied gracefully
+# @note  Creates read-only directory and verifies function fails appropriately
+#
+test_shtracer_tmpdir_permission_denied() {
+	_orig_tmpdir="${TMPDIR:-}"
+
+	# Create a read-only directory
+	readonly_dir="$TEMP_DIR/readonly_tmp"
+	mkdir -p "$readonly_dir"
+	chmod 500 "$readonly_dir"
+	export TMPDIR="$readonly_dir"
+
+	# Attempt to create tmpdir (should fail)
+	result=$(shtracer_tmpdir 2>/dev/null)
+	exit_code=$?
+
+	# Should fail with non-zero exit code
+	assertNotEquals "Should fail with permission denied" 0 "$exit_code"
+	assertEquals "Should return empty string on failure" "" "$result"
+
+	# Cleanup
+	chmod 700 "$readonly_dir"
+	rmdir "$readonly_dir"
+	if [ -n "$_orig_tmpdir" ]; then
+		export TMPDIR="$_orig_tmpdir"
+	else
+		unset TMPDIR
+	fi
+}
+
+##
+# @brief Test shtracer_tmpdir Windows path compatibility
+# @note  Verifies paths work in MSYS2/Git Bash environments
+#
+test_shtracer_tmpdir_windows_path_compatibility() {
+	result=$(shtracer_tmpdir)
+
+	# Verify directory was created
+	assertTrue "Directory should exist" "[ -d '$result' ]"
+
+	# Verify path doesn't contain backslashes (POSIX requirement)
+	case "$result" in
+		*\\*)
+			fail "Path should not contain backslashes: $result"
+			;;
+		*)
+			assertTrue "Path is POSIX-compliant" true
+			;;
+	esac
+
+	# Verify path is absolute
+	case "$result" in
+		/*)
+			assertTrue "Path is absolute" true
+			;;
+		*)
+			fail "Path should be absolute, got: $result"
+			;;
+	esac
+
+	# Cleanup
+	rmdir "$result"
+}
+
+##
+# @brief Test shtracer_tmpdir prevents symlink attacks
+# @note  Verifies that existing symlinks don't cause security issues
+#
+test_shtracer_tmpdir_symlink_attack_prevention() {
+	_tmp_base="$(_shtracer_tmp_base_dir)"
+
+	# Create a target directory for symlink
+	attack_target="$TEMP_DIR/attack_target"
+	mkdir -p "$attack_target"
+
+	# Pre-create first possible tmpdir path as a symlink
+	symlink_path="${_tmp_base%/}/shtracer.$$.0.d"
+	ln -s "$attack_target" "$symlink_path" 2>/dev/null || {
+		# If symlink creation fails, skip test
+		rmdir "$attack_target"
+		startSkipping
+		return
+	}
+
+	# Try to create tmpdir (should skip the symlink and use next index)
+	result=$(shtracer_tmpdir)
+
+	# Verify result is NOT the symlink
+	assertNotEquals "Should not use existing symlink" "$symlink_path" "$result"
+
+	# Verify result is a real directory, not a symlink
+	assertTrue "Result should be a directory" "[ -d '$result' ]"
+	assertFalse "Result should not be a symlink" "[ -L '$result' ]"
+
+	# Verify it's index 1, not 0
+	case "$result" in
+		*shtracer.$$.1.d)
+			assertTrue "Should use next available index" true
+			;;
+		*)
+			fail "Should have used index 1, got: $result"
+			;;
+	esac
+
+	# Cleanup
+	rm -f "$symlink_path"
+	rmdir "$attack_target"
+	rmdir "$result"
+}
+
 # Load shunit2
 # shellcheck source=../shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"
