@@ -247,8 +247,8 @@ test_integration_multiple_files() {
 		echo "${_TAG_TABLE}" | grep -q "@REQ1.3@ @ARC1.3@ @IMP1.3@"
 		assertEquals "Complete chain REQ->ARC->IMP should exist for requirement 1.3" 0 $?
 
-		# Count total chains
-		_CHAIN_COUNT=$(echo "${_TAG_TABLE}" | wc -l)
+		# Count total chains (strip whitespace for BSD wc compatibility)
+		_CHAIN_COUNT=$(echo "${_TAG_TABLE}" | wc -l | tr -d ' \t')
 		assertEquals "Should have exactly 3 traceability chains" 3 "${_CHAIN_COUNT}"
 	)
 }
@@ -446,7 +446,7 @@ test_cross_ref_matrix_files_generated() {
 		assertEquals "Shtracer should exit successfully" 0 "${_EXIT_CODE}"
 
 		# Check that cross-reference matrix files exist
-		_MATRIX_FILES=$(find shtracer_output/tags -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find shtracer_output/tags -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' \t')
 		assertTrue "At least one cross-reference matrix file should exist" "[ ${_MATRIX_FILES} -gt 0 ]"
 
 		# Verify matrix file format

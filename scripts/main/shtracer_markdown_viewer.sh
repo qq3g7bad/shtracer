@@ -470,8 +470,10 @@ _get_layer_display_name() {
 		in_layers && /^\s*\]/ { in_layers = 0; next }
 		in_layers && /^\s*\{/ { in_layer_obj = 1; layer_name = ""; next }
 		in_layer_obj && /"name":/ {
-			match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
-			layer_name = arr[1]
+		line = $0
+		sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", line)
+		sub(/".*$/, "", line)
+			layer_name = line
 		}
 		in_layer_obj && /^\s*\}/ {
 			in_layer_obj = 0
@@ -735,23 +737,29 @@ _parse_json_metadata() {
 
 		in_meta && /"version":/ {
 			# Extract value between quotes after colon
-			match($0, /"version": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "version=" arr[1]
+			line = $0
+			sub(/.*"version": *"/, "", line)
+			sub(/".*$/, "", line)
+			if (line != "") {
+				print "version=" line
 			}
 		}
 
 		in_meta && /"generated":/ {
-			match($0, /"generated": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "generated=" arr[1]
+			line = $0
+			sub(/.*"generated": *"/, "", line)
+			sub(/".*$/, "", line)
+			if (line != "") {
+				print "generated=" line
 			}
 		}
 
 		in_meta && /"config_path":/ {
-			match($0, /"config_path": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "config_path=" arr[1]
+			line = $0
+			sub(/.*"config_path": *"/, "", line)
+			sub(/".*$/, "", line)
+			if (line != "") {
+				print "config_path=" line
 			}
 		}
 	'
@@ -781,9 +789,24 @@ _parse_json_files() {
 			next
 		}
 
-		in_file_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_file_obj && /"file":/ { match($0, /"file": "([^"]+)"/, arr); file = arr[1] }
-		in_file_obj && /"version":/ { match($0, /"version": "([^"]*)"/, arr); version = arr[1] }
+		in_file_obj && /"file_id":/ {
+		line = $0
+		sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+		file_id = line
+	}
+		in_file_obj && /"file":/  {
+		line = $0
+		sub(/.*"file": *"/,  "", line)
+		sub(/".*$/, "", line)
+		file = line
+	}
+	in_file_obj && /"version":/ {
+		line = $0
+		sub(/.*"version": *"/, "", line)
+		sub(/".*$/, "", line)
+		version = line
+	}
 	'
 }
 
@@ -811,9 +834,24 @@ _parse_json_layers() {
 			next
 		}
 
-		in_layer_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_layer_obj && /"name":/ { match($0, /"name": "([^"]+)"/, arr); name = arr[1] }
-		in_layer_obj && /"pattern":/ { match($0, /"pattern": "([^"]+)"/, arr); pattern = arr[1] }
+		in_layer_obj && /"layer_id":/ {
+		line = $0
+		sub(/.*"layer_id": */, "", line)
+		sub(/,.*$/, "", line)
+		layer_id = line
+	}
+	in_layer_obj && /"name":/ {
+		line = $0
+		sub(/.*"name": *"/, "", line)
+		sub(/".*$/, "", line)
+		name = line
+	}
+	in_layer_obj && /"pattern":/ {
+		line = $0
+		sub(/.*"pattern": *"/, "", line)
+		sub(/".*$/, "", line)
+		pattern = line
+	}
 	'
 }
 
@@ -871,11 +909,36 @@ _parse_json_nodes() {
 		}
 
 		# Extract fields
-		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
-		in_tag_obj && /"description":/ { match($0, /"description": "([^"]*)"/, arr); desc = arr[1] }
-		in_tag_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_tag_obj && /"line":/ { match($0, /"line": ([0-9]+)/, arr); line = arr[1] }
-		in_tag_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
+	in_tag_obj && /"id":/ {
+		line = $0
+		sub(/.*"id": *"/, "", line)
+		sub(/".*$/, "", line)
+		tag_id = line
+	}
+	in_tag_obj && /"description":/ {
+		line = $0
+		sub(/.*"description": *"/, "", line)
+		sub(/".*$/, "", line)
+		desc = line
+	}
+		in_tag_obj && /"file_id":/ {
+		line = $0
+		sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+		file_id = line
+	}
+		in_tag_obj && /"line":/ {
+		line = $0
+		sub(/.*"line": */, "", line)
+		sub(/,.*$/, "", line)
+		line = line
+	}
+		in_tag_obj && /"layer_id":/ {
+		line = $0
+		sub(/.*"layer_id": */, "", line)
+		sub(/,.*$/, "", line)
+		layer_id = line
+	}
 	'
 }
 
@@ -965,13 +1028,17 @@ _parse_json_health() {
 		}
 
 		in_file_obj && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id = arr[1]
+		line = $0
+		sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+			file_id = line
 		}
 
 		in_file_obj && /"file":/ {
-			match($0, /"file": "([^"]+)"/, arr)
-			file_path = arr[1]
+		line = $0
+		sub(/.*"file": *"/, "", line)
+		sub(/".*$/, "", line)
+			file_path = line
 		}
 
 		/"health": \{/ {
@@ -986,26 +1053,34 @@ _parse_json_health() {
 		}
 
 		in_health && /"total_tags":/ {
-			match($0, /"total_tags": ([0-9]+)/, arr)
-			total_tags = arr[1]
+		line = $0
+		sub(/.*"total_tags": */, "", line)
+		sub(/,.*$/, "", line)
+			total_tags = line
 			print "total_tags=" total_tags
 		}
 
 		in_health && /"tags_with_links":/ {
-			match($0, /"tags_with_links": ([0-9]+)/, arr)
-			tags_with_links = arr[1]
+		line = $0
+		sub(/.*"tags_with_links": */, "", line)
+		sub(/,.*$/, "", line)
+			tags_with_links = line
 			print "tags_with_links=" tags_with_links
 		}
 
 		in_health && /"isolated_tags":/ {
-			match($0, /"isolated_tags": ([0-9]+)/, arr)
-			isolated_tags = arr[1]
+		line = $0
+		sub(/.*"isolated_tags": */, "", line)
+		sub(/,.*$/, "", line)
+			isolated_tags = line
 			print "isolated_tags=" isolated_tags
 		}
 
 		in_health && /"duplicate_tags":/ {
-			match($0, /"duplicate_tags": ([0-9]+)/, arr)
-			duplicate_tags = arr[1]
+		line = $0
+		sub(/.*"duplicate_tags": */, "", line)
+		sub(/,.*$/, "", line)
+			duplicate_tags = line
 			print "duplicate_tags=" duplicate_tags
 		}
 
@@ -1035,18 +1110,27 @@ _parse_json_health() {
 			iso_id=""; iso_file_id=""; iso_line=""
 
 			# Extract id
-			if (match($0, /"id": *"([^"]+)"/, arr)) {
-				iso_id = arr[1]
+		line = $0
+		if (index(line, "\"id\"")) {
+			sub(/.*"id": *"/, "", line)
+			sub(/".*$/, "", line)
+			iso_id = line
 			}
 
 			# Extract file_id
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				iso_file_id = arr[1]
+		line = $0
+		if (index(line, "\"file_id\"")) {
+			sub(/.*"file_id": */, "", line)
+			sub(/,.*$/, "", line)
+			iso_file_id = line
 			}
 
 			# Extract line
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				iso_line = arr[1]
+		line = $0
+		if (index(line, "\"line\"")) {
+			sub(/.*"line": */, "", line)
+			sub(/[,}].*$/, "", line)
+			iso_line = line
 			}
 
 			# Output immediately
@@ -1061,16 +1145,25 @@ _parse_json_health() {
 		in_duplicate_list && /\{"id":/ {
 			dup_id=""; dup_file_id=""; dup_line=""
 
-			if (match($0, /"id": *"([^"]+)"/, arr)) {
-				dup_id = arr[1]
+		line = $0
+		if (index(line, "\"id\"")) {
+			sub(/.*"id": *"/, "", line)
+			sub(/".*$/, "", line)
+			dup_id = line
 			}
 
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				dup_file_id = arr[1]
+		line = $0
+		if (index(line, "\"file_id\"")) {
+			sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+			dup_file_id = line
 			}
 
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				dup_line = arr[1]
+		line = $0
+		if (index(line, "\"line\"")) {
+			sub(/.*"line": */, "", line)
+			sub(/[,}].*$/, "", line)
+			dup_line = line
 			}
 
 			if (dup_id != "") {
@@ -1080,8 +1173,10 @@ _parse_json_health() {
 		}
 
 		in_health && /"dangling_references":/ {
-			match($0, /"dangling_references": ([0-9]+)/, arr)
-			dangling_refs = arr[1]
+		line = $0
+		sub(/.*"dangling_references": */, "", line)
+		sub(/,.*$/, "", line)
+			dangling_refs = line
 			print "dangling_references=" dangling_refs
 		}
 
@@ -1101,23 +1196,35 @@ _parse_json_health() {
 			dang_child=""; dang_parent=""; dang_file_id=""; dang_line=""
 
 			# Extract child_tag
-			if (match($0, /"child_tag": *"([^"]+)"/, arr)) {
-				dang_child = arr[1]
+		line = $0
+		if (index(line, "\"child_tag\"")) {
+			sub(/.*"child_tag": *"/, "", line)
+			sub(/".*$/, "", line)
+			dang_child = line
 			}
 
 			# Extract missing_parent
-			if (match($0, /"missing_parent": *"([^"]+)"/, arr)) {
-				dang_parent = arr[1]
+		line = $0
+		if (index(line, "\"missing_parent\"")) {
+			sub(/.*"missing_parent": *"/, "", line)
+			sub(/".*$/, "", line)
+			dang_parent = line
 			}
 
 			# Extract file_id
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				dang_file_id = arr[1]
+		line = $0
+		if (index(line, "\"file_id\"")) {
+			sub(/.*"file_id": */, "", line)
+			sub(/,.*$/, "", line)
+			dang_file_id = line
 			}
 
 			# Extract line
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				dang_line = arr[1]
+		line = $0
+		if (index(line, "\"line\"")) {
+			sub(/.*"line": */, "", line)
+			sub(/[,}].*$/, "", line)
+			dang_line = line
 			}
 
 			# Output immediately
@@ -1184,13 +1291,17 @@ _parse_json_coverage() {
 		}
 
 		in_file_entry && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id = arr[1]
+		line = $0
+		sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+			file_id = line
 		}
 
 		in_file_entry && /"file":/ {
-			match($0, /"file": "([^"]+)"/, arr)
-			file_path = arr[1]
+		line = $0
+		sub(/.*"file": *"/, "", line)
+		sub(/".*$/, "", line)
+			file_path = line
 		}
 
 		# Parse coverage section
@@ -1234,14 +1345,18 @@ _parse_json_coverage() {
 		}
 
 		in_layer_obj && /"name":/ {
-			match($0, /"name": "([^"]+)"/, arr)
-			name = arr[1]
-			current_layer_name = arr[1]
+		line = $0
+		sub(/.*"name": *"/, "", line)
+		sub(/".*$/, "", line)
+			name = line
+			current_layer_name = line
 		}
 
 		in_layer_obj && /"total":/ && !in_upstream_obj && !in_downstream_obj && !in_layer_files {
-			match($0, /"total": ([0-9]+)/, arr)
-			total = arr[1]
+		line = $0
+		sub(/.*"total": */, "", line)
+		sub(/,.*$/, "", line)
+			total = line
 		}
 
 		# Parse upstream object
@@ -1256,13 +1371,17 @@ _parse_json_coverage() {
 		}
 
 		in_upstream_obj && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			up_count = arr[1]
+		line = $0
+		sub(/.*"count": */, "", line)
+		sub(/,.*$/, "", line)
+			up_count = line
 		}
 
 		in_upstream_obj && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			up_pct = arr[1]
+		line = $0
+		sub(/.*"percent": */, "", line)
+		sub(/,.*$/, "", line)
+			up_pct = line
 		}
 
 		# Parse downstream object
@@ -1277,13 +1396,17 @@ _parse_json_coverage() {
 		}
 
 		in_downstream_obj && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			down_count = arr[1]
+		line = $0
+		sub(/.*"count": */, "", line)
+		sub(/,.*$/, "", line)
+			down_count = line
 		}
 
 		in_downstream_obj && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			down_pct = arr[1]
+		line = $0
+		sub(/.*"percent": */, "", line)
+		sub(/,.*$/, "", line)
+			down_pct = line
 		}
 
 		# Parse files array within layer
@@ -1317,13 +1440,17 @@ _parse_json_coverage() {
 		}
 
 		in_file_obj && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id_local = arr[1]
+		line = $0
+		sub(/.*"file_id": */, "", line)
+		sub(/,.*$/, "", line)
+			file_id_local = line
 		}
 
 		in_file_obj && /"total":/ && !in_file_upstream && !in_file_downstream {
-			match($0, /"total": ([0-9]+)/, arr)
-			file_total = arr[1]
+		line = $0
+		sub(/.*"total": */, "", line)
+		sub(/,.*$/, "", line)
+			file_total = line
 		}
 
 		# Parse file-level upstream
@@ -1338,13 +1465,17 @@ _parse_json_coverage() {
 		}
 
 		in_file_upstream && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			file_up_count = arr[1]
+		line = $0
+		sub(/.*"count": */, "", line)
+		sub(/,.*$/, "", line)
+			file_up_count = line
 		}
 
 		in_file_upstream && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			file_up_pct = arr[1]
+		line = $0
+		sub(/.*"percent": */, "", line)
+		sub(/,.*$/, "", line)
+			file_up_pct = line
 		}
 
 		# Parse file-level downstream
@@ -1359,18 +1490,24 @@ _parse_json_coverage() {
 		}
 
 		in_file_downstream && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			file_down_count = arr[1]
+		line = $0
+		sub(/.*"count": */, "", line)
+		sub(/,.*$/, "", line)
+			file_down_count = line
 		}
 
 		in_file_downstream && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			file_down_pct = arr[1]
+		line = $0
+		sub(/.*"percent": */, "", line)
+		sub(/,.*$/, "", line)
+			file_down_pct = line
 		}
 
 		in_file_obj && /"version":/ {
-			match($0, /"version": "([^"]*)"/, arr)
-			version = arr[1]
+			line = $0
+			sub(/.*"version": *"/, "", line)
+			sub(/".*$/, "", line)
+			version = line
 		}
 	'
 }
@@ -1419,18 +1556,24 @@ _parse_json_links() {
 		}
 
 		in_link_obj && /"source":/ {
-			match($0, /"source": "([^"]+)"/, arr)
-			link_source = arr[1]
+		line = $0
+		sub(/.*"source": *"/, "", line)
+		sub(/".*$/, "", line)
+			link_source = line
 		}
 
 		in_link_obj && /"target":/ {
-			match($0, /"target": "([^"]+)"/, arr)
-			link_target = arr[1]
+		line = $0
+		sub(/.*"target": *"/, "", line)
+		sub(/".*$/, "", line)
+			link_target = line
 		}
 
 		in_link_obj && /"value":/ {
-			match($0, /"value": ([0-9]+)/, arr)
-			link_value = arr[1]
+		line = $0
+		sub(/.*"value": */, "", line)
+		sub(/,.*$/, "", line)
+			link_value = line
 		}
 	'
 }
@@ -1467,8 +1610,10 @@ _extract_layer_order() {
 	}
 	in_layer_obj && /"name":/ {
 		# Extract layer name
-		match($0, /"name": *"([^"]+)"/, arr)
-		layer_name = arr[1]
+		line = $0
+		sub(/.*"name": *"/, "", line)
+		sub(/".*$/, "", line)
+		layer_name = line
 		if (layer_name != "") {
 			print layer_name
 		}

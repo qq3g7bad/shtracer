@@ -10,6 +10,9 @@ case "$0" in
 	*shtracer*test*)
 		: # Successfully sourced from shtracer.
 		;;
+	*shtracer_func*)
+		: # Successfully sourced (zsh sets $0 to sourced file).
+		;;
 	*)
 		echo "This script should only be sourced, not executed directly."
 		exit 1
@@ -609,7 +612,7 @@ make_tag_table() {
 
 		# Make joined tag table (each row has a single trace tag chain)
 		# Only join tags if there are downstream relationships (multi-level configs)
-		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
+		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM" | tr -d ' \t')" -ge 1 ]; then
 			if ! join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"; then
 				error_exit 1 "make_tag_table" "Error in join_tag_pairs"
 			fi
@@ -929,7 +932,7 @@ _check_verification_file() {
 
 	[ -r "$_file" ] || return 0
 
-	_line_count="$(wc <"$_file" -l)"
+	_line_count="$(wc <"$_file" -l | tr -d ' \t')"
 	[ "$_line_count" -eq 0 ] && return 0
 
 	# For isolated tags, also check if content is just NODATA_STRING
