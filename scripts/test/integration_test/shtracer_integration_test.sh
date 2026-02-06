@@ -516,5 +516,455 @@ test_markdown_tag_index() {
 	)
 }
 
+##
+# @brief Test tag extraction with CRLF line endings (Windows compatibility)
+# @tag @IT5.1@
+test_crlf_tag_extraction() {
+	(
+		# Arrange
+		cd "${SCRIPT_DIR%/}/testdata/crlf_test" || exit 1
+		rm -rf shtracer_output/
+
+		# Act - run shtracer on CRLF input files
+		"${SHTRACER_BIN}" ./config_crlf.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert - should successfully extract tags despite CRLF
+		assertEquals "Should extract tags from CRLF files" 0 "${_EXIT_CODE}"
+
+		# Verify tags were extracted
+		test -f shtracer_output/tags/04_tag_table
+		assertEquals "Tag table should be created" 0 $?
+
+		# Check that tags from CRLF files are present
+		grep -q "@REQ1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract @REQ1@ from CRLF file" 0 $?
+
+		grep -q "@ARC1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract @ARC1@ from CRLF file" 0 $?
+	)
+}
+
+##
+# @brief Test that output files have LF-only line endings (no CRLF)
+# @tag @IT5.2@
+test_crlf_output_files_lf_only() {
+	(
+		# Arrange
+		cd "${SCRIPT_DIR%/}/testdata/crlf_test" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_crlf.md --debug >/dev/null 2>&1
+
+		# Assert - all output files must be LF-only (no CRLF)
+		# Check tag table
+		if [ -f shtracer_output/tags/04_tag_table ]; then
+			! file shtracer_output/tags/04_tag_table | grep -q "CRLF"
+			assertEquals "Tag table should have LF-only line endings" 0 $?
+		fi
+
+		# Check all tag files
+		for tagfile in shtracer_output/tags/*; do
+			if [ -f "$tagfile" ]; then
+				! file "$tagfile" | grep -q "CRLF"
+				assertEquals "Tag file $tagfile should have LF-only endings" 0 $?
+			fi
+		done
+	)
+}
+
+##
+# @brief Test JSON output has no CRLF line endings
+# @tag @IT5.3@
+test_crlf_json_output_lf_only() {
+	(
+		# Arrange
+		cd "${SCRIPT_DIR%/}/testdata/crlf_test" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_crlf.md --debug >/dev/null 2>&1
+
+		# Assert - JSON output must be LF-only
+		test -f shtracer_output/output.json
+		assertEquals "JSON output should exist" 0 $?
+
+		! file shtracer_output/output.json | grep -q "CRLF"
+		assertEquals "JSON output should have LF-only line endings" 0 $?
+
+		# Verify JSON is valid (no stray \r characters)
+		! grep -q "$(printf '\r')" shtracer_output/output.json
+		assertEquals "JSON should not contain carriage return characters" 0 $?
+	)
+}
+
+##
+# @brief Test HTML output has no CRLF line endings
+# @tag @IT5.4@
+test_crlf_html_output_lf_only() {
+	(
+		# Arrange
+		_TEMP_HTML=$(mktemp "${TEST_ROOT}/html_output.XXXXXX.html")
+
+		# Act
+		"${SHTRACER_BIN}" "${SCRIPT_DIR%/}/testdata/crlf_test/config_crlf.md" --html >"$_TEMP_HTML" 2>/dev/null
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "HTML generation should succeed" 0 "$_EXIT_CODE"
+
+		# HTML output must be LF-only
+		! file "$_TEMP_HTML" | grep -q "CRLF"
+		assertEquals "HTML output should have LF-only line endings" 0 $?
+
+		# Verify HTML doesn't have \r characters
+		! grep -q "$(printf '\r')" "$_TEMP_HTML"
+		assertEquals "HTML should not contain carriage return characters" 0 $?
+
+		# Clean up
+		rm -f "$_TEMP_HTML"
+	)
+}
+
+##
+# @brief Test Markdown output has no CRLF line endings
+# @tag @IT5.5@
+test_crlf_markdown_output_lf_only() {
+	(
+		# Arrange
+		_TEMP_MD=$(mktemp "${TEST_ROOT}/md_output.XXXXXX.md")
+
+		# Act
+		"${SHTRACER_BIN}" "${SCRIPT_DIR%/}/testdata/crlf_test/config_crlf.md" --markdown >"$_TEMP_MD" 2>/dev/null
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Markdown generation should succeed" 0 "$_EXIT_CODE"
+
+		# Markdown output must be LF-only
+		! file "$_TEMP_MD" | grep -q "CRLF"
+		assertEquals "Markdown output should have LF-only line endings" 0 $?
+
+		# Verify Markdown doesn't have \r characters
+		! grep -q "$(printf '\r')" "$_TEMP_MD"
+		assertEquals "Markdown should not contain carriage return characters" 0 $?
+
+		# Clean up
+		rm -f "$_TEMP_MD"
+	)
+}
+
+##
+# @brief Test handling of mixed CRLF/LF line endings in same file
+# @tag @IT5.6@
+test_crlf_mixed_line_endings() {
+	(
+		# Arrange
+		cd "${SCRIPT_DIR%/}/testdata/crlf_test" || exit 1
+		rm -rf shtracer_output/
+
+		# Update config to use absolute path to mixed file
+		cat >config_mixed.md <<EOF
+## Requirement
+* **PATH**: "${SCRIPT_DIR%/}/testdata/crlf_test/mixed_endings.md"
+* **TAG FORMAT**: \`@REQ[0-9\.]+@\`
+* **TAG LINE FORMAT**: \`<!--.*-->\`
+EOF
+
+		# Act
+		"${SHTRACER_BIN}" ./config_mixed.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert - should handle mixed line endings
+		assertEquals "Should handle mixed CRLF/LF line endings" 0 "${_EXIT_CODE}"
+
+		# Verify tag was extracted
+		if [ -f shtracer_output/tags/04_tag_table ]; then
+			grep -q "@REQ3@" shtracer_output/tags/04_tag_table
+			assertEquals "Should extract tag from mixed line ending file" 0 $?
+		fi
+
+		# Clean up
+		rm -f config_mixed.md
+	)
+}
+
+##
+# @brief Test absolute path resolution
+# @tag @IT6.1@
+test_path_absolute_paths() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+		_ABS_PATH="$(cd "$_TEST_DIR" && pwd)/requirements.md"
+
+		cat >"${_TEST_DIR}/config_abs.md" <<EOF
+## Requirement
+* **PATH**: "${_ABS_PATH}"
+* **TAG FORMAT**: \`@REQ[0-9\.]+@\`
+* **TAG LINE FORMAT**: \`<!--.*-->\`
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_abs.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle absolute paths" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from absolute path" 0 $?
+
+		# Clean up
+		rm -f config_abs.md
+	)
+}
+
+##
+# @brief Test relative path resolution (., .., ../../)
+# @tag @IT6.2@
+test_path_relative_paths() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cat >"${_TEST_DIR}/config_rel.md" <<'EOF'
+## Requirement
+* **PATH**: "./requirements.md"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_rel.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle relative paths" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from relative path" 0 $?
+
+		# Clean up
+		rm -f config_rel.md
+	)
+}
+
+##
+# @brief Test paths with spaces
+# @tag @IT6.3@
+test_path_with_spaces() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cat >"${_TEST_DIR}/config_spaces.md" <<'EOF'
+## Requirement
+* **PATH**: "./my documents"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+* **EXTENSION FILTER**: "*.md"
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_spaces.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle paths with spaces" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ2@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from path with spaces" 0 $?
+
+		# Clean up
+		rm -f config_spaces.md
+	)
+}
+
+##
+# @brief Test paths with special characters ($, parentheses)
+# @tag @IT6.4@
+test_path_with_special_chars() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cat >"${_TEST_DIR}/config_special.md" <<'EOF'
+## Requirement
+* **PATH**: "./special$chars"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+* **EXTENSION FILTER**: "*.md"
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_special.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle paths with special chars" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ3@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from path with special chars" 0 $?
+
+		# Clean up
+		rm -f config_special.md
+	)
+}
+
+##
+# @brief Test config file accessed via symlink
+# @tag @IT6.5@
+test_path_config_via_symlink() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cat >"${_TEST_DIR}/config_real.md" <<'EOF'
+## Requirement
+* **PATH**: "./requirements.md"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+		ln -sf config_real.md config_symlink.md
+
+		# Act
+		"${SHTRACER_BIN}" ./config_symlink.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle config via symlink" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag when config is symlink" 0 $?
+
+		# Clean up
+		rm -f config_real.md config_symlink.md
+	)
+}
+
+##
+# @brief Test source files accessed via symlink
+# @tag @IT6.6@
+test_path_source_file_symlink() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+		ln -sf requirements.md requirements_link.md
+
+		cat >config_srclink.md <<'EOF'
+## Requirement
+* **PATH**: "./requirements_link.md"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+EOF
+
+		# Act
+		"${SHTRACER_BIN}" ./config_srclink.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle source file symlink" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ1@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from symlinked source" 0 $?
+
+		# Clean up
+		rm -f requirements_link.md config_srclink.md
+	)
+}
+
+##
+# @brief Test error handling for non-existent paths
+# @tag @IT6.7@
+test_path_nonexistent_file() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		cat >"${_TEST_DIR}/config_nofile.md" <<'EOF'
+## Requirement
+* **PATH**: "./nonexistent.md"
+* **TAG FORMAT**: `@REQ[0-9\.]+@`
+* **TAG LINE FORMAT**: `<!--.*-->`
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_nofile.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert - should complete but with no tags extracted
+		assertEquals "Should handle nonexistent files gracefully" 0 "${_EXIT_CODE}"
+
+		# Clean up
+		rm -f config_nofile.md
+	)
+}
+
+##
+# @brief Test very long path (PATH_MAX boundary testing)
+# @tag @IT6.8@
+test_path_very_long_path() {
+	(
+		# Arrange
+		_TEST_DIR="${SCRIPT_DIR%/}/testdata/path_resolution"
+
+		# Create nested directory structure (not too deep to avoid issues)
+		_LONG_PATH="very/long/path/with/many/nested/directories/for/testing"
+		mkdir -p "${_TEST_DIR}/${_LONG_PATH}"
+
+		cat >"${_TEST_DIR}/${_LONG_PATH}/deep.md" <<'EOF'
+<!-- @REQ4@ -->
+## Deep Path Test
+EOF
+
+		cat >"${_TEST_DIR}/config_longpath.md" <<EOF
+## Requirement
+* **PATH**: "./${_LONG_PATH}/deep.md"
+* **TAG FORMAT**: \`@REQ[0-9\.]+@\`
+* **TAG LINE FORMAT**: \`<!--.*-->\`
+EOF
+
+		cd "${_TEST_DIR}" || exit 1
+		rm -rf shtracer_output/
+
+		# Act
+		"${SHTRACER_BIN}" ./config_longpath.md --debug >/dev/null 2>&1
+		_EXIT_CODE=$?
+
+		# Assert
+		assertEquals "Should handle long paths" 0 "${_EXIT_CODE}"
+
+		grep -q "@REQ4@" shtracer_output/tags/04_tag_table
+		assertEquals "Should extract tag from long path" 0 $?
+
+		# Clean up
+		rm -rf very/
+		rm -f config_longpath.md
+	)
+}
+
 # shellcheck source=shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"
