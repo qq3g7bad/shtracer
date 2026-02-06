@@ -915,8 +915,8 @@ EOF
 		"${SHTRACER_BIN}" ./config_nofile.md --debug >/dev/null 2>&1
 		_EXIT_CODE=$?
 
-		# Assert - should complete but with no tags extracted
-		assertEquals "Should handle nonexistent files gracefully" 0 "${_EXIT_CODE}"
+		# Assert - should fail with error code 11 (no tags found) when file doesn't exist
+		assertEquals "Should return error for nonexistent files" 11 "${_EXIT_CODE}"
 
 		# Clean up
 		rm -f config_nofile.md
