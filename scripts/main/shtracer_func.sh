@@ -601,14 +601,20 @@ make_tag_table() {
 		_prepare_upstream_table "$_TAG_PAIRS" "$_TAG_TABLE"
 		_prepare_downstream_table "$_TAG_PAIRS" "$_TAG_PAIRS_DOWNSTREAM"
 
+		# Verify that at least one tag was extracted (skip in VERIFY mode)
+		# In VERIFY mode, we allow empty tag tables so verification can report proper error codes
+		if [ ! -s "$_TAG_TABLE" ] && [ "${SHTRACER_MODE:-NORMAL}" != "VERIFY" ]; then
+			error_exit 1 "make_tag_table" "No tags found. Check config file paths and tag patterns."
+		fi
+
 		# Make joined tag table (each row has a single trace tag chain)
+		# Only join tags if there are downstream relationships (multi-level configs)
 		if [ "$(wc -l <"$_TAG_PAIRS_DOWNSTREAM")" -ge 1 ]; then
 			if ! join_tag_pairs "$_TAG_TABLE" "$_TAG_PAIRS_DOWNSTREAM"; then
 				error_exit 1 "make_tag_table" "Error in join_tag_pairs"
 			fi
-		else
-			error_exit 1 "make_tag_table" "No linked tags found."
 		fi
+		# Note: Single-level configurations (no downstream pairs) are valid and allowed
 		sort -k1,1 <"$_TAG_TABLE" >"$_TAG_TABLE"TMP
 		mv "$_TAG_TABLE"TMP "$_TAG_TABLE"
 
