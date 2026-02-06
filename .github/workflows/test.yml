@@ -150,3 +150,72 @@ jobs:
             $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
+  # @IT3.3@ POSIX shell compatibility testing
+  # Job 3: Test on multiple POSIX-compliant shells
+  posix-shell-matrix:
+    name: Test on ${{ matrix.shell }} (${{ matrix.os }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Note: ksh not easily available on macOS via homebrew
+        # dash, bash, zsh are available on both platforms
+        os: [ubuntu-latest, macos-latest]
+        shell: [dash, bash, zsh]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Install shells on Linux
+      - name: Install shells (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dash bash zsh
+          echo "Installed shells:"
+          dash --version || echo "dash not found"
+          bash --version | head -1 || echo "bash not found"
+          zsh --version || echo "zsh not found"
+
+      # Install shells on macOS
+      - name: Install shells (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # bash and zsh are pre-installed on macOS
+          # Install dash via homebrew
+          brew install dash || echo "dash install failed, may already exist"
+          echo "Installed shells:"
+          dash --version || echo "dash not found"
+          bash --version | head -1 || echo "bash not found"
+          zsh --version || echo "zsh not found"
+
+      - name: Make shtracer executable
+        run: chmod +x ./shtracer
+
+      # Run unit tests with specific shell
+      - name: Run unit tests with ${{ matrix.shell }}
+        run: |
+          echo "Running unit tests with ${{ matrix.shell }}..."
+          ${{ matrix.shell }} ./shtracer -t
+
+      # Run integration tests with specific shell
+      - name: Run integration tests with ${{ matrix.shell }}
+        run: |
+          echo "Running integration tests with ${{ matrix.shell }}..."
+          ${{ matrix.shell }} ./scripts/test/integration_test/shtracer_integration_test.sh
+
+      # Verify normal operation with specific shell
+      - name: Verify normal operation with ${{ matrix.shell }}
+        run: |
+          echo "Testing normal operation with ${{ matrix.shell }}..."
+          rm -rf ./sample/shtracer_output
+          ${{ matrix.shell }} ./shtracer --debug ./sample/config.md
+          test -f ./sample/shtracer_output/tags/04_tag_table || exit 1
+          test -f ./sample/shtracer_output/output.json || exit 1
+          echo "${{ matrix.shell }} compatibility verified!"
+
