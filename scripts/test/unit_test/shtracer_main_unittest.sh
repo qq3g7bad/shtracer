@@ -606,7 +606,7 @@ test_main_routine_output_isolated() {
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "[shtracer_main_unittest.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_main_unittest.sh][error][make_tag_table]: No tags found. Check config file paths and tag patterns." "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
@@ -624,8 +624,8 @@ test_main_routine_invalid_config_paths() {
 		IFS=' '
 
 		# Assert ----------
-		# Should output error about no linked tags found
-		echo "$_RETURN" | grep -q "No linked tags found"
+		# Should output error about no tags found
+		echo "$_RETURN" | grep -q "No tags found"
 		assertEquals 0 "$?"
 
 		# Should output find errors for nonexistent paths
