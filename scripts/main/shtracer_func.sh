@@ -163,6 +163,14 @@ _extract_tags_discover_files() {
 			}
 			return string
 		}
+		function shell_escape(string) {
+			# Escape special characters for shell command execution
+			gsub(/\\/, "\\\\", string)  # Backslash first
+			gsub(/\$/, "\\$", string)   # Dollar sign
+			gsub(/`/, "\\`", string)    # Backtick
+			gsub(/"/, "\\\"", string)   # Double quote
+			return string
+		}
 		BEGIN {
 			OFS=separator
 		}
@@ -179,7 +187,8 @@ _extract_tags_discover_files() {
 
 			if (tag_format == "") { next }
 
-			cmd = "test -f \""path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
+			escaped_path = shell_escape(path)
+			cmd = "test -f \""escaped_path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
 			if (is_file_exist == 0) {
 				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset
 			}
@@ -203,10 +212,10 @@ _extract_tags_discover_files() {
 						}
 						ignore_ext_str = ignore_ext_str "-name \"" ignore_exts[i] "\"";
 					}
-					cmd = "find \"" path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f " ext_expr " \\) -print";
+					cmd = "find \"" escaped_path "\" \\( "ignore_ext_str" \\) -prune -o \\( -type f " ext_expr " \\) -print";
 				}
 				else {
-					cmd = "find \"" path "\" -type f " ext_expr ""
+					cmd = "find \"" escaped_path "\" -type f " ext_expr ""
 				}
 				while ((cmd | getline path) > 0) { print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset; } close(cmd);
 			}
