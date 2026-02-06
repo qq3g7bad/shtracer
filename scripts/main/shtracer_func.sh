@@ -281,11 +281,25 @@ _extract_tags_process_files() {
 				}
 				line_num = 0
 				counter = -1
+				last_tag_line = 0
+				last_tag_text = ""
+				pending_tag = 0
 				while (getline line < path > 0) {
 					line_num++
 
 					# 1) Print tag column
 					if (line ~ tag_format && line ~ tag_line_format) {
+						# If there is a pending tag from previous iteration, complete it first
+						if (pending_tag && counter >= 0) {
+							title_text = last_tag_text
+							sub(/^#+[[:space:]]*/, "", title_text)
+							printf("%s%s", title_text, separator)                        # column 4: title
+							printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
+							printf("%s%s", last_tag_line, separator)               # column 6: line number
+							printf("%s%s", NR, separator)                          # column 7: file num
+							printf("%s\n", file_version)                          # column 8: file version
+						}
+
 						counter=tag_title_offset;
 						printf("%s%s", title, separator)                       # column 1: trace target
 
@@ -304,6 +318,9 @@ _extract_tags_process_files() {
 							sub(/[[:space:]]$/, "", from_tag)
 						}
 						printf("%s%s", from_tag, separator)                    # column 3: from tag
+						last_tag_line = line_num
+						last_tag_text = line
+						pending_tag = 1
 					}
 
 					# 2) Print the offset line
@@ -314,11 +331,23 @@ _extract_tags_process_files() {
 						printf("%s%s", line_num, separator)                    # column 6: line number including title
 						printf("%s%s", NR, separator)                          # column 7: file num
 						printf("%s\n", file_version)                          # column 8: file version
+						counter = -1
+						pending_tag = 0
 					}
 					if (counter >= 0) {
 						counter--;
 					}
 
+				}
+				# Handle tag at end of file (counter >= 0 means tag was found but title not printed)
+				if (pending_tag && counter >= 0) {
+					title_text = last_tag_text
+					sub(/^#+[[:space:]]*/, "", title_text)
+					printf("%s%s", title_text, separator)                        # column 4: title
+					printf("%s%s", absolute_file_path, separator)          # column 5: file absolute path
+					printf("%s%s", last_tag_line, separator)               # column 6: line number
+					printf("%s%s", NR, separator)                          # column 7: file num
+					printf("%s\n", file_version)                          # column 8: file version
 				}
 				close(path)
 			}
