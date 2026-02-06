@@ -37,6 +37,8 @@ setUp() {
 	export OUTPUT_DIR="${TEST_ROOT%/}/shtracer_output/"
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
+	rm -rf "$OUTPUT_DIR"
+	mkdir -p "$OUTPUT_DIR"
 	cd "${TEST_ROOT}" || exit 1
 }
 

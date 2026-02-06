@@ -46,6 +46,7 @@ setUp() {
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
+	mkdir -p "$OUTPUT_DIR"
 	cd "${TEST_ROOT}" || exit 1
 }
 

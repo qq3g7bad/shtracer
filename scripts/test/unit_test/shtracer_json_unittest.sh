@@ -39,6 +39,7 @@ setUp() {
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	export NODATA_STRING="NONE"
 	export OUTPUT_DIR="${SHUNIT_TMPDIR}/output/"
+	rm -rf "$OUTPUT_DIR"
 	mkdir -p "$OUTPUT_DIR"
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	cd "${TEST_ROOT}" || exit 1
