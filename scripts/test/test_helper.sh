@@ -69,8 +69,16 @@ shtracer_test_source_modules() {
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 				;;
 			func)
-				# shellcheck source=../main/shtracer_func.sh
-				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
+				# shellcheck source=../main/shtracer_config.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_config.sh"
+				# shellcheck source=../main/shtracer_extract.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_extract.sh"
+				# shellcheck source=../main/shtracer_verify.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_verify.sh"
+				# shellcheck source=../main/shtracer_json_export.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_export.sh"
+				# shellcheck source=../main/shtracer_crossref.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_crossref.sh"
 				;;
 			html_viewer)
 				export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
@@ -78,6 +86,8 @@ shtracer_test_source_modules() {
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 				;;
 			markdown_viewer)
+				# shellcheck source=../main/shtracer_json_parser.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 				# shellcheck source=../main/shtracer_markdown_viewer.sh
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 				;;

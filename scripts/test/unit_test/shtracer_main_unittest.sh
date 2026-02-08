@@ -109,7 +109,7 @@ test_load_functions() {
 
 		# Assert ----------
 		(
-			echo "$_SHTRACER_FUNC_SH" >/dev/null
+			echo "$_SHTRACER_CONFIG_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 	)
@@ -564,7 +564,7 @@ test_main_routine() {
 
 		# load_functions
 		(
-			echo "$_SHTRACER_FUNC_SH" >/dev/null
+			echo "$_SHTRACER_CONFIG_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 

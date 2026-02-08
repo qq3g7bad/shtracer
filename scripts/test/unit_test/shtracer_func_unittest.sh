@@ -12,10 +12,18 @@ SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 
 
 cd "${TEST_ROOT}" || exit 1
 
-# shellcheck source=../../main/shtracer_func.sh
-. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+# shellcheck source=../../main/shtracer_config.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_config.sh"
+# shellcheck source=../../main/shtracer_extract.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_extract.sh"
+# shellcheck source=../../main/shtracer_verify.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_verify.sh"
+# shellcheck source=../../main/shtracer_json_export.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_export.sh"
+# shellcheck source=../../main/shtracer_crossref.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_crossref.sh"
 
 ##
 # @brief

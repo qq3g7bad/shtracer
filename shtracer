@@ -72,8 +72,16 @@ load_functions() {
 
 	# shellcheck source=scripts/main/shtracer_util.sh
 	. "./scripts/main/shtracer_util.sh"
-	# shellcheck source=scripts/main/shtracer_func.sh
-	. "./scripts/main/shtracer_func.sh"
+	# shellcheck source=scripts/main/shtracer_config.sh
+	. "./scripts/main/shtracer_config.sh"
+	# shellcheck source=scripts/main/shtracer_extract.sh
+	. "./scripts/main/shtracer_extract.sh"
+	# shellcheck source=scripts/main/shtracer_verify.sh
+	. "./scripts/main/shtracer_verify.sh"
+	# shellcheck source=scripts/main/shtracer_json_export.sh
+	. "./scripts/main/shtracer_json_export.sh"
+	# shellcheck source=scripts/main/shtracer_crossref.sh
+	. "./scripts/main/shtracer_crossref.sh"
 	cd "${_PREVIOUS_DIR}" || error_exit "$EXIT_INTERNAL_ERROR" "load_functions" "Cannot change current directory"
 }
 

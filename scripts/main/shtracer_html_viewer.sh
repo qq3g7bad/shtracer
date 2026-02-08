@@ -102,11 +102,8 @@ _html_add_table_header() {
 		else
 			printf '%s\n' "$_TAG_INFO_TABLE"
 		fi
-	} | awk -F"$_sep" -v col_idx=0 '
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
+	} | awk -F"$_sep" -v col_idx=0 \
+		"$AWK_FN_GET_LAST_SEGMENT"'
 		{
 			if (NF >= 4 && $4 != "") {
 				trace_target = $4
@@ -150,120 +147,13 @@ _html_convert_tag_table() {
 		fi
 		printf '%s\n' '__SHTRACER_TAG_INFO_END__'
 		cat "$_TAG_TABLE_FILENAME"
-	} | awk -v sep="$_sep" -v nodata="$_nodata" '
+	} | awk -v sep="$_sep" -v nodata="$_nodata" \
+		"$AWK_FN_COMMON"'
+		'"$AWK_FN_FIELD_EXTRACTORS"'
         BEGIN {
             ndims = 0
             mode = 0
         }
-        function get_last_segment(s,   n, parts) {
-            n = split(s, parts, ":")
-            return n > 0 ? parts[n] : s
-        }
-        function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-        function field1(s, delim,   p1) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return s
-            return substr(s, 1, p1 - 1)
-        }
-        function field2(s, delim,   rest, p1, p2) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return rest
-            return substr(rest, 1, p2 - 1)
-        }
-        function field3(s, delim,   rest, p1, p2, p3) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return rest
-            return substr(rest, 1, p3 - 1)
-        }
-        function field4(s, delim,   rest, p1, p2, p3, p4) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return rest
-            rest = substr(rest, p3 + length(delim))
-            p4 = index(rest, delim)
-            if (p4 <= 0) return rest
-            return substr(rest, 1, p4 - 1)
-        }
-        function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return ""
-            rest = substr(rest, p3 + length(delim))
-            p4 = index(rest, delim)
-            if (p4 <= 0) return rest
-            rest = substr(rest, p4 + length(delim))
-            p5 = index(rest, delim)
-            if (p5 <= 0) return rest
-            return substr(rest, 1, p5 - 1)
-        }
-        function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
-            p1 = index(s, delim)
-            if (p1 <= 0) return ""
-            rest = substr(s, p1 + length(delim))
-            p2 = index(rest, delim)
-            if (p2 <= 0) return ""
-            rest = substr(rest, p2 + length(delim))
-            p3 = index(rest, delim)
-            if (p3 <= 0) return ""
-            rest = substr(rest, p3 + length(delim))
-            p4 = index(rest, delim)
-            if (p4 <= 0) return ""
-            rest = substr(rest, p4 + length(delim))
-            p5 = index(rest, delim)
-            if (p5 <= 0) return rest
-            rest = substr(rest, p5 + length(delim))
-            p6 = index(rest, delim)
-            if (p6 <= 0) return rest
-            return substr(rest, 1, p6 - 1)
-        }
-        function type_from_trace_target(tt,   n, p, t) {
-            if (tt == "") return "Unknown"
-            n = split(tt, p, ":")
-            t = trim(p[n])
-            return t == "" ? "Unknown" : t
-        }
-        function escape_html(s,   t) {
-            t = s
-            gsub(/&/, "&amp;", t)
-            gsub(/</, "&lt;", t)
-            gsub(/>/, "&gt;", t)
-            gsub(/"/, "&quot;", t)
-            return t
-        }
-        function basename(path,   t) {
-            t = path
-            gsub(/.*\//, "", t)
-            return t
-        }
-        function ext_from_basename(base) {
-            if (match(base, /[.][^.]+$/)) return substr(base, RSTART + 1)
-            return "sh"
-        }
-		function fileid_from_path(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)  # Extract basename only
-			gsub(/\./, "_", t)   # Replace dots with underscores
-			return "Target_" t
-		}
         function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
             safeTyp = escape_html(typ)
             safeTag = escape_html(tag)
@@ -363,122 +253,15 @@ _html_generate_cross_ref_table() {
 		printf '%s\n' "$_tag_info_table"
 		printf '%s\n' "__SHTRACER_TAG_INFO_END__"
 		cat "$_xref_file"
-	} | awk -v sep="$_sep" -v nodata="$_nodata" -v table_id="$_table_id" '
+	} | awk -v sep="$_sep" -v nodata="$_nodata" -v table_id="$_table_id" \
+		"$AWK_FN_COMMON"'
+		'"$AWK_FN_FIELD_EXTRACTORS"'
 		BEGIN {
 			mode = "tag_info"
 			row_count = 0
 			col_count = 0
 			row_prefix = ""
 			col_prefix = ""
-		}
-		function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
-		function type_from_trace_target(tt,   n, p, t) {
-			if (tt == "") return "Unknown"
-			n = split(tt, p, ":")
-			t = trim(p[n])
-			return t == "" ? "Unknown" : t
-		}
-		function field1(s, delim,   p1) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return s
-			return substr(s, 1, p1 - 1)
-		}
-		function field2(s, delim,   rest, p1, p2) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return rest
-			return substr(rest, 1, p2 - 1)
-		}
-		function field3(s, delim,   rest, p1, p2, p3) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return rest
-			return substr(rest, 1, p3 - 1)
-		}
-		function field4(s, delim,   rest, p1, p2, p3, p4) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return rest
-			return substr(rest, 1, p4 - 1)
-		}
-		function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return ""
-			rest = substr(rest, p4 + length(delim))
-			p5 = index(rest, delim)
-			if (p5 <= 0) return rest
-			return substr(rest, 1, p5 - 1)
-		}
-		function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return ""
-			rest = substr(rest, p4 + length(delim))
-			p5 = index(rest, delim)
-			if (p5 <= 0) return ""
-			rest = substr(rest, p5 + length(delim))
-			p6 = index(rest, delim)
-			if (p6 <= 0) return rest
-			return substr(rest, 1, p6 - 1)
-		}
-		function escape_html(s,   t) {
-			t = s
-			gsub(/&/, "&amp;", t)
-			gsub(/</, "&lt;", t)
-			gsub(/>/, "&gt;", t)
-			gsub(/"/, "&quot;", t)
-			return t
-		}
-		function basename(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)
-			return t
-		}
-		function ext_from_basename(base) {
-			if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
-			return "sh"
-		}
-		function fileid_from_path(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)  # Extract basename only
-			gsub(/\./, "_", t)   # Replace dots with underscores
-			return "Target_" t
 		}
 		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
 			safeTyp = escape_html(typ)
@@ -655,7 +438,9 @@ _html_generate_cross_ref_table_from_json() {
 		printf '%s\n' "$_tag_info_table"
 		printf '%s\n' "__SHTRACER_TAG_INFO_END__"
 		printf '%s' "$_json_xref"
-	} | awk -v sep="$_sep" -v table_id="$_table_id" '
+	} | awk -v sep="$_sep" -v table_id="$_table_id" \
+		"$AWK_FN_COMMON"'
+		'"$AWK_FN_FIELD_EXTRACTORS"'
 		BEGIN {
 			mode = "tag_info"
 			row_count = 0
@@ -667,115 +452,6 @@ _html_generate_cross_ref_table_from_json() {
 			in_link_obj = 0
 			in_source_section = 0
 			in_target_section = 0
-		}
-		function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
-		}
-		function type_from_trace_target(tt,   n, p, t) {
-			if (tt == "") return "Unknown"
-			n = split(tt, p, ":")
-			t = trim(p[n])
-			return t == "" ? "Unknown" : t
-		}
-		function field1(s, delim,   p1) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return s
-			return substr(s, 1, p1 - 1)
-		}
-		function field2(s, delim,   rest, p1, p2) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return rest
-			return substr(rest, 1, p2 - 1)
-		}
-		function field3(s, delim,   rest, p1, p2, p3) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return rest
-			return substr(rest, 1, p3 - 1)
-		}
-		function field4(s, delim,   rest, p1, p2, p3, p4) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return rest
-			return substr(rest, 1, p4 - 1)
-		}
-		function field5(s, delim,   rest, p1, p2, p3, p4, p5) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return ""
-			rest = substr(rest, p4 + length(delim))
-			p5 = index(rest, delim)
-			if (p5 <= 0) return rest
-			return substr(rest, 1, p5 - 1)
-		}
-		function field6(s, delim,   rest, p1, p2, p3, p4, p5, p6) {
-			p1 = index(s, delim)
-			if (p1 <= 0) return ""
-			rest = substr(s, p1 + length(delim))
-			p2 = index(rest, delim)
-			if (p2 <= 0) return ""
-			rest = substr(rest, p2 + length(delim))
-			p3 = index(rest, delim)
-			if (p3 <= 0) return ""
-			rest = substr(rest, p3 + length(delim))
-			p4 = index(rest, delim)
-			if (p4 <= 0) return ""
-			rest = substr(rest, p4 + length(delim))
-			p5 = index(rest, delim)
-			if (p5 <= 0) return ""
-			rest = substr(rest, p5 + length(delim))
-			p6 = index(rest, delim)
-			if (p6 <= 0) return rest
-			return substr(rest, 1, p6 - 1)
-		}
-		function escape_html(s,   t) {
-			t = s
-			gsub(/&/, "&amp;", t)
-			gsub(/</, "&lt;", t)
-			gsub(/>/, "&gt;", t)
-			gsub(/"/, "&quot;", t)
-			return t
-		}
-		function basename(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)
-			return t
-		}
-		function ext_from_basename(base) {
-			if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
-			return "sh"
-		}
-		function fileid_from_path(path,   t) {
-			t = path
-			gsub(/.*\//, "", t)  # Extract basename only
-			gsub(/\./, "_", t)   # Replace dots with underscores
-			return "Target_" t
 		}
 		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
 			safeTyp = escape_html(typ)
@@ -1248,11 +924,8 @@ convert_template_html() {
 						else
 							printf '%s\n' "$_TAG_INFO_TABLE"
 						fi
-					} | awk -F"$SHTRACER_SEPARATOR" '
-					function get_last_segment(s,   n, parts) {
-						n = split(s, parts, ":")
-						return n > 0 ? parts[n] : s
-					}
+					} | awk -F"$SHTRACER_SEPARATOR" \
+						"$AWK_FN_GET_LAST_SEGMENT"'
 					NF >= 4 && $4 != "" {
 						display_name = get_last_segment($4)
 						# Convert display name to filename pattern (spaces to underscores)
@@ -1373,11 +1046,8 @@ convert_template_html() {
 				else
 					printf '%s\n' "$_TAG_INFO_TABLE"
 				fi
-			} | awk -F"$SHTRACER_SEPARATOR" -v col_idx=0 '
-				function get_last_segment(s,   n, parts) {
-					n = split(s, parts, ":")
-					return n > 0 ? parts[n] : s
-				}
+			} | awk -F"$SHTRACER_SEPARATOR" -v col_idx=0 \
+				"$AWK_FN_GET_LAST_SEGMENT"'
 				{
 					if (NF >= 4 && $4 != "") {
 						trace_target = $4
@@ -1616,7 +1286,8 @@ tag_info_table_from_json_file() {
 			>"$_tmp_sort"
 
 	# Assign trace target order based on config.md heading order
-	awk -F '\t' -v sep="$_sep" -v config_order_file="$_tmp_config_order" '
+	awk -F '\t' -v sep="$_sep" -v config_order_file="$_tmp_config_order" \
+		"$AWK_FN_GET_LAST_SEGMENT"'
 		BEGIN {
 			# Load config.md heading order
 			old_fs = FS
@@ -1630,10 +1301,6 @@ tag_info_table_from_json_file() {
 			}
 			close(config_order_file)
 			FS = old_fs
-		}
-		function get_last_segment(s,   n, parts) {
-			n = split(s, parts, ":")
-			return n > 0 ? parts[n] : s
 		}
 		{
 			tag = $2
