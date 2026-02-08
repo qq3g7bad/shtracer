@@ -1468,6 +1468,7 @@ function renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, conta
         .enter()
         .append('path')
         .attr('d', d => {
+            if (!d.source || d.source.x1 == null || !d.target || d.target.x0 == null) return '';
             const sourceX = d.source.x1;
             const sourceY = (d.source.y0 + d.source.y1) / 2;
             const targetX = d.target.x0;
@@ -1721,12 +1722,12 @@ function renderSankey(data) {
 				...d,
 				source: nodeIndexMap.get(d.source),
 				target: nodeIndexMap.get(d.target)
-		}));
-
-		sankeyLinks.forEach((link, i) => {
-				if (link.source === undefined || link.target === undefined) {
-						console.error(`Link ${i} has undefined source/target:`, link);
+		})).filter(l => {
+				if (l.source === undefined || l.target === undefined) {
+						console.warn('Skipping link with unresolved source/target:', l);
+						return false;
 				}
+				return true;
 		});
 
 		// Render full diagram
