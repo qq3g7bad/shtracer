@@ -518,7 +518,7 @@ test_markdown_tag_index() {
 
 ##
 # @brief Test tag extraction with CRLF line endings (Windows compatibility)
-# @tag @IT5.1@
+# @tag @IT5.1@ (FROM: @IMP2.2@)
 test_crlf_tag_extraction() {
 	(
 		# Arrange
@@ -547,7 +547,7 @@ test_crlf_tag_extraction() {
 
 ##
 # @brief Test that output files have LF-only line endings (no CRLF)
-# @tag @IT5.2@
+# @tag @IT5.2@ (FROM: @IMP2.2@)
 test_crlf_output_files_lf_only() {
 	(
 		# Arrange
@@ -576,7 +576,7 @@ test_crlf_output_files_lf_only() {
 
 ##
 # @brief Test JSON output has no CRLF line endings
-# @tag @IT5.3@
+# @tag @IT5.3@ (FROM: @IMP2.2@)
 test_crlf_json_output_lf_only() {
 	(
 		# Arrange
@@ -601,7 +601,7 @@ test_crlf_json_output_lf_only() {
 
 ##
 # @brief Test HTML output has no CRLF line endings
-# @tag @IT5.4@
+# @tag @IT5.4@ (FROM: @IMP2.2@)
 test_crlf_html_output_lf_only() {
 	(
 		# Arrange
@@ -629,7 +629,7 @@ test_crlf_html_output_lf_only() {
 
 ##
 # @brief Test Markdown output has no CRLF line endings
-# @tag @IT5.5@
+# @tag @IT5.5@ (FROM: @IMP2.2@)
 test_crlf_markdown_output_lf_only() {
 	(
 		# Arrange
@@ -657,7 +657,7 @@ test_crlf_markdown_output_lf_only() {
 
 ##
 # @brief Test handling of mixed CRLF/LF line endings in same file
-# @tag @IT5.6@
+# @tag @IT5.6@ (FROM: @IMP2.2@)
 test_crlf_mixed_line_endings() {
 	(
 		# Arrange
@@ -692,7 +692,7 @@ EOF
 
 ##
 # @brief Test absolute path resolution
-# @tag @IT6.1@
+# @tag @IT6.1@ (FROM: @IMP2.1@)
 test_path_absolute_paths() {
 	(
 		# Arrange
@@ -726,7 +726,7 @@ EOF
 
 ##
 # @brief Test relative path resolution (., .., ../../)
-# @tag @IT6.2@
+# @tag @IT6.2@ (FROM: @IMP2.1@)
 test_path_relative_paths() {
 	(
 		# Arrange
@@ -759,7 +759,7 @@ EOF
 
 ##
 # @brief Test paths with spaces
-# @tag @IT6.3@
+# @tag @IT6.3@ (FROM: @IMP2.1@)
 test_path_with_spaces() {
 	(
 		# Arrange
@@ -793,7 +793,7 @@ EOF
 
 ##
 # @brief Test paths with special characters ($, parentheses)
-# @tag @IT6.4@
+# @tag @IT6.4@ (FROM: @IMP2.1@)
 test_path_with_special_chars() {
 	(
 		# Arrange
@@ -827,7 +827,7 @@ EOF
 
 ##
 # @brief Test config file accessed via symlink
-# @tag @IT6.5@
+# @tag @IT6.5@ (FROM: @IMP2.1@)
 test_path_config_via_symlink() {
 	(
 		# Arrange
@@ -861,7 +861,7 @@ EOF
 
 ##
 # @brief Test source files accessed via symlink
-# @tag @IT6.6@
+# @tag @IT6.6@ (FROM: @IMP2.1@)
 test_path_source_file_symlink() {
 	(
 		# Arrange
@@ -895,7 +895,7 @@ EOF
 
 ##
 # @brief Test error handling for non-existent paths
-# @tag @IT6.7@
+# @tag @IT6.7@ (FROM: @IMP2.1@)
 test_path_nonexistent_file() {
 	(
 		# Arrange
@@ -925,7 +925,7 @@ EOF
 
 ##
 # @brief Test very long path (PATH_MAX boundary testing)
-# @tag @IT6.8@
+# @tag @IT6.8@ (FROM: @IMP2.1@)
 test_path_very_long_path() {
 	(
 		# Arrange

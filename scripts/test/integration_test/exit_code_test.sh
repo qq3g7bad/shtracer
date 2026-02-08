@@ -45,7 +45,7 @@ oneTimeTearDown() {
 
 ##
 # @brief Test exit code 0 (success)
-# @tag @IT4.1@
+# @tag @IT4.1@ (FROM: @IMP1.2@)
 test_exit_code_0_success() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'
@@ -67,7 +67,7 @@ EOF
 
 ##
 # @brief Test exit code 1 (invalid arguments)
-# @tag @IT4.2@
+# @tag @IT4.2@ (FROM: @IMP1.2@)
 test_exit_code_1_invalid_usage() {
 	# Act
 	"$SHTRACER_BIN" --invalid-option >/dev/null 2>&1
@@ -79,7 +79,7 @@ test_exit_code_1_invalid_usage() {
 
 ##
 # @brief Test exit code 2 (config not found)
-# @tag @IT4.3@
+# @tag @IT4.3@ (FROM: @IMP1.2@)
 test_exit_code_2_config_not_found() {
 	# Act
 	"$SHTRACER_BIN" /nonexistent/config.md >/dev/null 2>&1
@@ -91,7 +91,7 @@ test_exit_code_2_config_not_found() {
 
 ##
 # @brief Test exit code 20 (isolated tags in verify mode)
-# @tag @IT4.4@
+# @tag @IT4.4@ (FROM: @IMP1.2@)
 test_exit_code_20_isolated_tags() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'
@@ -119,7 +119,7 @@ EOF
 
 ##
 # @brief Test exit code 21 (duplicate tags in verify mode)
-# @tag @IT4.5@
+# @tag @IT4.5@ (FROM: @IMP1.2@)
 test_exit_code_21_duplicate_tags() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'
@@ -144,7 +144,7 @@ EOF
 
 ##
 # @brief Test exit code 22 (dangling FROM tags in verify mode)
-# @tag @IT4.6@
+# @tag @IT4.6@ (FROM: @IMP1.2@)
 test_exit_code_22_dangling_from_tags() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'
@@ -172,7 +172,7 @@ EOF
 
 ##
 # @brief Test verify mode priority: duplicate (21) > dangling (22) > isolated (20)
-# @tag @IT4.7@
+# @tag @IT4.7@ (FROM: @IMP1.2@)
 test_verify_mode_error_priority() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'
@@ -217,7 +217,7 @@ EOF
 
 ##
 # @brief Test error message format compliance
-# @tag @IT4.8@
+# @tag @IT4.8@ (FROM: @IMP1.2@)
 test_error_message_format() {
 	# Arrange
 	cat >"${TEST_DATA_DIR}/config.md" <<'EOF'

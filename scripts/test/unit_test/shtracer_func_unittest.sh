@@ -425,7 +425,7 @@ EOF
 
 ##
 # @brief  Test for _verify_dangling_fromtags with valid references
-# @tag    @UT2.14@
+# @tag    @UT2.14@ (FROM: @IMP2.5.1@)
 test_verify_dangling_fromtags_no_dangling() {
 	(
 		# Arrange ---------
@@ -451,7 +451,7 @@ EOF
 
 ##
 # @brief  Test for _verify_dangling_fromtags with dangling reference
-# @tag    @UT2.15@
+# @tag    @UT2.15@ (FROM: @IMP2.5.1@)
 test_verify_dangling_fromtags_with_dangling() {
 	(
 		# Arrange ---------
@@ -478,7 +478,7 @@ EOF
 
 ##
 # @brief  Test for _verify_dangling_fromtags with multiple dangling references
-# @tag    @UT2.16@
+# @tag    @UT2.16@ (FROM: @IMP2.5.1@)
 test_verify_dangling_fromtags_multiple_dangling() {
 	(
 		# Arrange ---------
@@ -502,7 +502,7 @@ EOF
 
 ##
 # @brief  Test for _verify_dangling_fromtags with comma-separated FROM tags
-# @tag    @UT2.17@
+# @tag    @UT2.17@ (FROM: @IMP2.5.1@)
 test_verify_dangling_fromtags_comma_separated() {
 	(
 		# Arrange ---------
@@ -528,7 +528,7 @@ EOF
 
 ##
 # @brief  Test for _verify_dangling_fromtags with mixed valid and dangling
-# @tag    @UT2.18@
+# @tag    @UT2.18@ (FROM: @IMP2.5.1@)
 test_verify_dangling_fromtags_mixed() {
 	(
 		# Arrange ---------
@@ -558,7 +558,7 @@ EOF
 
 ##
 # @brief Test create_file_versions_table with valid tags file
-# @tag @UT2.8.1@
+# @tag @UT2.8.1@ (FROM: @IMP2.2.1@)
 test_create_file_versions_table_valid() {
 	(
 		# Arrange ---------
@@ -595,7 +595,7 @@ EOF
 
 ##
 # @brief Test create_file_versions_table with multiple files per layer
-# @tag @UT2.8.2@
+# @tag @UT2.8.2@ (FROM: @IMP2.2.1@)
 test_create_file_versions_table_multiple_files() {
 	(
 		# Arrange ---------
@@ -621,7 +621,7 @@ EOF
 
 ##
 # @brief Test create_file_versions_table with empty tags file
-# @tag @UT2.8.3@
+# @tag @UT2.8.3@ (FROM: @IMP2.2.1@)
 test_create_file_versions_table_empty() {
 	(
 		# Arrange ---------
@@ -646,7 +646,7 @@ test_create_file_versions_table_empty() {
 
 ##
 # @brief Test create_file_versions_table with unreadable file
-# @tag @UT2.8.4@
+# @tag @UT2.8.4@ (FROM: @IMP2.2.1@)
 test_create_file_versions_table_unreadable() {
 	# Arrange ---------
 	mkdir -p "$OUTPUT_DIR/tags"
@@ -667,7 +667,7 @@ test_create_file_versions_table_unreadable() {
 
 ##
 # @brief Test _extract_layer_hierarchy with simple config
-# @tag @UT2.7.1@
+# @tag @UT2.7.1@ (FROM: @IMP2.7.3@)
 test_extract_layer_hierarchy_simple() {
 	(
 		# Arrange ---------
@@ -704,7 +704,7 @@ EOF
 
 ##
 # @brief Test _extract_layer_hierarchy with three layers
-# @tag @UT2.7.2@
+# @tag @UT2.7.2@ (FROM: @IMP2.7.3@)
 test_extract_layer_hierarchy_three_layers() {
 	(
 		# Arrange ---------
@@ -728,7 +728,7 @@ EOF
 
 ##
 # @brief Test _extract_layer_hierarchy with empty config
-# @tag @UT2.7.3@
+# @tag @UT2.7.3@ (FROM: @IMP2.7.3@)
 test_extract_layer_hierarchy_empty_config() {
 	(
 		# Arrange ---------
@@ -747,7 +747,7 @@ test_extract_layer_hierarchy_empty_config() {
 
 ##
 # @brief Test _extract_layer_hierarchy with unreadable file
-# @tag @UT2.7.4@
+# @tag @UT2.7.4@ (FROM: @IMP2.7.3@)
 test_extract_layer_hierarchy_unreadable() {
 	(
 		# Act -------------
@@ -760,7 +760,7 @@ test_extract_layer_hierarchy_unreadable() {
 
 ##
 # @brief Test make_cross_reference_tables with single layer pair
-# @tag @UT2.7.5@
+# @tag @UT2.7.5@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_single_pair() {
 	(
 		# Arrange ---------
@@ -798,7 +798,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with multiple layer pairs
-# @tag @UT2.7.6@
+# @tag @UT2.7.6@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_multiple_pairs() {
 	(
 		# Arrange ---------
@@ -839,7 +839,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with orphaned tags
-# @tag @UT2.7.7@
+# @tag @UT2.7.7@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_orphaned_tags() {
 	(
 		# Arrange ---------
@@ -878,7 +878,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with empty config
-# @tag @UT2.7.8@
+# @tag @UT2.7.8@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_empty_config() {
 	(
 		# Arrange ---------
@@ -907,7 +907,7 @@ test_make_cross_reference_tables_empty_config() {
 
 ##
 # @brief Test make_cross_reference_tables with unreadable files
-# @tag @UT2.7.9@
+# @tag @UT2.7.9@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_unreadable_files() {
 	(
 		# Arrange ---------
@@ -934,7 +934,7 @@ test_make_cross_reference_tables_unreadable_files() {
 
 ##
 # @brief Test make_cross_reference_tables with missing intermediate layers
-# @tag @UT2.7.10@
+# @tag @UT2.7.10@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_missing_intermediate() {
 	(
 		# Arrange: REQ -> ARC -> IMP, but skip ARC layer
@@ -973,7 +973,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with files containing no tags
-# @tag @UT2.7.11@
+# @tag @UT2.7.11@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_files_with_no_tags() {
 	(
 		# Arrange: Config points to files but no tags found
@@ -1005,7 +1005,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with special characters in paths
-# @tag @UT2.7.12@
+# @tag @UT2.7.12@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_special_char_paths() {
 	(
 		# Arrange: Paths with spaces and special characters
@@ -1043,7 +1043,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables with UTF-8 tag titles
-# @tag @UT2.7.13@
+# @tag @UT2.7.13@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_utf8_titles() {
 	(
 		# Arrange: Tags with UTF-8 characters in titles
@@ -1082,7 +1082,7 @@ EOF
 
 ##
 # @brief Test make_cross_reference_tables directory structure creation
-# @tag @UT2.7.14@
+# @tag @UT2.7.14@ (FROM: @IMP2.7.1@)
 test_make_cross_reference_tables_directory_structure() {
 	(
 		# Arrange
@@ -1137,7 +1137,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with empty matrix (no tags)
-# @tag @UT2.9.1@
+# @tag @UT2.9.1@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_empty() {
 	(
 		# Arrange: Create matrix file with no tags
@@ -1167,7 +1167,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with single row
-# @tag @UT2.9.2@
+# @tag @UT2.9.2@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_single_row() {
 	(
 		# Arrange: Matrix with one requirement and one architecture
@@ -1207,7 +1207,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with multiple rows
-# @tag @UT2.9.3@
+# @tag @UT2.9.3@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_multiple_rows() {
 	(
 		# Arrange: Matrix with multiple requirements and architectures
@@ -1253,7 +1253,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with special characters in tags
-# @tag @UT2.9.4@
+# @tag @UT2.9.4@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_special_chars() {
 	(
 		# Arrange: Tags with markdown special chars (|, \, *, [, ])
@@ -1290,7 +1290,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with UTF-8 content
-# @tag @UT2.9.5@
+# @tag @UT2.9.5@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_utf8_content() {
 	(
 		# Arrange: Tags with UTF-8 characters
@@ -1327,7 +1327,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with very long file paths
-# @tag @UT2.9.6@
+# @tag @UT2.9.6@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_long_paths() {
 	(
 		# Arrange: Tags with very long file paths
@@ -1365,7 +1365,7 @@ EOF
 
 ##
 # @brief Test markdown_cross_reference with nonexistent tags directory
-# @tag @UT2.9.7@
+# @tag @UT2.9.7@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_invalid_dir() {
 	(
 		# Arrange: Point to nonexistent directory
@@ -1386,7 +1386,7 @@ test_markdown_cross_reference_invalid_dir() {
 
 ##
 # @brief Test markdown_cross_reference with no matrix files
-# @tag @UT2.9.8@
+# @tag @UT2.9.8@ (FROM: @IMP2.7.4@)
 test_markdown_cross_reference_no_matrix_files() {
 	(
 		# Arrange: Tags directory exists but no matrix files
@@ -1407,7 +1407,7 @@ test_markdown_cross_reference_no_matrix_files() {
 
 ##
 # @brief Test _generate_markdown_table basic formatting
-# @tag @UT2.9.9@
+# @tag @UT2.9.9@ (FROM: @IMP2.7.5@)
 test_generate_markdown_table_formatting() {
 	(
 		# Arrange

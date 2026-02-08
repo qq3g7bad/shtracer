@@ -447,6 +447,7 @@ _verify_duplicated_tags() {
 # @param   $1 : TAG_OUTPUT_DATA file path (01_tag_extracted_all)
 # @param   $2 : Output file path for dangling references
 # @return  None (writes to file with format: child_tag parent_tag file line)
+# @tag     @IMP2.5.1@ (FROM: @ARC2.5@)
 _verify_dangling_fromtags() {
 	# Single AWK pass over the tag data to avoid temp file/grep mismatches
 	# Output format: child_tag parent_tag file line
@@ -528,6 +529,7 @@ _detect_isolated_tags() {
 # @param $1 : TAG_OUTPUT_DATA (01_tags with 8 columns)
 # @param $2 : Output file path (05_file_versions)
 # @return Creates file with format: trace_target<SEP>file_path<SEP>version_info
+# @tag   @IMP2.2.1@ (FROM: @ARC2.2@)
 create_file_versions_table() {
 	_TAGS_FILE="$1"
 	_OUTPUT="$2"

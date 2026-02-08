@@ -150,7 +150,7 @@ jobs:
             $(find ./scripts/test -name "*.sh" -not -path "./scripts/test/shunit2/*")
           echo "Formatting check passed!"
 
-  # @IT3.3@ POSIX shell compatibility testing
+  # @IT3.3@ (FROM: @IMP1.1@) POSIX shell compatibility testing
   # Job 3: Test on multiple POSIX-compliant shells
   posix-shell-matrix:
     name: Test on ${{ matrix.shell }} (${{ matrix.os }})

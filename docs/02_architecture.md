@@ -124,7 +124,7 @@ All error handling uses these constants instead of hardcoded values.
 
 ### 📄 `shtracer_func.sh`
 
-<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.5@) -->
+<!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.2.1@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.5@) -->
 #### Check the config file
 
 * Read configuration file.
