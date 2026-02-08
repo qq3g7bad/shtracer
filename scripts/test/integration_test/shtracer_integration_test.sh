@@ -307,7 +307,7 @@ EOF
 		assertNotEquals "Shtracer should exit with error for non-existent file" 0 "${_EXIT_CODE}"
 
 		# Error message should be present
-		echo "${_OUTPUT}" | grep -q "error\|Error\|No linked tags"
+		echo "${_OUTPUT}" | grep -qE "error|Error|No linked tags"
 		assertEquals "Error message should be present" 0 $?
 
 		# Clean up
@@ -363,11 +363,11 @@ test_integration_summary_export() {
 		assertEquals "Shtracer should exit successfully with summary" 0 "${_EXIT_CODE}"
 
 		# Basic format checks
-		echo "${_OUTPUT}" | grep -q "^Requirement$\|^Architecture$\|^Implementation$\|^Unit test$\|^Integration test$"
+		echo "${_OUTPUT}" | grep -qE "^Requirement$|^Architecture$|^Implementation$|^Unit test$|^Integration test$"
 		assertEquals "Summary should contain layer headers" 0 $?
-		echo "${_OUTPUT}" | grep -q "^  upstream: \|^  downstream: "
+		echo "${_OUTPUT}" | grep -qE "^  upstream: |^  downstream: "
 		assertEquals "Summary should contain upstream/downstream lines" 0 $?
-		echo "${_OUTPUT}" | grep -q "%$\|<1%"
+		echo "${_OUTPUT}" | grep -qE "%$|<1%"
 		assertEquals "Summary should contain percentage tokens" 0 $?
 
 		# HTML/JSON should NOT be generated in summary mode
@@ -965,6 +965,13 @@ EOF
 		rm -f config_longpath.md
 	)
 }
+
+# zsh compatibility: shunit2 requires shwordsplit and SHUNIT_PARENT in zsh
+if [ -n "${ZSH_VERSION:-}" ]; then
+	setopt shwordsplit
+	SHUNIT_PARENT="$0"
+	export SHUNIT_PARENT
+fi
 
 # shellcheck source=shunit2/shunit2
 . "${TEST_ROOT%/}/shunit2/shunit2"

@@ -445,7 +445,7 @@ EOF
 
 		# Assert ----------
 		# Should have no dangling references
-		assertEquals "0" "$(wc -l <"$_OUTPUT_FILE")"
+		assertEquals "0" "$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')"
 	)
 }
 
@@ -468,7 +468,7 @@ EOF
 
 		# Assert ----------
 		# Should have 1 dangling reference
-		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE")"
+		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')"
 		# Check the output format: child_tag parent_tag file line
 		_RESULT="$(cat "$_OUTPUT_FILE")"
 		echo "$_RESULT" | grep -q "@ARC1@ @REQ-MISSING@ arch.md 20"
@@ -496,7 +496,7 @@ EOF
 
 		# Assert ----------
 		# Should have 2 dangling references
-		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE")"
+		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')"
 	)
 }
 
@@ -519,7 +519,7 @@ EOF
 
 		# Assert ----------
 		# Should have 1 dangling reference (@REQ-MISSING@)
-		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE")"
+		assertEquals "1" "$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')"
 		_RESULT="$(cat "$_OUTPUT_FILE")"
 		echo "$_RESULT" | grep -q "@ARC1@ @REQ-MISSING@ arch.md 20"
 		assertEquals "0" "$?"
@@ -548,7 +548,7 @@ EOF
 
 		# Assert ----------
 		# Should have 2 dangling references from @ARC2@
-		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE")"
+		assertEquals "2" "$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')"
 	)
 }
 
@@ -581,7 +581,7 @@ EOF
 		assertTrue "Output file should exist" "[ -f '$_OUTPUT_FILE' ]"
 
 		# Should have 2 unique file entries (req.md and arch.md)
-		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')
 		assertEquals "Should have 2 unique files" 2 "$_LINE_COUNT"
 
 		# Should contain version info
@@ -614,7 +614,7 @@ EOF
 
 		# Assert ----------
 		# Should have 2 unique files (req1.md and req2.md)
-		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')
 		assertEquals "Should have 2 unique files" 2 "$_LINE_COUNT"
 	)
 }
@@ -639,7 +639,7 @@ test_create_file_versions_table_empty() {
 		assertTrue "Output file should exist" "[ -f '$_OUTPUT_FILE' ]"
 
 		# Should be empty
-		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE")
+		_LINE_COUNT=$(wc -l <"$_OUTPUT_FILE" | tr -d ' ')
 		assertEquals "Should have 0 lines" 0 "$_LINE_COUNT"
 	)
 }
@@ -689,7 +689,7 @@ EOF
 		assertNotNull "Result should not be empty" "$_RESULT"
 
 		# Should have two layers
-		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l)
+		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l | tr -d ' ')
 		assertEquals "Should have 2 layers" 2 "$_LINE_COUNT"
 
 		# Should contain Requirement layer
@@ -721,7 +721,7 @@ EOF
 		_RESULT=$(_extract_layer_hierarchy "$_CONFIG_TABLE")
 
 		# Assert ----------
-		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l)
+		_LINE_COUNT=$(printf '%s\n' "$_RESULT" | wc -l | tr -d ' ')
 		assertEquals "Should have 3 layers" 3 "$_LINE_COUNT"
 	)
 }
@@ -791,7 +791,7 @@ EOF
 		assertEquals "Should return success" 0 "$_STATUS"
 
 		# Check that at least one cross-ref matrix file was created
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertTrue "Should create at least one matrix file" "[ $_MATRIX_FILES -ge 1 ]"
 	)
 }
@@ -832,7 +832,7 @@ EOF
 		assertEquals "Should return success" 0 "$_STATUS"
 
 		# Should create 2 matrix files (REQ->ARC and ARC->IMP)
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "0*_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "0*_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertEquals "Should create 2 matrix files" 2 "$_MATRIX_FILES"
 	)
 }
@@ -871,7 +871,7 @@ EOF
 		assertEquals "Should return success even with orphaned tags" 0 "$_STATUS"
 
 		# Matrix file should still be created (may be empty)
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertTrue "Should create matrix file even with orphaned tags" "[ $_MATRIX_FILES -ge 1 ]"
 	)
 }
@@ -900,7 +900,7 @@ test_make_cross_reference_tables_empty_config() {
 		assertEquals "Should return success with empty config" 0 "$_STATUS"
 
 		# Should output warning about no layers
-		echo "$_RESULT" | grep -q "warn\|No traceability layers"
+		echo "$_RESULT" | grep -qE "warn|No traceability layers"
 		assertEquals "Should warn about no layers" 0 $?
 	)
 }
@@ -927,7 +927,7 @@ test_make_cross_reference_tables_unreadable_files() {
 		assertEquals "Should return error for unreadable files" 1 "$_STATUS"
 
 		# Should output error message
-		echo "$_RESULT" | grep -q "error\|Cannot read"
+		echo "$_RESULT" | grep -qE "error|Cannot read"
 		assertEquals "Should show error message" 0 $?
 	)
 }
@@ -966,7 +966,7 @@ EOF
 		assertEquals "Should handle missing intermediate layers" 0 "$_STATUS"
 
 		# Should create matrix for REQ->IMP pair
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertTrue "Should create cross-ref matrix" "[ $_MATRIX_FILES -ge 1 ]"
 	)
 }
@@ -998,7 +998,7 @@ EOF
 		assertEquals "Should handle empty tags gracefully" 0 "$_STATUS"
 
 		# No matrix files should be created (no layer pairs)
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertEquals "Should not create matrix for empty tags" 0 "$_MATRIX_FILES"
 	)
 }
@@ -1036,7 +1036,7 @@ EOF
 		assertEquals "Should handle special chars in paths" 0 "$_STATUS"
 
 		# Should create matrix
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertTrue "Should create cross-ref matrix" "[ $_MATRIX_FILES -ge 1 ]"
 	)
 }
@@ -1075,7 +1075,7 @@ EOF
 		assertEquals "Should handle UTF-8 titles" 0 "$_STATUS"
 
 		# Verify matrix files were created
-		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l)
+		_MATRIX_FILES=$(find "$OUTPUT_DIR/tags" -name "06_cross_ref_matrix_*" 2>/dev/null | wc -l | tr -d ' ')
 		assertTrue "Should create cross-ref matrix with UTF-8" "[ $_MATRIX_FILES -ge 1 ]"
 	)
 }

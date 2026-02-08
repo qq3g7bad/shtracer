@@ -234,7 +234,7 @@ line3
 
 line5
 EOF
-	result=$(remove_empty_lines <"$TEMP_DIR/empty.txt" | wc -l)
+	result=$(remove_empty_lines <"$TEMP_DIR/empty.txt" | wc -l | tr -d ' ')
 	assertEquals "3" "$result"
 }
 
@@ -249,7 +249,7 @@ line3
 
 line5
 EOF
-	result=$(remove_empty_lines <"$TEMP_DIR/whitespace.txt" | wc -l)
+	result=$(remove_empty_lines <"$TEMP_DIR/whitespace.txt" | wc -l | tr -d ' ')
 	assertEquals "3" "$result"
 }
 
@@ -528,7 +528,7 @@ Line 1
 Line 2
 Line 3
 EOF
-	result=$(remove_markdown_comments "$TEMP_DIR/none.md" | wc -l)
+	result=$(remove_markdown_comments "$TEMP_DIR/none.md" | wc -l | tr -d ' ')
 	assertEquals "3" "$result"
 }
 

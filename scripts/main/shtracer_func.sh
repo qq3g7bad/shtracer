@@ -589,8 +589,8 @@ make_tag_table() {
 			-F"$SHTRACER_SEPARATOR" \
 			'{
 				# OFS="'"$SHTRACER_SEPARATOR"'"
-				split($3, parent, /[ ]*,[ ]*/);
-				for (i=1; i<=length(parent); i++){
+				_np = split($3, parent, /[ ]*,[ ]*/);
+				for (i=1; i<=_np; i++){
 					print(parent[i], $2);
 				}
 		}' \
@@ -1137,8 +1137,8 @@ make_json() {
 		}
 		BEGIN {
 			while ((getline line < isolated_file) > 0) {
-				split(line, parts, " ")
-				if (length(parts) >= 2 && parts[2] != "") {
+				_np = split(line, parts, " ")
+				if (_np >= 2 && parts[2] != "") {
 					isolated[parts[2]] = 1
 				}
 			}
@@ -1153,8 +1153,8 @@ make_json() {
 			close(duplicated_file)
 
 			while ((getline line < dangling_file) > 0) {
-				split(line, parts, " ")
-				if (length(parts) >= 4) {
+				_np = split(line, parts, " ")
+				if (_np >= 4) {
 					d_child[d_count] = parts[1]
 					d_parent[d_count] = parts[2]
 					d_file[d_count] = parts[3]
@@ -1165,8 +1165,8 @@ make_json() {
 			close(dangling_file)
 
 			while ((getline line < tag_output_data) > 0) {
-				split(line, fields, sep)
-				if (length(fields) >= 8) {
+				_nf = split(line, fields, sep)
+				if (_nf >= 8) {
 					tag_id = fields[2]
 					file_path = fields[5]
 					line_num = fields[6]
@@ -1265,8 +1265,8 @@ BEGIN {
 	# STEP 1: Read layer order AND patterns from config table
 	n_layers = 0
 	while ((getline line < config_table) > 0) {
-		split(line, fields, sep)
-		if (length(fields) >= 6 && fields[1] != "") {
+		_nf = split(line, fields, sep)
+		if (_nf >= 6 && fields[1] != "") {
 			# Extract layer name: last component after last colon
 			layer = fields[1]
 			sub(/^:/, "", layer)
@@ -1290,8 +1290,8 @@ BEGIN {
 		# STEP 2: Read all tags AND build global file mapping
 		global_file_id = 0
 		while ((getline line < tag_output_data) > 0) {
-			split(line, fields, sep)
-			if (length(fields) >= 8) {
+			_nf = split(line, fields, sep)
+			if (_nf >= 8) {
 				tag_id = fields[2]
 				all_tags[tag_id] = 1
 				tag_from[tag_id] = fields[3]  # NEW: Store from_tag
@@ -1361,8 +1361,8 @@ BEGIN {
 			dangling_file = output_dir "/tags/verified/12_dangling_fromtag"
 			dangling_count = 0
 			while ((getline line < dangling_file) > 0) {
-				split(line, fields, " ")
-				if (length(fields) >= 4) {
+				_nf = split(line, fields, " ")
+				if (_nf >= 4) {
 					dangling_child[dangling_count] = fields[1]
 					dangling_parent[dangling_count] = fields[2]
 					dangling_file_path[dangling_count] = fields[3]
@@ -1793,8 +1793,8 @@ END { printf "\n" }
 	BEGIN {
 		# Load global file_id mapping (full path -> file_id) generated earlier
 		while ((getline line < file_mapping) > 0) {
-			split(line, parts, "|")
-			if (length(parts) >= 2) {
+			_np = split(line, parts, "|")
+			if (_np >= 2) {
 				file_global_id[parts[1]] = parts[2]
 			}
 		}
@@ -1802,8 +1802,8 @@ END { printf "\n" }
 
 			n_layers = 0
 			while ((getline line < config_table) > 0) {
-				split(line, fields, sep)
-				if (length(fields) >= 1 && fields[1] != "") {
+				_nf = split(line, fields, sep)
+				if (_nf >= 1 && fields[1] != "") {
 					layer = fields[1]
 					sub(/^:/, "", layer)
 					sub(/.*:/, "", layer)
@@ -1818,8 +1818,8 @@ END { printf "\n" }
 
 			# Read all tags
 			while ((getline line < tag_output_data) > 0) {
-				split(line, fields, sep)
-				if (length(fields) >= 8) {
+				_nf = split(line, fields, sep)
+				if (_nf >= 8) {
 					tag_id = fields[2]
 					all_tags[tag_id] = 1
 					tag_target[tag_id] = fields[1]
@@ -1846,8 +1846,8 @@ END { printf "\n" }
 			dangling_file = output_dir "/tags/verified/12_dangling_fromtag"
 			dangling_count = 0
 			while ((getline line < dangling_file) > 0) {
-				split(line, fields, " ")
-				if (length(fields) >= 4) {
+				_nf = split(line, fields, " ")
+				if (_nf >= 4) {
 					dangling_child[dangling_count] = fields[1]
 					dangling_parent[dangling_count] = fields[2]
 					dangling_file_path[dangling_count] = fields[3]

@@ -869,31 +869,39 @@ _parse_json_nodes() {
 
 	# AWK-based trace_tags extraction with lookup tables
 	# Output format: id|description|file|line|trace_target|file_version (backward compatible)
-	printf '%s\n' "$_json" | awk -v files="$_files" -v layers="$_layers" '
-		BEGIN {
-			# Build lookup maps
-			split(files, file_lines, "\n")
-			for (i in file_lines) {
-				split(file_lines[i], parts, "|")
-				file_map[parts[1]] = parts[2]    # file_id -> file
-				ver_map[parts[1]] = parts[3]     # file_id -> version
-			}
+	# Note: lookup data is fed via stdin (not -v) for nawk/macOS awk portability
+	{
+		printf '%s\n' "---FILES---"
+		printf '%s\n' "$_files"
+		printf '%s\n' "---LAYERS---"
+		printf '%s\n' "$_layers"
+		printf '%s\n' "---JSON---"
+		printf '%s\n' "$_json"
+	} | awk '
+		/^---FILES---$/ { mode="files"; next }
+		/^---LAYERS---$/ { mode="layers"; next }
+		/^---JSON---$/ { mode="json"; next }
 
-			split(layers, layer_lines, "\n")
-			for (i in layer_lines) {
-				split(layer_lines[i], parts, "|")
-				layer_map[parts[1]] = parts[2]   # layer_id -> name
-			}
-
-			in_trace_tags=0; in_tag_obj=0
+		mode == "files" && /\|/ {
+			split($0, parts, "|")
+			file_map[parts[1]] = parts[2]
+			ver_map[parts[1]] = parts[3]
+			next
 		}
+		mode == "layers" && /\|/ {
+			split($0, parts, "|")
+			layer_map[parts[1]] = parts[2]
+			next
+		}
+
+		mode != "json" { next }
 
 		/"trace_tags": \[/ { in_trace_tags=1; next }
 		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
 
 		in_trace_tags && /^    \{/ {
 			in_tag_obj=1
-			tag_id=""; desc=""; file_id=""; line=""; layer_id=""
+			tag_id=""; desc=""; file_id=""; ln=""; layer_id=""
 			next
 		}
 
@@ -902,7 +910,7 @@ _parse_json_nodes() {
 				file = file_map[file_id]
 				version = ver_map[file_id]
 				target = layer_map[layer_id]
-				print tag_id "|" desc "|" file "|" line "|" target "|" version
+				print tag_id "|" desc "|" file "|" ln "|" target "|" version
 			}
 			in_tag_obj=0
 			next
@@ -931,7 +939,7 @@ _parse_json_nodes() {
 		line = $0
 		sub(/.*"line": */, "", line)
 		sub(/,.*$/, "", line)
-		line = line
+		ln = line
 	}
 		in_tag_obj && /"layer_id":/ {
 		line = $0

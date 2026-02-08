@@ -87,7 +87,7 @@ test_get_file_version_info_git_repo() {
 
 	# Assert - should be 7 chars after "git:"
 	_hash_part="${_result#git:}"
-	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c | tr -d ' ')"
 	assertEquals "7" "$_hash_len"
 }
 
@@ -244,7 +244,7 @@ test_get_file_version_info_uncommitted_changes() {
 
 	# Assert - hash should be 7 chars
 	_hash_part="${_result#git:}"
-	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c | tr -d ' ')"
 	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
 }
 
@@ -284,7 +284,7 @@ test_get_file_version_info_detached_head() {
 
 	# Assert - hash should be 7 chars
 	_hash_part="${_result#git:}"
-	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c | tr -d ' ')"
 	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
 }
 
@@ -333,7 +333,7 @@ test_get_file_version_info_shallow_clone() {
 
 	# Assert - hash should be 7 chars
 	_hash_part="${_result#git:}"
-	_hash_len="$(printf '%s' "$_hash_part" | wc -c)"
+	_hash_len="$(printf '%s' "$_hash_part" | wc -c | tr -d ' ')"
 	assertEquals "Hash should be 7 chars" "7" "$_hash_len"
 }
 

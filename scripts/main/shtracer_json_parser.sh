@@ -108,27 +108,37 @@ json_parse_trace_tags() {
 	_files="$(json_parse_files "$_json")"
 	_layers="$(json_parse_layers "$_json")"
 
-	printf '%s\n' "$_json" | awk -v files="$_files" -v layers="$_layers" '
-		BEGIN {
-			# Build lookup maps from files
-			n = split(files, file_lines, "\n")
-			for (i = 1; i <= n; i++) {
-				split(file_lines[i], parts, "|")
-				if (parts[1] != "") {
-					file_map[parts[1]] = parts[2]
-					ver_map[parts[1]] = parts[3]
-				}
+	# Note: lookup data is fed via stdin (not -v) for nawk/macOS awk portability
+	{
+		printf '%s\n' "---FILES---"
+		printf '%s\n' "$_files"
+		printf '%s\n' "---LAYERS---"
+		printf '%s\n' "$_layers"
+		printf '%s\n' "---JSON---"
+		printf '%s\n' "$_json"
+	} | awk '
+		/^---FILES---$/ { mode="files"; next }
+		/^---LAYERS---$/ { mode="layers"; next }
+		/^---JSON---$/ { mode="json"; next }
+
+		mode == "files" && /\|/ {
+			split($0, parts, "|")
+			if (parts[1] != "") {
+				file_map[parts[1]] = parts[2]
+				ver_map[parts[1]] = parts[3]
 			}
-			# Build lookup maps from layers
-			n = split(layers, layer_lines, "\n")
-			for (i = 1; i <= n; i++) {
-				split(layer_lines[i], parts, "|")
-				if (parts[1] != "") {
-					layer_map[parts[1]] = parts[2]
-				}
-			}
-			in_tags=0; in_obj=0
+			next
 		}
+		mode == "layers" && /\|/ {
+			split($0, parts, "|")
+			if (parts[1] != "") {
+				layer_map[parts[1]] = parts[2]
+			}
+			next
+		}
+
+		mode != "json" { next }
+
 		/"trace_tags": \[/ { in_tags=1; next }
 		in_tags && /^  \],?$/ { in_tags=0; next }
 		in_tags && /^    \{/ {
