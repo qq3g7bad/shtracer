@@ -318,7 +318,7 @@ make_cross_reference_tables() {
 	_tag_pairs_file="$3"
 
 	if [ ! -r "$_config_table" ] || [ ! -r "$_tags_file" ] || [ ! -r "$_tag_pairs_file" ]; then
-		echo "[shtracer][error]: Cannot read input files for cross-reference generation" >&2
+		echo "[shtracer][error][make_cross_reference_tables]: Cannot read input files for cross-reference generation" >&2
 		return 1
 	fi
 
@@ -328,7 +328,7 @@ make_cross_reference_tables() {
 	_layer_hierarchy=$(_extract_layer_hierarchy "$_config_table")
 
 	if [ -z "$_layer_hierarchy" ]; then
-		echo "[shtracer][warn]: No traceability layers found in tags" >&2
+		echo "[shtracer][warn][make_cross_reference_tables]: No traceability layers found in tags" >&2
 		echo "$_xref_output_dir"
 		return 0
 	fi
@@ -354,7 +354,7 @@ make_cross_reference_tables() {
 
 			if ! _generate_cross_reference_matrix "$_tags_file" "$_tag_pairs_file" \
 				"$_prev_format" "$_current_format" "$_output_file"; then
-				echo "[shtracer][warn]: Failed to generate $_prev_identifier vs $_current_identifier matrix" >&2
+				echo "[shtracer][warn][make_cross_reference_tables]: Failed to generate $_prev_identifier vs $_current_identifier matrix" >&2
 			fi
 
 			_file_num=$((_file_num + 1))
@@ -607,13 +607,13 @@ markdown_cross_reference() {
 	_config_path="$2"
 
 	if [ ! -d "$_tags_dir" ]; then
-		echo "[shtracer][error]: Tags directory not found: $_tags_dir" >&2
+		echo "[shtracer][error][markdown_cross_reference]: Tags directory not found: $_tags_dir" >&2
 		return 1
 	fi
 
 	_md_output_dir="${OUTPUT_DIR%/}/cross_reference/"
 	mkdir -p "$_md_output_dir" || {
-		echo "[shtracer][error]: Failed to create output directory: $_md_output_dir" >&2
+		echo "[shtracer][error][markdown_cross_reference]: Failed to create output directory: $_md_output_dir" >&2
 		return 1
 	}
 
@@ -621,7 +621,7 @@ markdown_cross_reference() {
 	_matrix_files=$(find "$_tags_dir" -maxdepth 1 -type f -name '*_cross_ref_matrix_*' 2>/dev/null | sort)
 
 	if [ -z "$_matrix_files" ]; then
-		echo "[shtracer][warn]: No cross-reference matrix files found" >&2
+		echo "[shtracer][warn][markdown_cross_reference]: No cross-reference matrix files found" >&2
 		echo "$_md_output_dir"
 		return 0
 	fi
@@ -639,7 +639,7 @@ markdown_cross_reference() {
 
 		# Generate markdown table
 		if ! _generate_markdown_table "$_matrix_file" "$_config_path" "$_output_md"; then
-			echo "[shtracer][warn]: Failed to generate markdown for $_layer_pair" >&2
+			echo "[shtracer][warn][markdown_cross_reference]: Failed to generate markdown for $_layer_pair" >&2
 		fi
 
 		_file_num=$((_file_num + 1))

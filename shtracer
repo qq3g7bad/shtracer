@@ -547,15 +547,15 @@ main_routine() {
 			cat "$_TAG_TABLE_FILENAME" >&2
 		fi
 		_cleanup_output_dir
-		# Print warning message for highest-priority issue (consistent with verify mode)
+		# Print error summary for highest-priority issue (consistent with verify mode)
 		if [ "$_has_duplicates" = true ]; then
-			echo "[${0##*/}][warn][main_routine]: found duplicate tags" 1>&2
+			echo "[${0##*/}][error][main_routine]: found duplicate tags" 1>&2
 		elif [ "$_has_dangling" = true ]; then
-			echo "[${0##*/}][warn][main_routine]: found dangling FROM tag references" 1>&2
+			echo "[${0##*/}][error][main_routine]: found dangling FROM tag references" 1>&2
 		elif [ "$_has_isolated" = true ]; then
-			echo "[${0##*/}][warn][main_routine]: found isolated tags" 1>&2
+			echo "[${0##*/}][error][main_routine]: found isolated tags" 1>&2
 		fi
-		# Exit with success in normal mode (warnings are informational only)
+		# Exit with success in normal mode (errors are reported but don't block output)
 		return 0
 	fi
 }

@@ -43,7 +43,7 @@ export AWK_LIB_DIR
 if [ -f "${AWK_LIB_DIR}/common.awk" ]; then
 	AWK_FN_COMMON=$(cat "${AWK_LIB_DIR}/common.awk")
 else
-	printf '[shtracer][warn] AWK library not found: %s/common.awk\n' "$AWK_LIB_DIR" >&2
+	printf '[shtracer][warn][shtracer_awk_helpers]: AWK library not found: %s/common.awk\n' "$AWK_LIB_DIR" >&2
 	AWK_FN_COMMON=""
 fi
 
@@ -51,7 +51,7 @@ fi
 if [ -f "${AWK_LIB_DIR}/field_extractors.awk" ]; then
 	AWK_FN_FIELD_EXTRACTORS=$(cat "${AWK_LIB_DIR}/field_extractors.awk")
 else
-	printf '[shtracer][warn] AWK library not found: %s/field_extractors.awk\n' "$AWK_LIB_DIR" >&2
+	printf '[shtracer][warn][shtracer_awk_helpers]: AWK library not found: %s/field_extractors.awk\n' "$AWK_LIB_DIR" >&2
 	AWK_FN_FIELD_EXTRACTORS=""
 fi
 
