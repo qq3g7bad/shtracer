@@ -29,6 +29,11 @@
   * **TAG FORMAT**: `@IMP[0-9\.]+@`
   * **TAG LINE FORMAT**: `#.*`
   * **BRIEF**: "All files are shell scripts."
+* **PATH**: "../scripts/main/"
+  * **EXTENSION FILTER**: "*.awk"
+  * **TAG FORMAT**: `@IMP[0-9\.]+@`
+  * **TAG LINE FORMAT**: `#.*`
+  * **BRIEF**: "AWK helper functions for shared utilities and field extraction."
 
 ### Unit test
 

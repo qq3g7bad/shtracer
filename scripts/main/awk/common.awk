@@ -13,17 +13,20 @@
 #   fileid_from_path(path)  - Generate HTML element ID from path
 #   type_from_trace_target(tt) - Extract layer type from trace_target string
 
+# @IMP5.1@ (FROM: @ARC1.2@)
 function trim(s) {
 	sub(/^[[:space:]]+/, "", s)
 	sub(/[[:space:]]+$/, "", s)
 	return s
 }
 
+# @IMP5.2@ (FROM: @ARC2.1@)
 function get_last_segment(s,   n, parts) {
 	n = split(s, parts, ":")
 	return n > 0 ? parts[n] : s
 }
 
+# @IMP5.3@ (FROM: @ARC3.1@)
 function escape_html(s,   t) {
 	t = s
 	gsub(/&/, "\\&amp;", t)
@@ -33,6 +36,7 @@ function escape_html(s,   t) {
 	return t
 }
 
+# @IMP5.4@ (FROM: @ARC2.6@)
 function json_escape(s,   result) {
 	result = s
 	gsub(/\\/, "\\\\", result)
@@ -43,17 +47,20 @@ function json_escape(s,   result) {
 	return result
 }
 
+# @IMP5.5@ (FROM: @ARC1.2@)
 function basename(path,   t) {
 	t = path
 	gsub(/.*\//, "", t)
 	return t
 }
 
+# @IMP5.6@ (FROM: @ARC1.2@)
 function ext_from_basename(base) {
 	if (match(base, /\.[^\.]+$/)) return substr(base, RSTART + 1)
 	return "sh"
 }
 
+# @IMP5.7@ (FROM: @ARC2.6@, @ARC3.1@)
 function fileid_from_path(path,   t) {
 	t = path
 	gsub(/.*\//, "", t)
@@ -61,6 +68,7 @@ function fileid_from_path(path,   t) {
 	return "Target_" t
 }
 
+# @IMP5.8@ (FROM: @ARC2.1@)
 function type_from_trace_target(tt,   n, p, t) {
 	if (tt == "") return "Unknown"
 	n = split(tt, p, ":")

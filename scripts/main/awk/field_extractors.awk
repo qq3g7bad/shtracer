@@ -14,6 +14,7 @@
 #   field5(s, delim) - Extract 5th field
 #   field6(s, delim) - Extract 6th field
 
+# @IMP6.1@ (FROM: @ARC2.1@)
 function field1(s, delim,   p1) {
 	p1 = index(s, delim)
 	if (p1 <= 0) return s
