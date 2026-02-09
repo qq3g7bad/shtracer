@@ -24,14 +24,14 @@ cd "${TEST_ROOT}" || exit 1
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_export.sh"
 # shellcheck source=../../main/shtracer_crossref.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_crossref.sh"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (Core Functions) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (Core Functions)"
 }
 
 ##

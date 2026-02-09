@@ -21,14 +21,14 @@ cd "${TEST_ROOT}" || exit 1
 
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief OneTimeSetUp function
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (File Version Information) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (File Version Information)"
 }
 
 ##

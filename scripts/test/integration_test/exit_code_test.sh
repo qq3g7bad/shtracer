@@ -8,14 +8,14 @@ SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 
 
 SHTRACER_BIN="${SHTRACER_ROOT_DIR%/}/shtracer"
 TEST_DATA_DIR="${SCRIPT_DIR%/}/testdata_exit_codes"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief OneTimeSetUp function
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " INTEGRATION TEST (Exit Codes) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "INTEGRATION TEST (Exit Codes)"
 	mkdir -p "$TEST_DATA_DIR"
 }
 

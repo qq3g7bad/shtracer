@@ -24,14 +24,14 @@ SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 . "${SHTRACER_ROOT_DIR%/}/shtracer"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (Main Routine) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (Main Routine)"
 }
 
 ##

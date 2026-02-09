@@ -11,14 +11,14 @@ SHTRACER_BIN="${SHTRACER_ROOT_DIR%/}/shtracer"
 SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 TEST_DATA_DIR="${SCRIPT_DIR%/}/testdata"
 ANSWER_DIR="${SCRIPT_DIR%/}/testdata/expected"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " INTEGRATION TEST : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "INTEGRATION TEST"
 }
 
 ##
