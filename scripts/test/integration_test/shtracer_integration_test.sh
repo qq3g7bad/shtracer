@@ -488,7 +488,7 @@ test_html_cross_ref_tables() {
 
 ##
 # @brief  Test that markdown viewer shows populated tag index
-# @tag    @IT1.10@ (FROM: @IMP4.3.10.2@)
+# @tag    @IT1.10@ (FROM: @IMP4.3.7@)
 test_markdown_tag_index() {
 	(
 		# Arrange ---------
