@@ -14,6 +14,10 @@ if [ -z "$SCRIPT_DIR" ]; then
 	)
 fi
 
+# shunit2 needs a readable path to this test file (it uses $SHUNIT_PARENT/$0)
+SHUNIT_PARENT="${SCRIPT_DIR%/}/$(basename -- "$0")"
+export SHUNIT_PARENT
+
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
 
@@ -1282,6 +1286,51 @@ test_shtracer_tmpdir_symlink_attack_prevention() {
 	rm -f "$symlink_path"
 	rmdir "$attack_target"
 	rmdir "$result"
+}
+
+# ============================================================================
+# Phase 7: Relative Path Computation Tests
+# ============================================================================
+
+##
+# @brief Test _compute_relative_path with same directory
+# @tag @UT2.7.6.1@ (FROM: @IMP2.7.6@)
+test_compute_relative_path_same_dir() {
+	result=$(_compute_relative_path "/a/b/c" "/a/b/c/file.md")
+	assertEquals "file.md" "$result"
+}
+
+##
+# @brief Test _compute_relative_path up one level
+# @tag @UT2.7.6.2@ (FROM: @IMP2.7.6@)
+test_compute_relative_path_up_one() {
+	result=$(_compute_relative_path "/a/b/c" "/a/b/file.md")
+	assertEquals "../file.md" "$result"
+}
+
+##
+# @brief Test _compute_relative_path up two levels
+# @tag @UT2.7.6.3@ (FROM: @IMP2.7.6@)
+test_compute_relative_path_up_two() {
+	result=$(_compute_relative_path "/a/b/c/d" "/a/b/file.md")
+	assertEquals "../../file.md" "$result"
+}
+
+##
+# @brief Test _compute_relative_path across directories
+# @tag @UT2.7.6.4@ (FROM: @IMP2.7.6@)
+test_compute_relative_path_across() {
+	result=$(_compute_relative_path "/a/b/c" "/a/x/y/file.md")
+	assertEquals "../../x/y/file.md" "$result"
+}
+
+##
+# @brief Test _compute_relative_path with empty input
+# @tag @UT2.7.6.5@ (FROM: @IMP2.7.6@)
+test_compute_relative_path_empty() {
+	result=$(_compute_relative_path "" "/a/b/file.md")
+	status=$?
+	assertEquals "Should return error" 1 "$status"
 }
 
 # Load shunit2
