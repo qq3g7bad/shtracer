@@ -269,7 +269,8 @@ function renderLegend(containerId, types) {
 
     el.innerHTML = legendData.map(d =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${d.color}"></span><span>${d.type}</span></span>`
-    ).join('');
+    ).join('') +
+        `<span class="legend-item"><span class="legend-swatch" style="background:transparent;border:2px dashed #e74c3c"></span><span>Dead-end</span></span>`;
 }
 
 function annotateTraceTargets(data) {
@@ -1508,7 +1509,7 @@ function renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, conta
  * @param {Function} getTraceType - Function to get trace type from node
  * @param {Object} tooltip - D3 tooltip selection
  */
-function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
+function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip, deadEndNodes) {
     const colors = getThemeColors();
     g.append('g')
         .attr('class', 'nodes')
@@ -1521,8 +1522,9 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
         .attr('height', d => d.y1 - d.y0)
         .attr('width', d => d.x1 - d.x0)
         .attr('fill', d => colorScale(getTraceType(d.trace_target, d.layer_id)))
-        .attr('stroke', colors.text)
-        .attr('stroke-width', 1)
+        .attr('stroke', d => (deadEndNodes && deadEndNodes.has(d.index)) ? '#e74c3c' : colors.text)
+        .attr('stroke-width', d => (deadEndNodes && deadEndNodes.has(d.index)) ? 2 : 1)
+        .attr('stroke-dasharray', d => (deadEndNodes && deadEndNodes.has(d.index)) ? '4,3' : 'none')
         .style('cursor', 'pointer')
         .on('click', function(event, d) {
             if (typeof showText === 'function') {
@@ -1545,8 +1547,9 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
         .on('mouseover', function(event, d) {
             d3.select(this).attr('stroke-width', 2);
             const filePath = resolveFilePath(d, traceabilityData);
+            const isDeadEnd = deadEndNodes && deadEndNodes.has(d.index);
             tooltip.style('visibility', 'visible')
-                .html(`<strong>${d.id}</strong><br>` +
+                .html(`<strong>${d.id}</strong>` + (isDeadEnd ? ' <span style="color:#e74c3c">[dead-end]</span>' : '') + `<br>` +
                       `Type: ${getTraceType(d.trace_target, d.layer_id)}<br>` +
                       `File: ${filePath || 'unknown'}:${d.line}<br>` +
                       `<em>${d.description}</em>`);
@@ -1593,7 +1596,7 @@ function renderSankeyLabels(g, nodes, width) {
         .text(d => d.id);
 }
 
-function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, typeOrder) {
+function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, typeOrder, deadEndNodes) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
 
@@ -1669,7 +1672,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     }
 
     // Render nodes and labels
-    renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip);
+    renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip, deadEndNodes);
     renderSankeyLabels(g, nodes, width);
 }
 
@@ -1737,8 +1740,22 @@ function renderSankey(data) {
 				return true;
 		});
 
+		// Identify dead-end nodes (missing expected upstream or downstream connections)
+		const hasUpstream = new Set(sankeyLinks.map(l => l.target));
+		const hasDownstream = new Set(sankeyLinks.map(l => l.source));
+		const firstType = types[0];
+		const lastType = types[types.length - 1];
+		const deadEndNodes = new Set();
+		sankeyNodes.forEach(node => {
+			const nodeType = getTraceType(node.trace_target, node.layer_id);
+			const isFirst = (nodeType === firstType);
+			const isLast = (nodeType === lastType);
+			if (!isFirst && !hasUpstream.has(node.index)) deadEndNodes.add(node.index);
+			if (!isLast && !hasDownstream.has(node.index)) deadEndNodes.add(node.index);
+		});
+
 		// Render full diagram
-        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, types);
+        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, types, deadEndNodes);
 
 		// Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
 		// Use the same derived links for consistency with v0.2.0 format
