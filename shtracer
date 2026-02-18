@@ -389,6 +389,10 @@ _install_cleanup_traps() {
 # @tag    @IMP1.4@ (FROM: @ARC1.1@)
 main_routine() {
 
+	# Save PATH before init_environment replaces it with the POSIX default.
+	# The test runner needs the user's original PATH to find tools like node
+	# that may be managed by nvm/volta/fnm.
+	_user_path="$PATH"
 	load_functions
 	init_environment
 	parse_arguments "$@"
@@ -417,7 +421,7 @@ main_routine() {
 
 	# Test mode
 	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-		sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./run_all_tests.sh"
+		PATH="$_user_path" sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./run_all_tests.sh"
 		return 0
 	fi
 

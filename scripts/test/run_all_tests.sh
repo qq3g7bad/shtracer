@@ -23,7 +23,7 @@ OVERALL_EXIT_CODE=0
 
 # Run unit tests
 shtracer_test_section_header "Running Unit Tests"
-for test_file in ./unit_test/*.sh; do
+for test_file in ./unit_test/*_unittest.sh; do
 	if [ -f "$test_file" ] && [ -x "$test_file" ]; then
 		sh -c "$test_file"
 		EXIT_CODE=$?
@@ -32,6 +32,18 @@ for test_file in ./unit_test/*.sh; do
 		fi
 	fi
 done
+
+echo ""
+
+# Run JavaScript unit tests (if Node.js 18+ is available)
+shtracer_test_section_header "Running JavaScript Unit Tests"
+if [ -f "./unit_test/run_js_tests.sh" ]; then
+	sh "./unit_test/run_js_tests.sh"
+	EXIT_CODE=$?
+	if [ $EXIT_CODE -ne 0 ]; then
+		OVERALL_EXIT_CODE=$EXIT_CODE
+	fi
+fi
 
 echo ""
 

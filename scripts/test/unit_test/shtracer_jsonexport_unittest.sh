@@ -36,7 +36,7 @@ cd "${TEST_ROOT}" || exit 1
 # @brief
 #
 oneTimeSetUp() {
-	shtracer_test_header "UNIT TEST (JSON Export)"
+	shtracer_test_header "UNIT TEST (JSON Emit Functions)"
 }
 
 ##
