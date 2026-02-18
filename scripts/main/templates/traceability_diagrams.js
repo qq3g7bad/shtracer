@@ -1409,6 +1409,65 @@ function calculateSankeyDimensions(orderedTypes, nodesByType, config) {
 }
 
 /**
+ * Reorder nodes within each column using barycenter heuristic to reduce link crossings.
+ * For each node, compute the average Y-position (row index) of its neighbors in adjacent
+ * columns, then sort by that value. Two passes: left-to-right, then right-to-left.
+ * @param {Map} nodesByType - Map of types to node arrays (mutated in place)
+ * @param {Array} orderedTypes - Ordered array of trace types
+ * @param {Array} links - Array of links with source/target as node indices
+ * @param {Array} nodes - Flat array of all nodes (links reference indices into this)
+ */
+function reorderNodesByBarycenter(nodesByType, orderedTypes, links, nodes) {
+    // Build adjacency: for each node index, list of connected node indices
+    const adj = new Map();
+    links.forEach(link => {
+        if (typeof link.source !== 'number' || typeof link.target !== 'number') return;
+        if (!adj.has(link.source)) adj.set(link.source, []);
+        if (!adj.has(link.target)) adj.set(link.target, []);
+        adj.get(link.source).push(link.target);
+        adj.get(link.target).push(link.source);
+    });
+
+    // Map each node index to its current row position within its column
+    const rowPosition = new Map();
+    orderedTypes.forEach(type => {
+        const typeNodes = nodesByType.get(type) || [];
+        typeNodes.forEach((node, i) => { rowPosition.set(node.index, i); });
+    });
+
+    // Barycenter sort for a single column based on neighbors in adjacent columns
+    function sortColumnByBarycenter(type) {
+        const typeNodes = nodesByType.get(type);
+        if (!typeNodes || typeNodes.length <= 1) return;
+
+        typeNodes.forEach(node => {
+            const neighbors = adj.get(node.index) || [];
+            if (neighbors.length === 0) {
+                node._barycenter = Infinity; // no connections → push to bottom
+                return;
+            }
+            let sum = 0;
+            neighbors.forEach(ni => { sum += (rowPosition.get(ni) || 0); });
+            node._barycenter = sum / neighbors.length;
+        });
+
+        typeNodes.sort((a, b) => a._barycenter - b._barycenter);
+
+        // Update row positions after sorting
+        typeNodes.forEach((node, i) => { rowPosition.set(node.index, i); });
+    }
+
+    // Forward pass (left to right, skip first column)
+    for (let c = 1; c < orderedTypes.length; c++) {
+        sortColumnByBarycenter(orderedTypes[c]);
+    }
+    // Backward pass (right to left, skip last column)
+    for (let c = orderedTypes.length - 2; c >= 0; c--) {
+        sortColumnByBarycenter(orderedTypes[c]);
+    }
+}
+
+/**
  * Position nodes in a grid layout grouped by type
  * @param {Map} nodesByType - Map of types to nodes
  * @param {Array} orderedTypes - Ordered array of trace types
@@ -1637,6 +1696,9 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     // Create a group for the sankey diagram
     const g = svg.append('g')
         .attr('transform', 'translate(10,10)');
+
+    // Reorder nodes within columns to minimize link crossings
+    reorderNodesByBarycenter(nodesByType, orderedTypes, links, nodes);
 
     // Position nodes in a custom grid layout grouped by type
     positionNodesInGrid(nodesByType, orderedTypes, width, height, config);
