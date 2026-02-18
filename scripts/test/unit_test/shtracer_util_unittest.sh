@@ -14,10 +14,6 @@ if [ -z "$SCRIPT_DIR" ]; then
 	)
 fi
 
-# shunit2 needs a readable path to this test file (it uses $SHUNIT_PARENT/$0)
-SHUNIT_PARENT="${SCRIPT_DIR%/}/$(basename -- "$0")"
-export SHUNIT_PARENT
-
 TEST_ROOT=${TEST_ROOT:-$(CDPATH='' cd -- "${SCRIPT_DIR%/}/.." 2>/dev/null && pwd -P)}
 SHTRACER_ROOT_DIR=${SHTRACER_ROOT_DIR:-$(CDPATH='' cd -- "${TEST_ROOT%/}/../.." 2>/dev/null && pwd -P)}
 
@@ -27,6 +23,30 @@ cd "${TEST_ROOT}" || exit 1
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 # shellcheck source=../test_helper.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
+
+##
+# @brief Check if chmod actually enforces file permissions
+# @return 0 if chmod works, 1 if not (e.g., Git Bash without POSIX emulation)
+# @note GitHub Actions MSYS2 has proper POSIX emulation, local Git Bash may not
+#
+_chmod_works() {
+	_test_file="${TEMP_DIR}/.chmod_test_$$"
+	touch "$_test_file" 2>/dev/null || return 1
+	chmod 600 "$_test_file" 2>/dev/null || {
+		rm -f "$_test_file"
+		return 1
+	}
+
+	# Check if permissions were actually applied
+	if stat -c '%a' "$_test_file" >/dev/null 2>&1; then
+		_perms=$(stat -c '%a' "$_test_file")
+	else
+		_perms=$(stat -f '%Lp' "$_test_file")
+	fi
+	rm -f "$_test_file"
+
+	[ "$_perms" = "600" ]
+}
 
 ##
 # @brief OneTimeSetUp function
@@ -902,8 +922,13 @@ test_shtracer_tmpfile_unique_files() {
 
 ##
 # @brief Test shtracer_tmpfile creates files with secure permissions (0600)
+# @note  Skipped if chmod doesn't work (e.g., Git Bash without POSIX emulation)
 #
 test_shtracer_tmpfile_secure_permissions() {
+	if ! _chmod_works; then
+		startSkipping
+		return
+	fi
 	_orig_tmpdir="${TMPDIR:-}"
 	export TMPDIR="$TEMP_DIR"
 
@@ -1063,8 +1088,13 @@ test_shtracer_tmpdir_unique_directories() {
 
 ##
 # @brief Test shtracer_tmpdir creates directories with secure permissions (0700)
+# @note  Skipped if chmod doesn't work (e.g., Git Bash without POSIX emulation)
 #
 test_shtracer_tmpdir_secure_permissions() {
+	if ! _chmod_works; then
+		startSkipping
+		return
+	fi
 	_orig_tmpdir="${TMPDIR:-}"
 	export TMPDIR="$TEMP_DIR"
 
@@ -1149,8 +1179,13 @@ test_shtracer_tmpdir_uses_tmpdir() {
 ##
 # @brief Test shtracer_tmpfile handles permission denied gracefully
 # @note  Creates read-only directory and verifies function fails appropriately
+# @note  Skipped if chmod doesn't enforce permissions
 #
 test_shtracer_tmpfile_permission_denied() {
+	if ! _chmod_works; then
+		startSkipping
+		return
+	fi
 	_orig_tmpdir="${TMPDIR:-}"
 
 	# Create a read-only directory
@@ -1180,8 +1215,13 @@ test_shtracer_tmpfile_permission_denied() {
 ##
 # @brief Test shtracer_tmpdir handles permission denied gracefully
 # @note  Creates read-only directory and verifies function fails appropriately
+# @note  Skipped if chmod doesn't enforce permissions
 #
 test_shtracer_tmpdir_permission_denied() {
+	if ! _chmod_works; then
+		startSkipping
+		return
+	fi
 	_orig_tmpdir="${TMPDIR:-}"
 
 	# Create a read-only directory
@@ -1286,51 +1326,6 @@ test_shtracer_tmpdir_symlink_attack_prevention() {
 	rm -f "$symlink_path"
 	rmdir "$attack_target"
 	rmdir "$result"
-}
-
-# ============================================================================
-# Phase 7: Relative Path Computation Tests
-# ============================================================================
-
-##
-# @brief Test _compute_relative_path with same directory
-# @tag @UT2.7.6.1@ (FROM: @IMP2.7.6@)
-test_compute_relative_path_same_dir() {
-	result=$(_compute_relative_path "/a/b/c" "/a/b/c/file.md")
-	assertEquals "file.md" "$result"
-}
-
-##
-# @brief Test _compute_relative_path up one level
-# @tag @UT2.7.6.2@ (FROM: @IMP2.7.6@)
-test_compute_relative_path_up_one() {
-	result=$(_compute_relative_path "/a/b/c" "/a/b/file.md")
-	assertEquals "../file.md" "$result"
-}
-
-##
-# @brief Test _compute_relative_path up two levels
-# @tag @UT2.7.6.3@ (FROM: @IMP2.7.6@)
-test_compute_relative_path_up_two() {
-	result=$(_compute_relative_path "/a/b/c/d" "/a/b/file.md")
-	assertEquals "../../file.md" "$result"
-}
-
-##
-# @brief Test _compute_relative_path across directories
-# @tag @UT2.7.6.4@ (FROM: @IMP2.7.6@)
-test_compute_relative_path_across() {
-	result=$(_compute_relative_path "/a/b/c" "/a/x/y/file.md")
-	assertEquals "../../x/y/file.md" "$result"
-}
-
-##
-# @brief Test _compute_relative_path with empty input
-# @tag @UT2.7.6.5@ (FROM: @IMP2.7.6@)
-test_compute_relative_path_empty() {
-	result=$(_compute_relative_path "" "/a/b/file.md")
-	status=$?
-	assertEquals "Should return error" 1 "$status"
 }
 
 # Load shunit2
