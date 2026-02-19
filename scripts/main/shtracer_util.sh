@@ -55,7 +55,7 @@ shtracer_tmpdir() {
 
 ##
 # @brief  Initialize environment
-# @tag    @IMP4.1@ (FROM: @ARC1.2@)
+# @tag    @IMP4.1@ (FROM: @ARC5.1@)
 init_environment() {
 	set -u
 	umask 0022
@@ -73,7 +73,7 @@ init_environment() {
 # @param  $1 : Error code
 # @param  $2 : Function name
 # @param  $3 : Error message
-# @tag    @IMP4.2@ (FROM: @ARC1.2@)
+# @tag    @IMP4.2@ (FROM: @ARC5.1@)
 error_exit() {
 	if [ $# -ge 3 ]; then
 		echo "[${0##*/}][error][$2]: $3" 1>&2

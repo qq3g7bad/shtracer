@@ -6,7 +6,7 @@
 # output format. All functions read JSON from stdin or a provided string
 # and output pipe-delimited text for easy processing by shell scripts.
 #
-# @tag @IMP4.6@ (FROM: @ARC1.2@)
+# @tag @IMP4.6@ (FROM: @ARC5.3@)
 
 # Prevent double-sourcing
 if [ -n "${_SHTRACER_JSON_PARSER_LOADED:-}" ]; then

@@ -19,7 +19,7 @@
 # shellcheck disable=SC2089,SC2090
 # SC2089/SC2090: Variables contain AWK code to be passed to awk, not shell-executed
 #
-# @tag @IMP4.5@ (FROM: @ARC1.2@)
+# @tag @IMP4.5@ (FROM: @ARC5.2@)
 
 # Prevent double-sourcing
 if [ -n "${_SHTRACER_AWK_HELPERS_LOADED:-}" ]; then

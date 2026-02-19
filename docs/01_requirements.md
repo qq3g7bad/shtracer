@@ -31,11 +31,11 @@ column | optional  | content                                                    
 3      | optional  | extension with wildcard (BRE is acceptable)                          | "
 4      | optional  | ignore filter (you can use wildcards)                                | "
 5      | optional  | description                                                          | "
-6      | mandatory | tag format (for searching tags written in BRE)                       | `
-7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
+6      | mandatory | tag format (for searching tags written in ERE)                       | `
+7      | mandatory | tag line format (for searching lines including tags written in ERE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
 
-* **[BRE](https://www.gnu.org/software/sed/manual/html_node/BRE-syntax.html)**: Basic regular expressions.
+* Columns 6 and 7 use **ERE** (Extended Regular Expressions).
 
 ```markdown
 ## Trace target
@@ -101,7 +101,7 @@ column | optional  | content                                                    
 * JSON schema should include:
   * Metadata (version, timestamp, config path)
   * Trace chains (complete tag sequences)
-  * Tag relationships (nodes and links)
+  * Tag relationships (trace_tags with from_tags arrays)
   * Summary statistics (total traces, completeness)
 * Enable seamless integration with CI/CD tools (jq, custom scripts, etc.).
 
@@ -207,9 +207,11 @@ column | optional  | content                                                    
 <!-- @REQ5.1.3@ -->
 #### Verification Errors (20-29)
 
-* `20` - Found isolated tags (no downstream references)
-* `21` - Found duplicate tags
-* `22` - Found both isolated and duplicate tags
+* `20` - Found isolated tags (no downstream references) — lowest priority
+* `21` - Found duplicate tags — highest priority
+* `22` - Found dangling FROM tag references
+
+If multiple issues coexist, all are reported to stderr but the exit code reflects the highest-priority error (21 > 22 > 20).
 
 <!-- @REQ5.1.4@ -->
 #### System Errors (30-39)

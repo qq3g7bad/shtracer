@@ -3,13 +3,33 @@
 ## 📂 Project layout
 
 ```text
-├── shtracer              Entry point of this project
-├── docs/                 Documents for development
-├── sample                Sample config data
-└── scripts               Scripts for `shtracer`
-    ├── main              Main shell scripts (and helper functions)
-    └── test              For testing
-        └── shunit2       Testing framework introduced by git submodule
+├── shtracer                        Entry point of this project
+├── docs/                           Documents for development
+├── sample/                         Sample config data
+└── scripts/
+    ├── main/                       Main shell scripts
+    │   ├── shtracer_util.sh        Utility functions (tempfile, profiling, helpers)
+    │   ├── shtracer_awk_helpers.sh AWK function loader
+    │   ├── shtracer_config.sh      Config file parsing
+    │   ├── shtracer_extract.sh     Tag extraction and file discovery
+    │   ├── shtracer_verify.sh      Verification output and summary
+    │   ├── shtracer_json_export.sh JSON generation and cross-ref matrix
+    │   ├── shtracer_crossref.sh    Cross-reference tables and tag swapping
+    │   ├── shtracer_json_parser.sh Shared JSON parsing module
+    │   ├── shtracer_html_viewer.sh HTML report generation
+    │   ├── shtracer_markdown_viewer.sh Markdown report generation
+    │   ├── awk/                    Standalone AWK library files
+    │   │   ├── common.awk          8 shared utility functions
+    │   │   └── field_extractors.awk field1-field6 extractors
+    │   └── templates/              HTML/CSS/JS templates
+    │       ├── template.html       Base HTML structure
+    │       ├── template.css        Viewer stylesheet
+    │       ├── show_text.js        Text display helper
+    │       └── traceability_diagrams.js Sankey diagram renderer
+    └── test/                       For testing
+        ├── unit_test/              Unit tests (shUnit2)
+        ├── integration_test/       End-to-end integration tests
+        └── shunit2/                Testing framework (git submodule)
 ```
 
 ### Workflow
@@ -122,7 +142,21 @@ All error handling uses these constants instead of hardcoded values.
 
 ## 📂 scripts/main/
 
-### 📄 `shtracer_func.sh`
+<!-- @ARC5.1@ (FROM: @REQ5.1@, @REQ6.1@) -->
+### 📄 `shtracer_util.sh`
+
+* Provides `shtracer_tmpfile` / `shtracer_tmpdir` for safe temp-file creation (umask 0077, `set -C`).
+* Provides `error_exit` and profiling instrumentation (`profile_start` / `profile_end`) used across all modules.
+* Hosts field extraction, whitespace, escaping, and JSON string helpers shared by all scripts.
+
+<!-- @ARC5.2@ (FROM: @REQ2.1@, @REQ6.1@) -->
+### 📄 `shtracer_awk_helpers.sh`
+
+* Loads standalone `.awk` library files (`common.awk`, `field_extractors.awk`) into shell variables at startup via `cat`.
+* Consumer scripts inject functions via string concatenation (`awk "$AWK_FN_COMMON"'…'`) — the only POSIX-compatible approach since `awk -f` and inline programs are mutually exclusive.
+* Exports `AWK_FN_COMMON`, `AWK_FN_FIELD_EXTRACTORS`, and individual function variables for selective injection.
+
+### 📄 `shtracer_config.sh`
 
 <!-- @ARC2.1@ (FROM: @REQ1.1@, @REQ1.2@, @REQ1.2.1@, @REQ1.4@, @REQ2.1@, @REQ2.2@, @REQ3.5@) -->
 #### Check the config file
@@ -155,6 +189,8 @@ column | optional  | content                                                    
 6      | mandatory | tag format (for searching tags written in BRE)                       | `
 7      | mandatory | tag line format (for searching lines including tags written in BRE) | `
 8      | optional  | tag-title offset (how many lines away from each tag, default: 1)     | none
+
+### 📄 `shtracer_extract.sh`
 
 <!-- @ARC2.2@ (FROM: @REQ2.1@, @REQ3.3.1@) -->
 #### Make tag table
@@ -209,10 +245,14 @@ NONE @REQ1.3@
 @REQ2.1@ @ARC2.2@ @IMP2.2@ @TST2.1@
 ```
 
+### 📄 `shtracer_crossref.sh`
+
 <!-- @ARC2.4@ (FROM: @REQ4.1@) -->
 #### Swap tags
 
 * Swap tags in all trace targets
+
+### 📄 `shtracer_verify.sh`
 
 <!-- @ARC2.5@ (FROM: @REQ4.3@) -->
 #### Verify tag information
@@ -230,6 +270,8 @@ Outputs errors to stderr in one-line-per-error format:
 
 All detected issues are reported, enabling easy filtering with grep/awk/cut for CI/CD integration.
 
+### 📄 `shtracer_json_export.sh`
+
 <!-- @ARC2.6@ (FROM: @REQ3.1@) -->
 #### Generate JSON output
 
@@ -240,9 +282,10 @@ All detected issues are reported, enabling easy filtering with grep/awk/cut for 
     * `total_tags`, `tags_with_links`, `isolated_tags`
     * `isolated_tag_list`: array of isolated tag metadata (id, file_id, line)
     * `coverage.layers`: per-layer statistics with mass-based coverage
-  * `files`: top-level array of file metadata (layer, file basename, coverage statistics, version)
-  * `nodes`: tag information (id, description, line, file_id referencing files array)
-  * `links`: relationships between tags (source, target)
+  * `files`: top-level array of file metadata (file_id, file basename, version)
+  * `layers`: top-level array of layer metadata (layer_id, name, pattern, file_ids, coverage)
+  * `trace_tags`: tag information (id, description, line, file_id, layer_id, from_tags array)
+    * `from_tags` embeds upstream references directly — no separate `links` array
   * `chains`: complete trace paths from requirements to tests
   * `cross_references`: optional layer-to-layer traceability matrices
 * Output to designated file in OUTPUT_DIR.
@@ -264,17 +307,23 @@ All detected issues are reported, enabling easy filtering with grep/awk/cut for 
   * Markdown table formatting with hyperlinks
   * Relative path computation for cross-references
 
+<!-- @ARC5.3@ (FROM: @REQ3.1@, @REQ3.2@) -->
+### 📄 `shtracer_json_parser.sh`
+
+* Shared POSIX-compatible JSON field extraction module (no GNU awk `match()` with 3 args).
+* Provides `json_parse_metadata`, `json_parse_files`, `json_parse_layers`, `json_parse_trace_tags`, `json_parse_chains`, `json_parse_health`, and `json_parse_coverage`.
+* Required by both `shtracer_html_viewer.sh` and `shtracer_markdown_viewer.sh`; sourced via `shtracer_util.sh` at startup.
+
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2@, @REQ3.4.2@) -->
 ### 📄 `shtracer_html_viewer.sh`
 
 * Generate an HTML visualization from shtracer JSON (stdin/file) as a viewer filter.
 * Read JSON from stdin or file argument.
-* Render interactive diagrams (D3.js network graph).
+* Render interactive Sankey diagram (D3.js) for end-to-end traceability flow visualization, including barycenter-based node ordering to minimize link crossings and dead-end node highlighting.
 * Display traceability matrix and summary tables.
 * Embed all assets inline (CSS, JavaScript) for standalone HTML.
-* Support syntax highlighting for code references.
 
-The viewer renders the diagrams and summary directly from the JSON payload (nodes/links/chains).
+The viewer renders diagrams and summary directly from the JSON payload (trace_tags/chains).
 
 <!-- @ARC3.2@ (FROM: @REQ3.2@) -->
 #### HTML Template Customization
@@ -287,8 +336,10 @@ The viewer renders the diagrams and summary directly from the JSON payload (node
 * Separate functions for HTML and CSS template retrieval
 * No validation of external templates (user responsibility)
 
+### 📄 `shtracer_markdown_viewer.sh`
+
 <!-- @ARC4@ (FROM: @REQ3.3.2@, @REQ3.4.2@) -->
-### 📄 Advanced Viewer Features
+#### Advanced Viewer Features
 
 * Cross-reference matrix visualization in HTML viewer
 * Markdown-based traceability reports
@@ -317,11 +368,4 @@ Implementation split into:
   - Health statistics and coverage data
 * Print-friendly format for documentation and audits
 
-subgraph "Optional scripts"
-id3_2_1 --> id3_2_2
-end
-id3_1_2 --> id4
-id3_2_2 --> id4
-id4 --> stop
 
-```
