@@ -69,6 +69,7 @@ _check_config_convert_to_table() {
 			# Set Markdown title hierarchy by separating with ":"
 			# e.g. title = Heading1:Heading1.1:Heading1.1.1
 			/^#/ {
+				_is_heading = 1
 				match($0, /^#+/)
 				gsub(/^#+ */, "", $0)
 				t[RLENGTH] = $0
@@ -86,7 +87,12 @@ _check_config_convert_to_table() {
 				a["TITLE"]=title
 			}
 
+			_is_heading == 0 && NF >= 2 && $1 != "" && $1 ~ /^[A-Z][A-Z -]*$/ && $1 !~ /^PATH$/ && $1 !~ /^EXTENSION FILTER$/ && $1 !~ /^IGNORE FILTER$/ && $1 !~ /^BRIEF$/ && $1 !~ /^TAG FORMAT$/ && $1 !~ /^TAG LINE FORMAT$/ && $1 !~ /^TAG-TITLE OFFSET$/ && $1 !~ /^TITLE$/ {
+				printf "[check_configfile][warn]: Unknown field \"%s\" (possible typo?)\n", $1 > "/dev/stderr"
+			}
+
 			{
+				_is_heading = 0
 				a[$1]=$2
 			}
 
@@ -94,6 +100,74 @@ _check_config_convert_to_table() {
 				print_data()
 			}
 		' >"$_CONFIG_TABLE"
+}
+
+##
+# @brief   Validate the generated config table
+# @param   $1 : Config table file path
+# @return  None (exits on error, warns on missing TAG FORMAT)
+_check_config_validate() {
+	_CONFIG_TABLE="$1"
+
+	# Empty config detection
+	if [ ! -s "$_CONFIG_TABLE" ]; then
+		error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Config file is empty or contains no valid sections"
+	fi
+
+	_has_valid_section="$SHTRACER_FALSE"
+	while IFS= read -r _line; do
+		# Skip empty lines
+		[ -z "$_line" ] && continue
+
+		_title=""
+		_path=""
+		_tag_format=""
+
+		# Extract fields using the separator
+		_rest="$_line"
+
+		# Column 1: TITLE
+		_title="${_rest%%"$SHTRACER_SEPARATOR"*}"
+		_rest="${_rest#*"$SHTRACER_SEPARATOR"}"
+
+		# Column 2: PATH
+		_path="${_rest%%"$SHTRACER_SEPARATOR"*}"
+		_rest="${_rest#*"$SHTRACER_SEPARATOR"}"
+
+		# Column 3: EXTENSION FILTER (skip)
+		_rest="${_rest#*"$SHTRACER_SEPARATOR"}"
+
+		# Column 4: IGNORE FILTER (skip)
+		_rest="${_rest#*"$SHTRACER_SEPARATOR"}"
+
+		# Column 5: BRIEF (skip)
+		_rest="${_rest#*"$SHTRACER_SEPARATOR"}"
+
+		# Column 6: TAG FORMAT
+		_tag_format="${_rest%%"$SHTRACER_SEPARATOR"*}"
+
+		# Validate TITLE (missing heading)
+		if [ -z "$_title" ] && [ -n "$_path" ]; then
+			error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "PATH \"$_path\" has no preceding section heading"
+		fi
+
+		# Validate PATH (required)
+		if [ -z "$_path" ]; then
+			error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Section \"$_title\" is missing required field PATH"
+		fi
+
+		# Warn on missing TAG FORMAT (not an error)
+		if [ -z "$_tag_format" ]; then
+			echo "[check_configfile][warn]: Section \"$_title\" has no TAG FORMAT (tags will not be extracted)" 1>&2
+		fi
+
+		_has_valid_section="$SHTRACER_TRUE"
+	done <"$_CONFIG_TABLE"
+
+	# Check if any valid sections were found
+	if [ "$_has_valid_section" -ne "$SHTRACER_TRUE" ]; then
+		error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Config file contains no valid sections"
+	fi
 }
 
 ##
@@ -115,6 +189,9 @@ check_configfile() {
 
 		# Convert cleaned content to table format
 		_check_config_convert_to_table "$_CONFIG_FILE_WITHOUT_COMMENT" "$_CONFIG_TABLE"
+
+		# Validate the generated config table
+		_check_config_validate "$_CONFIG_TABLE"
 
 		# echo the output file location
 		echo "$_CONFIG_TABLE"

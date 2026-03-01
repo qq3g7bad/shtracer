@@ -329,7 +329,7 @@ parse_arguments() {
 			esac
 		fi
 		CONFIG_PATH="${CONFIG_DIR%/}/$(basename "$_config_file")"
-		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH")
+		CONFIG_OUTPUT=$(check_configfile "$CONFIG_PATH") || exit $?
 	fi
 }
 

@@ -42,6 +42,7 @@ setUp() {
 	SHTRACER_SEPARATOR="<shtracer_separator>"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	export NODATA_STRING="NONE"
+	export EXIT_CONFIG_INVALID=3
 	export OUTPUT_DIR="${TEST_ROOT%/}/shtracer_output/"
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	SCRIPT_DIR="$SHTRACER_ROOT_DIR"
@@ -1448,6 +1449,85 @@ EOF
 		# Verify markdown table structure (should contain table markers)
 		grep -q "|" "$_OUTPUT_MD"
 		assertEquals "Should contain table pipes" 0 $?
+	)
+}
+
+##
+# @brief  Test that check_configfile warns on missing TAG FORMAT but succeeds
+test_check_configfile_missing_tag_format() {
+	(
+		# Arrange ---------
+
+		# Act -------------
+		_STDERR="$(check_configfile "./unit_test/testdata/config_missing_tag_format.md" 2>&1 1>/dev/null)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Should exit with 0" 0 "$_EXIT_CODE"
+		echo "$_STDERR" | grep -q "no TAG FORMAT"
+		assertEquals "Should warn about missing TAG FORMAT" 0 $?
+	)
+}
+
+##
+# @brief  Test that check_configfile errors on missing PATH
+test_check_configfile_missing_path() {
+	(
+		# Arrange ---------
+
+		# Act -------------
+		_STDERR="$(check_configfile "./unit_test/testdata/config_missing_path.md" 2>&1 1>/dev/null)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Should exit with EXIT_CONFIG_INVALID" 3 "$_EXIT_CODE"
+	)
+}
+
+##
+# @brief  Test that check_configfile warns on unknown fields
+test_check_configfile_unknown_field() {
+	(
+		# Arrange ---------
+
+		# Act -------------
+		_STDERR="$(check_configfile "./unit_test/testdata/config_unknown_field.md" 2>&1 1>/dev/null)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Should exit with 0" 0 "$_EXIT_CODE"
+		echo "$_STDERR" | grep -q "Unknown field"
+		assertEquals "Should warn about unknown field" 0 $?
+	)
+}
+
+##
+# @brief  Test that check_configfile errors when PATH has no heading
+test_check_configfile_no_heading() {
+	(
+		# Arrange ---------
+
+		# Act -------------
+		_STDERR="$(check_configfile "./unit_test/testdata/config_no_heading.md" 2>&1 1>/dev/null)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Should exit with EXIT_CONFIG_INVALID" 3 "$_EXIT_CODE"
+	)
+}
+
+##
+# @brief  Test that check_configfile errors on empty config
+test_check_configfile_empty() {
+	(
+		# Arrange ---------
+
+		# Act -------------
+		_STDERR="$(check_configfile "./unit_test/testdata/config_empty.md" 2>&1 1>/dev/null)"
+		_EXIT_CODE=$?
+
+		# Assert ----------
+		assertEquals "Should exit with EXIT_CONFIG_INVALID" 3 "$_EXIT_CODE"
 	)
 }
 
