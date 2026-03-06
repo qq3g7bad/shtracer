@@ -249,12 +249,16 @@ Examples:
 - `0` - Success
 - `1` - Invalid usage or arguments
 - `2` - Config file not found
+- `3` - Config file format invalid
 - `10` - Failed to extract tags
 - `11` - Failed to create tag table
 - `12` - Failed to generate JSON
+- `13` - Viewer script execution failed
 - `20` - Found isolated tags (verify mode)
 - `21` - Found duplicate tags (verify mode)
-- `22` - Found both isolated and duplicate tags (verify mode)
+- `22` - Found dangling FROM tag references (verify mode)
+- `30` - Internal error
+- `31` - Viewer script not found
 
 ### Automated Documentation
 
