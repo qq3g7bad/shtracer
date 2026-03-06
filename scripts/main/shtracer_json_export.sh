@@ -1174,7 +1174,7 @@ _generate_cross_reference_matrix_files() {
 	_tags_dir="${_output_dir}/tags"
 
 	[ -f "$_json_file" ] || return 1
-	[ -d "$_tags_dir" ] || mkdir -p "$_tags_dir"
+	[ -d "$_tags_dir" ] || mkdir -p "$_tags_dir" || return 1
 
 	# Remove stale matrices to avoid duplicate tabs
 	rm -f "${_tags_dir}"/[0-9][0-9]_cross_ref_matrix_* 2>/dev/null || true

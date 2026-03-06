@@ -279,7 +279,7 @@ extract_tags() {
 		_TAG_OUTPUT_DIR="${OUTPUT_DIR%/}/tags/"
 		_TAG_OUTPUT_LEVEL1="${_TAG_OUTPUT_DIR%/}/01_tags"
 
-		mkdir -p "$_TAG_OUTPUT_DIR"
+		mkdir -p "$_TAG_OUTPUT_DIR" || error_exit 1 "extract_tags" "Cannot create output directory: $_TAG_OUTPUT_DIR"
 		cd "$CONFIG_DIR" || error_exit 1 "extract_tags" "Cannot change directory to config path"
 
 		# Discover target files from config
@@ -477,8 +477,8 @@ make_tag_table() {
 		_TAG_TABLE_DUPLICATED="${_TAG_OUTPUT_VERIFIED_DIR%/}/11_duplicated"
 		_TAG_TABLE_DANGLING="${_TAG_OUTPUT_VERIFIED_DIR%/}/12_dangling_fromtag"
 
-		mkdir -p "$_TAG_OUTPUT_DIR"
-		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR"
+		mkdir -p "$_TAG_OUTPUT_DIR" || error_exit 1 "make_tag_table" "Cannot create output directory: $_TAG_OUTPUT_DIR"
+		mkdir -p "$_TAG_OUTPUT_VERIFIED_DIR" || error_exit 1 "make_tag_table" "Cannot create verified directory: $_TAG_OUTPUT_VERIFIED_DIR"
 
 		# Parse tag relationships into pairs
 		# AWK: Split FROM tags (field $3, comma-separated) and pair with TO tag (field $2)

@@ -1505,7 +1505,7 @@ make_html() {
                 print "@CONFIG@", "1", config_path, "", "", ""
 			}')"
 
-		mkdir -p "${OUTPUT_DIR%/}/assets/"
+		mkdir -p "${OUTPUT_DIR%/}/assets/" || error_exit 1 "html_viewer" "Cannot create assets directory"
 		convert_template_html "$_TAG_TABLE_FILENAME" "$_TAG_INFO_TABLE" >"${OUTPUT_DIR%/}/output.html"
 		convert_template_js "$_TAG_INFO_TABLE" >"${_OUTPUT_ASSETS_DIR%/}/show_text.js"
 		_viewer_get_template_css >"${_OUTPUT_ASSETS_DIR%/}/template.css"

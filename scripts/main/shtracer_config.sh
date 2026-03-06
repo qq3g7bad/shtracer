@@ -182,13 +182,13 @@ check_configfile() {
 		_CONFIG_OUTPUT_DIR="${OUTPUT_DIR%/}/config/"
 		_CONFIG_TABLE="${_CONFIG_OUTPUT_DIR%/}/01_config_table"
 
-		mkdir -p "$_CONFIG_OUTPUT_DIR"
+		mkdir -p "$_CONFIG_OUTPUT_DIR" || error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Cannot create output directory: $_CONFIG_OUTPUT_DIR"
 
 		# Remove comments from config markdown file
-		_CONFIG_FILE_WITHOUT_COMMENT="$(_check_config_remove_comments "$1")"
+		_CONFIG_FILE_WITHOUT_COMMENT="$(_check_config_remove_comments "$1")" || error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Failed to remove comments from config file"
 
 		# Convert cleaned content to table format
-		_check_config_convert_to_table "$_CONFIG_FILE_WITHOUT_COMMENT" "$_CONFIG_TABLE"
+		_check_config_convert_to_table "$_CONFIG_FILE_WITHOUT_COMMENT" "$_CONFIG_TABLE" || error_exit "$EXIT_CONFIG_INVALID" "check_configfile" "Failed to convert config to table format"
 
 		# Validate the generated config table
 		_check_config_validate "$_CONFIG_TABLE"
