@@ -69,8 +69,16 @@ shtracer_test_source_modules() {
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
 				;;
 			func)
-				# shellcheck source=../main/shtracer_func.sh
-				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
+				# shellcheck source=../main/shtracer_config.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_config.sh"
+				# shellcheck source=../main/shtracer_extract.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_extract.sh"
+				# shellcheck source=../main/shtracer_verify.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_verify.sh"
+				# shellcheck source=../main/shtracer_json_export.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_export.sh"
+				# shellcheck source=../main/shtracer_crossref.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_crossref.sh"
 				;;
 			html_viewer)
 				export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
@@ -78,6 +86,8 @@ shtracer_test_source_modules() {
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 				;;
 			markdown_viewer)
+				# shellcheck source=../main/shtracer_json_parser.sh
+				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 				# shellcheck source=../main/shtracer_markdown_viewer.sh
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 				;;
@@ -133,11 +143,74 @@ shtracer_test_tmpfile() {
 }
 
 ##
-# @brief Print test suite header
+# @brief Print test suite header with color
 # @param $1 : Test suite name
 shtracer_test_header() {
 	_suite_name="${1:-Unit Tests}"
+	# Use color only when output is a terminal
+	if [ -t 1 ]; then
+		_cyan='\033[36m'
+		_bold='\033[1m'
+		_reset='\033[0m'
+	else
+		_cyan=''
+		_bold=''
+		_reset=''
+	fi
+	printf '%b' "${_cyan}"
+	echo "=========================================="
+	printf ' %b%s%b : %s\n' "${_bold}" "$_suite_name" "${_reset}${_cyan}" "$0"
+	echo "=========================================="
+	printf '%b' "${_reset}"
+}
+
+##
+# @brief Print section header with color (for run_all_tests.sh)
+# @param $1 : Section name
+shtracer_test_section_header() {
+	_section="${1:-Tests}"
+	if [ -t 1 ]; then
+		_yellow='\033[33m'
+		_bold='\033[1m'
+		_reset='\033[0m'
+	else
+		_yellow=''
+		_bold=''
+		_reset=''
+	fi
+	printf '%b' "${_yellow}"
 	echo "----------------------------------------"
-	echo " $_suite_name : $0"
+	printf ' %b%s%b\n' "${_bold}" "$_section" "${_reset}${_yellow}"
 	echo "----------------------------------------"
+	printf '%b' "${_reset}"
+}
+
+##
+# @brief Print test result summary with color
+# @param $1 : exit code (0 = success)
+# @param $2 : message
+shtracer_test_result() {
+	_exit_code="${1:-0}"
+	_msg="${2:-Tests completed}"
+	if [ -t 1 ]; then
+		_green='\033[32m'
+		_red='\033[31m'
+		_bold='\033[1m'
+		_reset='\033[0m'
+	else
+		_green=''
+		_red=''
+		_bold=''
+		_reset=''
+	fi
+	if [ "$_exit_code" -eq 0 ]; then
+		_color="$_green"
+	else
+		_color="$_red"
+	fi
+	printf '%b' "${_color}"
+	echo "========================================"
+	printf ' %b%s%b\n' "${_bold}" "$_msg" "${_reset}${_color}"
+	echo "========================================"
+	printf '%b' "${_reset}"
 }

@@ -25,14 +25,14 @@ export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
 
 # Version to use in test fixtures (should match SHTRACER_VERSION in main script)
 SHTRACER_VERSION='0.1.3'
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (HTML Viewer) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (HTML Viewer)"
 }
 
 ##
@@ -46,6 +46,7 @@ setUp() {
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	rm -rf "$OUTPUT_DIR"
+	mkdir -p "$OUTPUT_DIR"
 	cd "${TEST_ROOT}" || exit 1
 }
 
@@ -227,6 +228,90 @@ EOF
 		# Regression: Trace targets list should call showText(..., 1, ...)
 		grep -q '""1""' "$OUTPUT_DIR/output.html"
 		assertNotEquals "Trace target links should use numeric line 1" 0 "$?"
+	)
+}
+
+# ============================================================================
+# Template Resolution Tests
+# ============================================================================
+
+##
+# @brief Test _viewer_get_template_html returns bundled template
+# @tag @UT3.10@ (FROM: @IMP3.10@)
+test_viewer_get_template_html_bundled() {
+	(
+		# Arrange ---------
+		unset SHTRACER_TEMPLATE_DIR
+		# shellcheck disable=SC2030
+		export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
+
+		# Act -------------
+		_RESULT="$(_viewer_get_template_html)"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+		assertNotEquals "" "$_RESULT"
+		assertNotEquals "" "$(printf '%s\n' "$_RESULT" | grep '<!DOCTYPE html>')"
+	)
+}
+
+##
+# @brief Test _viewer_get_template_css returns bundled template
+# @tag @UT3.11@ (FROM: @IMP3.11@)
+test_viewer_get_template_css_bundled() {
+	(
+		# Arrange ---------
+		unset SHTRACER_TEMPLATE_DIR
+		# shellcheck disable=SC2030,SC2031
+		export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
+
+		# Act -------------
+		_RESULT="$(_viewer_get_template_css)"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+		assertNotEquals "" "$_RESULT"
+	)
+}
+
+##
+# @brief Test _viewer_get_template with SHTRACER_TEMPLATE_DIR override
+# @tag @UT3.12.1@ (FROM: @IMP3.12@)
+test_viewer_get_template_env_override() {
+	(
+		# Arrange ---------
+		_TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'tmpl_test')"
+		echo "<html>custom</html>" >"$_TMPDIR/template.html"
+		export SHTRACER_TEMPLATE_DIR="$_TMPDIR"
+
+		# Act -------------
+		_RESULT="$(_viewer_get_template "template.html" "")"
+
+		# Assert ----------
+		assertEquals 0 "$?"
+		assertNotEquals "" "$(printf '%s\n' "$_RESULT" | grep 'custom')"
+
+		# Cleanup
+		rm -rf "$_TMPDIR"
+	)
+}
+
+##
+# @brief Test _viewer_get_template returns error for missing file
+# @tag @UT3.12.2@ (FROM: @IMP3.12@)
+test_viewer_get_template_not_found() {
+	(
+		# Arrange ---------
+		unset SHTRACER_TEMPLATE_DIR
+		# shellcheck disable=SC2031
+		export SHTRACER_SCRIPT_DIR="/nonexistent/path"
+
+		# Act -------------
+		_RESULT="$(_viewer_get_template "nonexistent_file.xyz" "" 2>/dev/null)"
+		_STATUS=$?
+
+		# Assert ----------
+		assertEquals 1 "$_STATUS"
 	)
 }
 

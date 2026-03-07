@@ -17,17 +17,23 @@ cd "${TEST_ROOT}" || exit 1
 
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
-
-# shellcheck source=../../main/shtracer_func.sh
-. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_func.sh"
-
+# shellcheck source=../../main/shtracer_config.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_config.sh"
+# shellcheck source=../../main/shtracer_extract.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_extract.sh"
+# shellcheck source=../../main/shtracer_verify.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_verify.sh"
+# shellcheck source=../../main/shtracer_json_export.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_export.sh"
+# shellcheck source=../../main/shtracer_crossref.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_crossref.sh"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (JSON Export) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (JSON Export)"
 }
 
 ##
@@ -39,6 +45,7 @@ setUp() {
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
 	export NODATA_STRING="NONE"
 	export OUTPUT_DIR="${SHUNIT_TMPDIR}/output/"
+	rm -rf "$OUTPUT_DIR"
 	mkdir -p "$OUTPUT_DIR"
 	export CONFIG_DIR="${TEST_ROOT%/}/unit_test/testdata/"
 	cd "${TEST_ROOT}" || exit 1

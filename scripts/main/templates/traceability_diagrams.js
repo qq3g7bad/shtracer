@@ -47,7 +47,7 @@ const DIAGRAM_CONFIG = {
         BAR_WIDTH: 16,
         HEIGHT_PER_NODE: 15,
         MIN_BAR_HEIGHT: 30,
-        MAX_BAR_HEIGHT: 200,
+        MAX_BAR_HEIGHT: 400,
         BAR_SPACING: 15,
         MIN_HEIGHT: 150,
         MAX_HEIGHT: 800
@@ -63,6 +63,19 @@ const DIAGRAM_CONFIG = {
         TEXT: '#333'
     }
 };
+
+/**
+ * Get theme-aware colors from CSS variables
+ * @returns {Object} Object containing current theme colors
+ */
+function getThemeColors() {
+    const computedStyle = getComputedStyle(document.body);
+    return {
+        text: computedStyle.getPropertyValue('--text-primary').trim() || '#24292f',
+        background: computedStyle.getPropertyValue('--bg-primary').trim() || '#ffffff',
+        border: computedStyle.getPropertyValue('--border-default').trim() || '#d0d7de'
+    };
+}
 
 // Utility functions for file path resolution
 /**
@@ -104,12 +117,14 @@ function getFileExtension(path) {
  * @returns {Object} D3 selection for the tooltip
  */
 function createTooltip(className = 'sankey-tooltip') {
+    const colors = getThemeColors();
     return d3.select('body').append('div')
         .attr('class', className)
         .style('position', 'absolute')
         .style('visibility', 'hidden')
-        .style('background-color', 'white')
-        .style('border', '1px solid #ccc')
+        .style('background-color', colors.background)
+        .style('color', colors.text)
+        .style('border', `1px solid ${colors.border}`)
         .style('border-radius', '4px')
         .style('padding', '8px')
         .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)')
@@ -254,7 +269,8 @@ function renderLegend(containerId, types) {
 
     el.innerHTML = legendData.map(d =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${d.color}"></span><span>${d.type}</span></span>`
-    ).join('');
+    ).join('') +
+        `<span class="legend-item"><span class="legend-swatch" style="background:transparent;border:2px dashed #e74c3c"></span><span>Dead-end</span></span>`;
 }
 
 function annotateTraceTargets(data) {
@@ -643,7 +659,7 @@ function renderHealth(data) {
         html += '<details>';
         html += `<summary>Show isolated tags (${isolatedCount})</summary>`;
         html += '<ul class="isolated-tags-list">';
-        
+
         isolatedList.forEach(item => {
             const tagId = item.id || '';
             const fileId = item.file_id;
@@ -690,7 +706,7 @@ function renderHealth(data) {
                 html += '</li>';
             }
         });
-        
+
         html += '</ul>';
         html += '</details>';
     }
@@ -942,19 +958,18 @@ function computeParallelSetsCoverage(dims, dimOrder, nodes, links, getTraceType)
  * @returns {Object} Object with barHeights, barYOffsets, sourceToTargets
  */
 function calculateParallelSetsBarLayout(dims, dimOrder, N, coveredUp, coveredDown, accDown) {
-    const heightPerNode = DIAGRAM_CONFIG.PARALLEL_SETS.HEIGHT_PER_NODE;
     const minBarHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MIN_BAR_HEIGHT;
     const maxBarHeight = DIAGRAM_CONFIG.PARALLEL_SETS.MAX_BAR_HEIGHT;
     const barSpacing = DIAGRAM_CONFIG.PARALLEL_SETS.BAR_SPACING;
 
+    // Bar heights proportional to tag count so layers are visually comparable
+    const maxN = Math.max(1, ...dims.map(d => N[d] || 0));
     const barHeights = {};
     dims.forEach(dim => {
         const total = N[dim] || 0;
-        const upCov = coveredUp[dim] || 0;
-        const downCov = coveredDown[dim] || 0;
-        const maxCov = Math.max(upCov, downCov, total * 0.3);
-        const calcHeight = maxCov * heightPerNode;
-        barHeights[dim] = Math.min(maxBarHeight, Math.max(minBarHeight, calcHeight));
+        // Scale linearly: largest layer gets maxBarHeight, others proportional
+        const calcHeight = (total / maxN) * maxBarHeight;
+        barHeights[dim] = Math.max(minBarHeight, calcHeight);
     });
 
     // Build connection map
@@ -972,38 +987,11 @@ function calculateParallelSetsBarLayout(dims, dimOrder, N, coveredUp, coveredDow
         });
     });
 
-    // Position bars
+    // Position bars: top-align all bars at y = 0
     const barYOffsets = {};
-    barYOffsets[dims[0]] = 0;
-
-    for (let i = 1; i < dims.length; i++) {
-        const dim = dims[i];
-        let strongestSource = null;
-        let maxWeight = 0;
-
-        for (let j = 0; j < i; j++) {
-            const prevDim = dims[j];
-            const weight = accDown[prevDim][dim] || 0;
-            if (weight > maxWeight) {
-                maxWeight = weight;
-                strongestSource = prevDim;
-            }
-        }
-
-        if (strongestSource) {
-            const siblings = sourceToTargets[strongestSource];
-            const siblingIndex = siblings.indexOf(dim);
-
-            if (siblingIndex === 0) {
-                barYOffsets[dim] = barYOffsets[strongestSource];
-            } else {
-                const prevSibling = siblings[siblingIndex - 1];
-                barYOffsets[dim] = barYOffsets[prevSibling] + barHeights[prevSibling] + barSpacing;
-            }
-        } else {
-            barYOffsets[dim] = 0;
-        }
-    }
+    dims.forEach(dim => {
+        barYOffsets[dim] = 0;
+    });
 
     return { barHeights, barYOffsets, sourceToTargets };
 }
@@ -1261,22 +1249,40 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
                 tooltip.style('visibility', 'hidden');
             });
 
-        // Per-ribbon percent label (single; avoid duplicating node-side total)
+        // Per-ribbon percent labels next to source and target bars
+        // Placed at the ribbon band's Y center, with x-offset from the bar edge
+        // No overlap with black totals since those are below the bar
         const hA = Math.max(0, y0b - y0a);
         const hB = Math.max(0, y1b - y1a);
-        if (Math.min(hA, hB) >= 12) {
-            const showLabel = isOverlay || (oa < ob ? (outDegreeDown[a] > 1) : (outDegreeUp[a] > 1));
-            if (showLabel && p0) {
-                const labelX = x0 + (x1 - x0) * 0.5;
-                g.append('text')
-                    .attr('x', labelX)
-                    .attr('y', (y0a + y0b) / 2)
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .attr('font-size', '10px')
-                    .attr('fill', '#333')
-                    .text(p0);
-            }
+        const ribbonLabelOffset = 4;
+
+        if (hA >= 6 && p0) {
+            const srcLabelX = (oa < ob) ? x0 + ribbonLabelOffset : x0 - ribbonLabelOffset;
+            const srcAnchor = (oa < ob) ? 'start' : 'end';
+            g.append('text')
+                .attr('x', srcLabelX)
+                .attr('y', (y0a + y0b) / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', srcAnchor)
+                .attr('font-size', '9px')
+                .attr('font-style', 'italic')
+                .attr('fill', colorScale(a))
+                .attr('opacity', 0.9)
+                .text(p0);
+        }
+        if (hB >= 6 && p1) {
+            const tgtLabelX = (oa < ob) ? x1 - ribbonLabelOffset : x1 + ribbonLabelOffset;
+            const tgtAnchor = (oa < ob) ? 'end' : 'start';
+            g.append('text')
+                .attr('x', tgtLabelX)
+                .attr('y', (y1a + y1b) / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', tgtAnchor)
+                .attr('font-size', '9px')
+                .attr('font-style', 'italic')
+                .attr('fill', colorScale(b))
+                .attr('opacity', 0.9)
+                .text(p1);
         }
     }
 
@@ -1303,13 +1309,14 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
         const upPct = formatPct(coveredUp[d] || 0, total);
         const downPct = formatPct(coveredDown[d] || 0, total);
 
+        const colors = getThemeColors();
         barGroup.append('text')
             .attr('x', x(d))
             .attr('y', yOffset - 10)
             .attr('text-anchor', 'middle')
             .attr('font-size', '12px')
-            .attr('fill', '#333')
-            .text(d);
+            .attr('fill', colors.text)
+            .text(`${d} (${total})`);
 
         // Total nodes outline (with base fill to restore node color)
         barGroup.append('rect')
@@ -1318,7 +1325,7 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
             .attr('width', barW)
             .attr('height', Math.max(0, bH))
             .attr('fill', colorScale(d))
-            .attr('stroke', '#333')
+            .attr('stroke', colors.text)
             .attr('stroke-width', 1)
             .on('mouseover', function() {
                 tooltip.style('visibility', 'visible')
@@ -1357,26 +1364,26 @@ function renderParallelSetsRequirements(containerId, nodes, links, colorScale, g
                 .attr('stroke', 'none');
         }
 
-        // Percent labels (upstream left, downstream right)
+        // Total percent labels below the bar (upstream left, downstream right)
         if (upPct) {
             barGroup.append('text')
-                .attr('x', barLeft(d) - 6)
-                .attr('y', yOffset + Math.min(Math.max(10, upH / 2), Math.max(10, bH - 10)))
+                .attr('x', barLeft(d) - 4)
+                .attr('y', yOffset + bH + 14)
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'end')
                 .attr('font-size', '11px')
-                .attr('fill', '#333')
-                .text(upPct);
+                .attr('fill', colors.text)
+                .text('\u2191' + upPct);
         }
         if (downPct) {
             barGroup.append('text')
-                .attr('x', barRight(d) + 6)
-                .attr('y', yOffset + Math.min(Math.max(10, downH / 2), Math.max(10, bH - 10)))
+                .attr('x', barRight(d) + 4)
+                .attr('y', yOffset + bH + 14)
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'start')
                 .attr('font-size', '11px')
-                .attr('fill', '#333')
-                .text(downPct);
+                .attr('fill', colors.text)
+                .text(downPct + '\u2193');
         }
     });
 }
@@ -1399,6 +1406,65 @@ function calculateSankeyDimensions(orderedTypes, nodesByType, config) {
                    Math.max(0, rows - 1) * config.nodeGap + config.bottomPadding;
 
     return { rows, height };
+}
+
+/**
+ * Reorder nodes within each column using barycenter heuristic to reduce link crossings.
+ * For each node, compute the average Y-position (row index) of its neighbors in adjacent
+ * columns, then sort by that value. Two passes: left-to-right, then right-to-left.
+ * @param {Map} nodesByType - Map of types to node arrays (mutated in place)
+ * @param {Array} orderedTypes - Ordered array of trace types
+ * @param {Array} links - Array of links with source/target as node indices
+ * @param {Array} nodes - Flat array of all nodes (links reference indices into this)
+ */
+function reorderNodesByBarycenter(nodesByType, orderedTypes, links, nodes) {
+    // Build adjacency: for each node index, list of connected node indices
+    const adj = new Map();
+    links.forEach(link => {
+        if (typeof link.source !== 'number' || typeof link.target !== 'number') return;
+        if (!adj.has(link.source)) adj.set(link.source, []);
+        if (!adj.has(link.target)) adj.set(link.target, []);
+        adj.get(link.source).push(link.target);
+        adj.get(link.target).push(link.source);
+    });
+
+    // Map each node index to its current row position within its column
+    const rowPosition = new Map();
+    orderedTypes.forEach(type => {
+        const typeNodes = nodesByType.get(type) || [];
+        typeNodes.forEach((node, i) => { rowPosition.set(node.index, i); });
+    });
+
+    // Barycenter sort for a single column based on neighbors in adjacent columns
+    function sortColumnByBarycenter(type) {
+        const typeNodes = nodesByType.get(type);
+        if (!typeNodes || typeNodes.length <= 1) return;
+
+        typeNodes.forEach(node => {
+            const neighbors = adj.get(node.index) || [];
+            if (neighbors.length === 0) {
+                node._barycenter = Infinity; // no connections → push to bottom
+                return;
+            }
+            let sum = 0;
+            neighbors.forEach(ni => { sum += (rowPosition.get(ni) || 0); });
+            node._barycenter = sum / neighbors.length;
+        });
+
+        typeNodes.sort((a, b) => a._barycenter - b._barycenter);
+
+        // Update row positions after sorting
+        typeNodes.forEach((node, i) => { rowPosition.set(node.index, i); });
+    }
+
+    // Forward pass (left to right, skip first column)
+    for (let c = 1; c < orderedTypes.length; c++) {
+        sortColumnByBarycenter(orderedTypes[c]);
+    }
+    // Backward pass (right to left, skip last column)
+    for (let c = orderedTypes.length - 2; c >= 0; c--) {
+        sortColumnByBarycenter(orderedTypes[c]);
+    }
 }
 
 /**
@@ -1468,7 +1534,6 @@ function renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, conta
         .enter()
         .append('path')
         .attr('d', d => {
-            if (!d.source || d.source.x1 == null || !d.target || d.target.x0 == null) return '';
             const sourceX = d.source.x1;
             const sourceY = (d.source.y0 + d.source.y1) / 2;
             const targetX = d.target.x0;
@@ -1503,7 +1568,8 @@ function renderSankeyLinks(g, svg, visibleLinks, colorScale, getTraceType, conta
  * @param {Function} getTraceType - Function to get trace type from node
  * @param {Object} tooltip - D3 tooltip selection
  */
-function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
+function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip, deadEndNodes) {
+    const colors = getThemeColors();
     g.append('g')
         .attr('class', 'nodes')
         .selectAll('rect')
@@ -1515,8 +1581,9 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
         .attr('height', d => d.y1 - d.y0)
         .attr('width', d => d.x1 - d.x0)
         .attr('fill', d => colorScale(getTraceType(d.trace_target, d.layer_id)))
-        .attr('stroke', DIAGRAM_CONFIG.COLORS.STROKE)
-        .attr('stroke-width', 1)
+        .attr('stroke', d => (deadEndNodes && deadEndNodes.has(d.index)) ? '#e74c3c' : colors.text)
+        .attr('stroke-width', d => (deadEndNodes && deadEndNodes.has(d.index)) ? 2 : 1)
+        .attr('stroke-dasharray', d => (deadEndNodes && deadEndNodes.has(d.index)) ? '4,3' : 'none')
         .style('cursor', 'pointer')
         .on('click', function(event, d) {
             if (typeof showText === 'function') {
@@ -1539,8 +1606,9 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
         .on('mouseover', function(event, d) {
             d3.select(this).attr('stroke-width', 2);
             const filePath = resolveFilePath(d, traceabilityData);
+            const isDeadEnd = deadEndNodes && deadEndNodes.has(d.index);
             tooltip.style('visibility', 'visible')
-                .html(`<strong>${d.id}</strong><br>` +
+                .html(`<strong>${d.id}</strong>` + (isDeadEnd ? ' <span style="color:#e74c3c">[dead-end]</span>' : '') + `<br>` +
                       `Type: ${getTraceType(d.trace_target, d.layer_id)}<br>` +
                       `File: ${filePath || 'unknown'}:${d.line}<br>` +
                       `<em>${d.description}</em>`);
@@ -1562,6 +1630,7 @@ function renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip) {
  * @param {number} width - Container width
  */
 function renderSankeyLabels(g, nodes, width) {
+    const colors = getThemeColors();
     const labelGroups = g.append('g')
         .attr('class', 'node-labels')
         .selectAll('g')
@@ -1582,11 +1651,11 @@ function renderSankeyLabels(g, nodes, width) {
         .attr('dy', '0.35em')
         .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
         .attr('font-size', '10px')
-        .attr('fill', DIAGRAM_CONFIG.COLORS.TEXT)
+        .attr('fill', colors.text)
         .text(d => d.id);
 }
 
-function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, typeOrder) {
+function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType, typeOrder, deadEndNodes) {
     const container = document.getElementById(containerId);
     const width = container.clientWidth;
 
@@ -1628,6 +1697,9 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     const g = svg.append('g')
         .attr('transform', 'translate(10,10)');
 
+    // Reorder nodes within columns to minimize link crossings
+    reorderNodesByBarycenter(nodesByType, orderedTypes, links, nodes);
+
     // Position nodes in a custom grid layout grouped by type
     positionNodesInGrid(nodesByType, orderedTypes, width, height, config);
 
@@ -1662,7 +1734,7 @@ function renderSankeyDiagram(containerId, nodes, links, colorScale, getTraceType
     }
 
     // Render nodes and labels
-    renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip);
+    renderSankeyNodes(g, nodes, colorScale, getTraceType, tooltip, deadEndNodes);
     renderSankeyLabels(g, nodes, width);
 }
 
@@ -1722,16 +1794,30 @@ function renderSankey(data) {
 				...d,
 				source: nodeIndexMap.get(d.source),
 				target: nodeIndexMap.get(d.target)
-		})).filter(l => {
-				if (l.source === undefined || l.target === undefined) {
-						console.warn('Skipping link with unresolved source/target:', l);
+		})).filter(link => {
+				if (typeof link.source !== 'number' || typeof link.target !== 'number') {
+						console.warn('Dropping link with unresolved source/target:', link);
 						return false;
 				}
 				return true;
 		});
 
+		// Identify dead-end nodes (missing expected upstream or downstream connections)
+		const hasUpstream = new Set(sankeyLinks.map(l => l.target));
+		const hasDownstream = new Set(sankeyLinks.map(l => l.source));
+		const firstType = types[0];
+		const lastType = types[types.length - 1];
+		const deadEndNodes = new Set();
+		sankeyNodes.forEach(node => {
+			const nodeType = getTraceType(node.trace_target, node.layer_id);
+			const isFirst = (nodeType === firstType);
+			const isLast = (nodeType === lastType);
+			if (!isFirst && !hasUpstream.has(node.index)) deadEndNodes.add(node.index);
+			if (!isLast && !hasDownstream.has(node.index)) deadEndNodes.add(node.index);
+		});
+
 		// Render full diagram
-        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, types);
+        renderSankeyDiagram('sankey-diagram-full', sankeyNodes, sankeyLinks, colorScale, getTraceType, types, deadEndNodes);
 
 		// Render type diagram as Parallel Sets (direct-link coverage; matches `--summary` definition)
 		// Use the same derived links for consistency with v0.2.0 format
@@ -1746,3 +1832,24 @@ function renderSankey(data) {
 		renderParallelSetsRequirements('sankey-diagram-type', sankeyNodes, directLinks, colorScale, getTraceType);
 }
 
+/**
+ * Re-render all diagrams (called on theme change)
+ */
+function reRenderDiagrams() {
+	if (typeof traceabilityData !== 'undefined' && traceabilityData) {
+		initializeApp();
+	}
+}
+
+// Listen for theme changes to re-render diagrams with updated colors
+if (typeof window !== 'undefined') {
+	// Store original toggleTheme function and wrap it
+	const originalToggleTheme = window.toggleTheme;
+	if (originalToggleTheme) {
+		window.toggleTheme = function() {
+			originalToggleTheme();
+			// Re-render diagrams after theme change
+			setTimeout(() => reRenderDiagrams(), 50);
+		};
+	}
+}

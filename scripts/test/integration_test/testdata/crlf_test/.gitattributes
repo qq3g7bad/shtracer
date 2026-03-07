@@ -1,0 +1,2 @@
+# Preserve CRLF line endings for these Windows compatibility test files
+*.md text eol=crlf

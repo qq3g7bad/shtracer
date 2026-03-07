@@ -3,6 +3,16 @@
 # This script can be executed (JSON -> Markdown report to stdout) or sourced (unit tests).
 # Reads JSON from stdin and outputs a unified print-friendly markdown report.
 
+# Source shared JSON parser module (required for json_parse_* functions)
+_md_viewer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)"
+if [ -n "$_md_viewer_dir" ] && [ -f "${_md_viewer_dir}/shtracer_json_parser.sh" ]; then
+	# shellcheck source=shtracer_json_parser.sh
+	. "${_md_viewer_dir}/shtracer_json_parser.sh"
+elif [ -n "${SHTRACER_ROOT_DIR:-}" ]; then
+	# shellcheck source=shtracer_json_parser.sh
+	. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
+fi
+
 ##
 # @brief Generate markdown header section (title, metadata)
 # @param $1 : JSON input string
@@ -11,7 +21,7 @@ _generate_markdown_header() {
 	_json="$1"
 
 	# Parse metadata
-	_metadata=$(_parse_json_metadata "$_json")
+	_metadata=$(json_parse_metadata "$_json")
 	_version=$(printf '%s\n' "$_metadata" | grep '^version=' | cut -d= -f2-)
 	_generated=$(printf '%s\n' "$_metadata" | grep '^generated=' | cut -d= -f2-)
 	_config_path=$(printf '%s\n' "$_metadata" | grep '^config_path=' | cut -d= -f2-)
@@ -64,8 +74,8 @@ _generate_markdown_summary() {
 	_json="$1"
 
 	# Parse coverage data from JSON
-	_coverage_data=$(_parse_json_coverage "$_json")
-	_health_data=$(_parse_json_health "$_json")
+	_coverage_data=$(json_parse_coverage "$_json")
+	_health_data=$(json_parse_health "$_json")
 
 	# Extract health metrics
 	_total_tags=$(printf '%s\n' "$_health_data" | grep '^total_tags=' | cut -d= -f2)
@@ -143,31 +153,6 @@ EOF
 }
 
 ##
-# @brief Find isolated tags (tags with no outbound links)
-# @param $1 : JSON input string
-# @return Prints isolated tag IDs (one per line)
-# @tag @IMP4.3.4.1@ (FROM: @ARC4.1@)
-_find_isolated_tags() {
-	_json="$1"
-
-	_nodes=$(_parse_json_nodes "$_json")
-	_links=$(_parse_json_links "$_json")
-
-	# Get all tag IDs
-	_all_tags=$(printf '%s\n' "$_nodes" | cut -d'|' -f1)
-
-	# Get tags that have outbound links
-	_tags_with_links=$(printf '%s\n' "$_links" | cut -d'|' -f1 | sort -u)
-
-	# Find tags NOT in the links list (isolated)
-	printf '%s\n' "$_all_tags" | while IFS= read -r _tag; do
-		if ! printf '%s\n' "$_tags_with_links" | grep -qxF "$_tag"; then
-			echo "$_tag"
-		fi
-	done
-}
-
-##
 # @brief Generate traceability health analysis (coverage, isolated tags, issues)
 # @param $1 : JSON input string
 # @tag @IMP4.3.4@ (FROM: @ARC4.1@)
@@ -175,7 +160,7 @@ _generate_markdown_health() {
 	_json="$1"
 
 	# Parse health data from JSON
-	_health_data=$(_parse_json_health "$_json")
+	_health_data=$(json_parse_health "$_json")
 
 	# Get stats
 	_total_tags=$(printf '%s\n' "$_health_data" | grep '^total_tags=' | cut -d= -f2)
@@ -290,8 +275,8 @@ EOF
 _generate_markdown_chains() {
 	_json="$1"
 
-	_chains=$(_parse_json_chains "$_json")
-	_nodes=$(_parse_json_nodes "$_json")
+	_chains=$(json_parse_chains "$_json")
+	_nodes=$(json_parse_trace_tags "$_json")
 
 	# Count total chains
 	_total=$(printf '%s\n' "$_chains" | grep -c '^' || echo 0)
@@ -300,7 +285,7 @@ _generate_markdown_chains() {
 	printf '%s total traceability chains.\n\n' "$_total"
 
 	# Get dynamic layer order
-	_order=$(_extract_layer_order "$_json")
+	_order=$(json_get_layer_order "$_json")
 	_col_count=$(printf '%s\n' "$_order" | grep -c '^' || echo 0)
 
 	# Build table header (use sed to join with ' | ')
@@ -425,8 +410,8 @@ _generate_markdown_matrix_table() {
 	_col_layer=$(printf '%s' "$_metadata" | cut -d'|' -f2)
 
 	# Get full layer names from JSON (fallback to abbreviated if not found)
-	_row_layer_full=$(_get_layer_display_name "$_json" "$_row_layer")
-	_col_layer_full=$(_get_layer_display_name "$_json" "$_col_layer")
+	_row_layer_full=$(json_get_layer_display_name "$_json" "$_row_layer")
+	_col_layer_full=$(json_get_layer_display_name "$_json" "$_col_layer")
 
 	# Parse links
 	_links=$(_parse_matrix_links "$_matrix_file")
@@ -450,50 +435,6 @@ _generate_markdown_matrix_table() {
 		printf '| %s | %s |\n' "$_source" "$_target"
 	done
 	printf '\n'
-}
-
-##
-# @brief Get display name for layer abbreviation
-# @param $1 : JSON input string
-# @param $2 : Layer abbreviation (e.g., REQ, ARC)
-# @return Full layer name (e.g., Requirement, Architecture) or abbreviation if not found
-# @tag @IMP4.3.6.6@ (FROM: @ARC4.1@)
-_get_layer_display_name() {
-	_json="$1"
-	_abbrev="$2"
-
-	# Extract layer name from JSON layers array
-	# Returns first match or fallback to abbreviation
-	printf '%s\n' "$_json" | awk -v abbrev="$_abbrev" '
-		BEGIN { in_layers = 0; in_layer_obj = 0 }
-		/"layers":/ && /\[/ { in_layers = 1; next }
-		in_layers && /^\s*\]/ { in_layers = 0; next }
-		in_layers && /^\s*\{/ { in_layer_obj = 1; layer_name = ""; next }
-		in_layer_obj && /"name":/ {
-			match($0, /"name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
-			layer_name = arr[1]
-		}
-		in_layer_obj && /^\s*\}/ {
-			in_layer_obj = 0
-			if (layer_name != "") {
-				# Check if this layer matches the abbreviation pattern
-				# Handles case-insensitive prefix match
-				if (tolower(layer_name) ~ "^" tolower(abbrev)) {
-					# Store first match
-					if (found == "") {
-						found = layer_name
-					}
-				}
-			}
-		}
-		END {
-			if (found != "") {
-				print found
-			} else {
-				print abbrev
-			}
-		}
-	'
 }
 
 ##
@@ -665,8 +606,8 @@ _generate_markdown_cross_refs() {
 _generate_markdown_tag_index() {
 	_json="$1"
 
-	_nodes=$(_parse_json_nodes "$_json")
-	_metadata=$(_parse_json_metadata "$_json")
+	_nodes=$(json_parse_trace_tags "$_json")
+	_metadata=$(json_parse_metadata "$_json")
 	_version=$(printf '%s\n' "$_metadata" | grep '^version=' | cut -d= -f2)
 
 	printf '## Tag Index\n\n'
@@ -709,771 +650,6 @@ _generate_markdown_tag_index() {
 		printf '%s **%s** - %s\n' "-" "$_tag" "$_short_desc"
 		printf '  - %s:%s (%s)\n' "$_file" "$_line" "$_ver_display"
 	done
-}
-
-##
-# @brief Parse metadata section from JSON
-# @param $1 : JSON input string
-# @return Prints metadata fields (version, timestamp, config_path)
-# @tag @IMP4.3.8@ (FROM: @ARC4.1@)
-_parse_json_metadata() {
-	_json="$1"
-
-	# AWK-based JSON metadata extraction
-	printf '%s\n' "$_json" | awk '
-		BEGIN { in_meta=0 }
-
-		/"metadata":/ {
-			in_meta=1
-			next
-		}
-
-		in_meta && /^  \}/ {
-			in_meta=0
-			next
-		}
-
-		in_meta && /"version":/ {
-			# Extract value between quotes after colon
-			match($0, /"version": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "version=" arr[1]
-			}
-		}
-
-		in_meta && /"generated":/ {
-			match($0, /"generated": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "generated=" arr[1]
-			}
-		}
-
-		in_meta && /"config_path":/ {
-			match($0, /"config_path": "([^"]+)"/, arr)
-			if (arr[1] != "") {
-				print "config_path=" arr[1]
-			}
-		}
-	'
-}
-
-##
-# @brief Parse files array from JSON
-# @param $1 : JSON input string
-# @return file_id|file|version (one per line)
-# @tag @IMP4.3.8.1@ (FROM: @ARC4.1@)
-_parse_json_files() {
-	_json="$1"
-
-	printf '%s\n' "$_json" | awk '
-		BEGIN { in_files=0; in_file_obj=0 }
-
-		/"files": \[/ { in_files=1; next }
-		in_files && /^  \],?$/ { in_files=0; next }
-		in_files && /^    \{/ {
-			in_file_obj=1
-			file_id=""; file=""; version=""
-			next
-		}
-		in_files && in_file_obj && /^    \},?$/ {
-			if (file_id != "") print file_id "|" file "|" version
-			in_file_obj=0
-			next
-		}
-
-		in_file_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_file_obj && /"file":/ { match($0, /"file": "([^"]+)"/, arr); file = arr[1] }
-		in_file_obj && /"version":/ { match($0, /"version": "([^"]*)"/, arr); version = arr[1] }
-	'
-}
-
-##
-# @brief Parse layers array from JSON
-# @param $1 : JSON input string
-# @return layer_id|name|pattern (one per line)
-# @tag @IMP4.3.8.2@ (FROM: @ARC4.1@)
-_parse_json_layers() {
-	_json="$1"
-
-	printf '%s\n' "$_json" | awk '
-		BEGIN { in_layers=0; in_layer_obj=0 }
-
-		/"layers": \[/ { in_layers=1; next }
-		in_layers && /^  \],?$/ { in_layers=0; next }
-		in_layers && /^    \{/ {
-			in_layer_obj=1
-			layer_id=""; name=""; pattern=""
-			next
-		}
-		in_layers && in_layer_obj && /^    \},?$/ {
-			if (layer_id != "") print layer_id "|" name "|" pattern
-			in_layer_obj=0
-			next
-		}
-
-		in_layer_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-		in_layer_obj && /"name":/ { match($0, /"name": "([^"]+)"/, arr); name = arr[1] }
-		in_layer_obj && /"pattern":/ { match($0, /"pattern": "([^"]+)"/, arr); pattern = arr[1] }
-	'
-}
-
-##
-# @brief Parse trace_tags array from JSON
-# @param $1 : JSON input string
-# @return Prints node information (id|description|file|line|trace_target|file_version) pipe-separated
-# @tag @IMP4.3.9@ (FROM: @ARC4.1@)
-_parse_json_nodes() {
-	_json="$1"
-
-	# Parse files and layers for lookups
-	_files=$(_parse_json_files "$_json")
-	_layers=$(_parse_json_layers "$_json")
-
-	# AWK-based trace_tags extraction with lookup tables
-	# Output format: id|description|file|line|trace_target|file_version (backward compatible)
-	printf '%s\n' "$_json" | awk -v files="$_files" -v layers="$_layers" '
-		BEGIN {
-			# Build lookup maps
-			split(files, file_lines, "\n")
-			for (i in file_lines) {
-				split(file_lines[i], parts, "|")
-				file_map[parts[1]] = parts[2]    # file_id -> file
-				ver_map[parts[1]] = parts[3]     # file_id -> version
-			}
-
-			split(layers, layer_lines, "\n")
-			for (i in layer_lines) {
-				split(layer_lines[i], parts, "|")
-				layer_map[parts[1]] = parts[2]   # layer_id -> name
-			}
-
-			in_trace_tags=0; in_tag_obj=0
-		}
-
-		/"trace_tags": \[/ { in_trace_tags=1; next }
-		in_trace_tags && /^  \],?$/ { in_trace_tags=0; next }
-
-		in_trace_tags && /^    \{/ {
-			in_tag_obj=1
-			tag_id=""; desc=""; file_id=""; line=""; layer_id=""
-			next
-		}
-
-		in_trace_tags && in_tag_obj && /^    \},?$/ {
-			if (tag_id != "") {
-				file = file_map[file_id]
-				version = ver_map[file_id]
-				target = layer_map[layer_id]
-				print tag_id "|" desc "|" file "|" line "|" target "|" version
-			}
-			in_tag_obj=0
-			next
-		}
-
-		# Extract fields
-		in_tag_obj && /"id":/ { match($0, /"id": "([^"]+)"/, arr); tag_id = arr[1] }
-		in_tag_obj && /"description":/ { match($0, /"description": "([^"]*)"/, arr); desc = arr[1] }
-		in_tag_obj && /"file_id":/ { match($0, /"file_id": ([0-9]+)/, arr); file_id = arr[1] }
-		in_tag_obj && /"line":/ { match($0, /"line": ([0-9]+)/, arr); line = arr[1] }
-		in_tag_obj && /"layer_id":/ { match($0, /"layer_id": ([0-9]+)/, arr); layer_id = arr[1] }
-	'
-}
-
-##
-# @brief Parse chains array from JSON
-# @param $1 : JSON input string
-# @return Prints chain data (tag1|tag2|tag3|tag4|tag5) pipe-separated per chain
-# @tag @IMP4.3.10.2@ (FROM: @ARC4.1@)
-_parse_json_chains() {
-	_json="$1"
-
-	# AWK-based JSON chains extraction
-	# Output format: tag1|tag2|tag3|tag4|tag5 (one chain per line)
-	printf '%s\n' "$_json" | awk '
-		BEGIN {
-			in_chains=0
-		}
-
-		/"chains": \[/ {
-			in_chains=1
-			next
-		}
-
-		in_chains && /^  \]/ {
-			# End of chains array
-			in_chains=0
-			next
-		}
-
-		in_chains && /\["@/ {
-			# Extract chain array elements
-			# Example: ["@REQx.x@", "@ARCx.x@", "@IMPx.x@", "@UTx.x@", "NONE"],
-			line = $0
-			gsub(/^[[:space:]]*\[/, "", line)
-			gsub(/\],?[[:space:]]*$/, "", line)
-			gsub(/"/, "", line)
-			gsub(/, /, "|", line)
-			print line
-		}
-	'
-}
-
-##
-# @brief Parse health section from JSON
-# @param $1 : JSON input string
-# @return Prints health statistics (total_tags, tags_with_links, isolated_tags, isolated_tag_list)
-# @tag @IMP4.3.12@ (FROM: @ARC4.1@)
-_parse_json_health() {
-	_json="$1"
-
-	# AWK-based JSON health extraction
-	printf '%s\n' "$_json" | awk '
-		BEGIN {
-			in_files=0
-			in_file_obj=0
-			in_health=0
-			in_isolated_list=0
-			in_isolated_obj=0
-			isolated_count=0
-			in_dangling_list=0
-			in_duplicate_list=0
-		}
-
-		# Parse top-level files array to map file_id -> file path
-		/"files": \[/ {
-			in_files=1
-			next
-		}
-
-		in_files && /^  \],?/ {
-			in_files=0
-			next
-		}
-
-		in_files && /^    \{/ {
-			in_file_obj=1
-			file_id=""; file_path=""
-			next
-		}
-
-		in_files && in_file_obj && /^    \},?/ {
-			if (file_id != "") {
-				file_map[file_id] = file_path
-			}
-			in_file_obj=0
-			next
-		}
-
-		in_file_obj && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id = arr[1]
-		}
-
-		in_file_obj && /"file":/ {
-			match($0, /"file": "([^"]+)"/, arr)
-			file_path = arr[1]
-		}
-
-		/"health": \{/ {
-			in_health=1
-			next
-		}
-
-		in_health && /^  \},?$/ {
-			# End of health object
-			in_health=0
-			next
-		}
-
-		in_health && /"total_tags":/ {
-			match($0, /"total_tags": ([0-9]+)/, arr)
-			total_tags = arr[1]
-			print "total_tags=" total_tags
-		}
-
-		in_health && /"tags_with_links":/ {
-			match($0, /"tags_with_links": ([0-9]+)/, arr)
-			tags_with_links = arr[1]
-			print "tags_with_links=" tags_with_links
-		}
-
-		in_health && /"isolated_tags":/ {
-			match($0, /"isolated_tags": ([0-9]+)/, arr)
-			isolated_tags = arr[1]
-			print "isolated_tags=" isolated_tags
-		}
-
-		in_health && /"duplicate_tags":/ {
-			match($0, /"duplicate_tags": ([0-9]+)/, arr)
-			duplicate_tags = arr[1]
-			print "duplicate_tags=" duplicate_tags
-		}
-
-		in_health && /"isolated_tag_list": \[/ {
-			in_isolated_list=1
-			next
-		}
-
-		in_isolated_list && /^    \]/ {
-			in_isolated_list=0
-			next
-		}
-
-		in_health && /"duplicate_tag_list": \[/ {
-			in_duplicate_list=1
-			next
-		}
-
-		in_duplicate_list && /^    \]/ {
-			in_duplicate_list=0
-			next
-		}
-
-		# Parse single-line JSON objects in isolated_tag_list
-		# Example: {"id": "@ARC1.3@", "file_id": 0, "line": 91},
-		in_isolated_list && /\{"id":/ {
-			iso_id=""; iso_file_id=""; iso_line=""
-
-			# Extract id
-			if (match($0, /"id": *"([^"]+)"/, arr)) {
-				iso_id = arr[1]
-			}
-
-			# Extract file_id
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				iso_file_id = arr[1]
-			}
-
-			# Extract line
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				iso_line = arr[1]
-			}
-
-			# Output immediately
-			if (iso_id != "") {
-				file_path_out = (iso_file_id in file_map) ? file_map[iso_file_id] : "unknown"
-				print "isolated|" iso_id "|" file_path_out "|" iso_line
-			}
-		}
-
-		# Parse single-line JSON objects in duplicate_tag_list
-		# Example: {"id": "@TAG1@", "file_id": 0, "line": 1},
-		in_duplicate_list && /\{"id":/ {
-			dup_id=""; dup_file_id=""; dup_line=""
-
-			if (match($0, /"id": *"([^"]+)"/, arr)) {
-				dup_id = arr[1]
-			}
-
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				dup_file_id = arr[1]
-			}
-
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				dup_line = arr[1]
-			}
-
-			if (dup_id != "") {
-				file_path_out = (dup_file_id in file_map) ? file_map[dup_file_id] : "unknown"
-				print "duplicate|" dup_id "|" file_path_out "|" dup_line
-			}
-		}
-
-		in_health && /"dangling_references":/ {
-			match($0, /"dangling_references": ([0-9]+)/, arr)
-			dangling_refs = arr[1]
-			print "dangling_references=" dangling_refs
-		}
-
-		in_health && /"dangling_reference_list": \[/ {
-			in_dangling_list=1
-			next
-		}
-
-		in_dangling_list && /^    \]/ {
-			in_dangling_list=0
-			next
-		}
-
-		# Parse single-line JSON objects in dangling_reference_list
-		# Example: {"child_tag": "@ARC1.1@", "missing_parent": "@REQ6.1@", "file_id": 1, "line": 64},
-		in_dangling_list && /\{"child_tag":/ {
-			dang_child=""; dang_parent=""; dang_file_id=""; dang_line=""
-
-			# Extract child_tag
-			if (match($0, /"child_tag": *"([^"]+)"/, arr)) {
-				dang_child = arr[1]
-			}
-
-			# Extract missing_parent
-			if (match($0, /"missing_parent": *"([^"]+)"/, arr)) {
-				dang_parent = arr[1]
-			}
-
-			# Extract file_id
-			if (match($0, /"file_id": *([0-9]+)/, arr)) {
-				dang_file_id = arr[1]
-			}
-
-			# Extract line
-			if (match($0, /"line": *([0-9]+)/, arr)) {
-				dang_line = arr[1]
-			}
-
-			# Output immediately
-			if (dang_child != "" && dang_parent != "") {
-				file_path_out = (dang_file_id in file_map) ? file_map[dang_file_id] : "unknown"
-				print "dangling|" dang_child "|" dang_parent "|" file_path_out "|" dang_line
-			}
-		}
-	'
-}
-
-##
-# @brief Parse coverage data from JSON health section and top-level files array
-# @param $1 : JSON input string
-# @brief Parse coverage data from JSON (health.coverage.layers with nested files)
-# @param $1 : JSON input string
-# @return Prints coverage data in format: layer|total|up_count|down_count|up_pct|down_pct
-#         AND file|layer|basename|total|up_count|down_count|up_pct|down_pct|version
-# @tag @IMP4.3.11.1@ (FROM: @ARC4.1@)
-_parse_json_coverage() {
-	_json="$1"
-
-	# AWK-based JSON coverage extraction
-	printf '%s\n' "$_json" | awk '
-		BEGIN {
-			# Parse top-level files array first for file_id -> file mapping
-			in_files=0
-			in_file_entry=0
-			in_coverage=0
-			in_layers=0
-			in_layer_obj=0
-			in_upstream_obj=0
-			in_downstream_obj=0
-			in_layer_files=0
-			in_file_obj=0
-			in_file_upstream=0
-			in_file_downstream=0
-			current_layer_name=""
-		}
-
-		# Parse top-level files array
-		/"files": \[/ && !in_coverage {
-			in_files=1
-			next
-		}
-
-		in_files && /^  \],?$/ {
-			in_files=0
-			next
-		}
-
-		in_files && /^    \{/ {
-			in_file_entry=1
-			file_id=""; file_path=""
-			next
-		}
-
-		in_files && in_file_entry && /^    \},?$/ {
-			if (file_id != "") {
-				file_map[file_id] = file_path
-			}
-			in_file_entry=0
-			next
-		}
-
-		in_file_entry && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id = arr[1]
-		}
-
-		in_file_entry && /"file":/ {
-			match($0, /"file": "([^"]+)"/, arr)
-			file_path = arr[1]
-		}
-
-		# Parse coverage section
-		/"coverage": \{/ {
-			in_coverage=1
-			next
-		}
-
-		in_coverage && /^    \}/ {
-			# End of coverage object
-			in_coverage=0
-			next
-		}
-
-		in_coverage && /"layers": \[/ {
-			in_layers=1
-			next
-		}
-
-		in_layers && /^      \],?$/ {
-			# End of layers array
-			in_layers=0
-			next
-		}
-
-		in_layers && /^        \{/ {
-			# Start of layer object
-			in_layer_obj=1
-			name=""; total=""; up_count=""; down_count=""; up_pct=""; down_pct=""
-			next
-		}
-
-		in_layers && in_layer_obj && /^        \},?$/ {
-			# End of layer object - output
-			if (name != "") {
-				print "layer|" name "|" total "|" up_count "|" down_count "|" up_pct "|" down_pct
-			}
-			in_layer_obj=0
-			current_layer_name=""
-			next
-		}
-
-		in_layer_obj && /"name":/ {
-			match($0, /"name": "([^"]+)"/, arr)
-			name = arr[1]
-			current_layer_name = arr[1]
-		}
-
-		in_layer_obj && /"total":/ && !in_upstream_obj && !in_downstream_obj && !in_layer_files {
-			match($0, /"total": ([0-9]+)/, arr)
-			total = arr[1]
-		}
-
-		# Parse upstream object
-		in_layer_obj && /"upstream": \{/ && !in_layer_files {
-			in_upstream_obj=1
-			next
-		}
-
-		in_upstream_obj && /^          \},?$/ {
-			in_upstream_obj=0
-			next
-		}
-
-		in_upstream_obj && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			up_count = arr[1]
-		}
-
-		in_upstream_obj && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			up_pct = arr[1]
-		}
-
-		# Parse downstream object
-		in_layer_obj && /"downstream": \{/ && !in_layer_files {
-			in_downstream_obj=1
-			next
-		}
-
-		in_downstream_obj && /^          \},?$/ {
-			in_downstream_obj=0
-			next
-		}
-
-		in_downstream_obj && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			down_count = arr[1]
-		}
-
-		in_downstream_obj && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			down_pct = arr[1]
-		}
-
-		# Parse files array within layer
-		in_layer_obj && /"files": \[/ {
-			in_layer_files=1
-			in_file_obj=0
-			next
-		}
-
-		in_layer_files && /^          \],?$/ {
-			# End of files array within layer
-			in_layer_files=0
-			next
-		}
-
-		in_layer_files && /^            \{/ {
-			# Start of file object within layer
-			in_file_obj=1
-			file_id_local=""; file_total=""; file_up_count=""; file_down_count=""; file_up_pct=""; file_down_pct=""; version=""
-			next
-		}
-
-		in_layer_files && in_file_obj && /^            \},?$/ {
-			# End of file object - resolve file_id and output
-			if (file_id_local != "") {
-				file_path_resolved = (file_id_local in file_map) ? file_map[file_id_local] : "unknown"
-				print "file|" current_layer_name "|" file_path_resolved "|" file_total "|" file_up_count "|" file_down_count "|" file_up_pct "|" file_down_pct "|" version
-			}
-			in_file_obj=0
-			next
-		}
-
-		in_file_obj && /"file_id":/ {
-			match($0, /"file_id": ([0-9]+)/, arr)
-			file_id_local = arr[1]
-		}
-
-		in_file_obj && /"total":/ && !in_file_upstream && !in_file_downstream {
-			match($0, /"total": ([0-9]+)/, arr)
-			file_total = arr[1]
-		}
-
-		# Parse file-level upstream
-		in_file_obj && /"upstream": \{/ {
-			in_file_upstream=1
-			next
-		}
-
-		in_file_upstream && /^              \},?$/ {
-			in_file_upstream=0
-			next
-		}
-
-		in_file_upstream && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			file_up_count = arr[1]
-		}
-
-		in_file_upstream && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			file_up_pct = arr[1]
-		}
-
-		# Parse file-level downstream
-		in_file_obj && /"downstream": \{/ {
-			in_file_downstream=1
-			next
-		}
-
-		in_file_downstream && /^              \},?$/ {
-			in_file_downstream=0
-			next
-		}
-
-		in_file_downstream && /"count":/ {
-			match($0, /"count": ([0-9]+)/, arr)
-			file_down_count = arr[1]
-		}
-
-		in_file_downstream && /"percent":/ {
-			match($0, /"percent": ([0-9.]+)/, arr)
-			file_down_pct = arr[1]
-		}
-
-		in_file_obj && /"version":/ {
-			match($0, /"version": "([^"]*)"/, arr)
-			version = arr[1]
-		}
-	'
-}
-
-##
-# @brief Parse links array from JSON
-# @param $1 : JSON input string
-# @return Prints link data (source|target|value) pipe-separated
-# @tag @IMP4.3.11.2@ (FROM: @ARC4.1@)
-_parse_json_links() {
-	_json="$1"
-
-	# AWK-based JSON links extraction
-	# Output format: source|target|value (pipe-separated)
-	printf '%s\n' "$_json" | awk '
-		BEGIN {
-			in_links=0
-			in_link_obj=0
-		}
-
-		/"links": \[/ {
-			in_links=1
-			next
-		}
-
-		in_links && /^  \]/ {
-			# End of links array
-			in_links=0
-			next
-		}
-
-		in_links && /^    \{/ {
-			# Start of new link object
-			in_link_obj=1
-			link_source=""; link_target=""; link_value=""
-			next
-		}
-
-		in_links && in_link_obj && /^    \},?$/ {
-			# End of link object - output
-			if (link_source != "" && link_target != "") {
-				print link_source "|" link_target "|" link_value
-			}
-			in_link_obj=0
-			next
-		}
-
-		in_link_obj && /"source":/ {
-			match($0, /"source": "([^"]+)"/, arr)
-			link_source = arr[1]
-		}
-
-		in_link_obj && /"target":/ {
-			match($0, /"target": "([^"]+)"/, arr)
-			link_target = arr[1]
-		}
-
-		in_link_obj && /"value":/ {
-			match($0, /"value": ([0-9]+)/, arr)
-			link_value = arr[1]
-		}
-	'
-}
-
-##
-# @brief Extract layer order from layers array
-# @param $1 : JSON input string
-# @return Prints layer names in order, one per line
-# @tag @IMP4.3.10.1@ (FROM: @ARC4.1@)
-_extract_layer_order() {
-	_json="$1"
-
-	# Extract layers from top-level layers array in order
-	printf '%s\n' "$_json" | awk '
-	BEGIN {
-		in_layers = 0
-		in_layer_obj = 0
-	}
-	/"layers": \[/ && !in_layers {
-		in_layers = 1
-		next
-	}
-	in_layers && /^  \],?$/ {
-		in_layers = 0
-		exit
-	}
-	in_layers && /^    \{/ {
-		in_layer_obj = 1
-		next
-	}
-	in_layers && in_layer_obj && /^    \},?$/ {
-		in_layer_obj = 0
-		next
-	}
-	in_layer_obj && /"name":/ {
-		# Extract layer name
-		match($0, /"name": *"([^"]+)"/, arr)
-		layer_name = arr[1]
-		if (layer_name != "") {
-			print layer_name
-		}
-	}
-	'
 }
 
 ##

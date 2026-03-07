@@ -14,6 +14,8 @@ cd "${TEST_ROOT}" || exit 1
 
 # Ensure shunit2 can find this script after we cd
 SELF_PATH="${SCRIPT_DIR%/}/$(basename -- "$0")"
+# Valid config file for parse_arguments tests
+VALID_CONFIG="${SCRIPT_DIR%/}/testdata/config_minimal_single_file.md"
 
 export TEST_ROOT
 export SHTRACER_ROOT_DIR
@@ -24,14 +26,14 @@ SCRIPT_DIR="$SHTRACER_ROOT_DIR"
 . "${SHTRACER_ROOT_DIR%/}/shtracer"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+# shellcheck source=../test_helper.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/test/test_helper.sh"
 
 ##
 # @brief
 #
 oneTimeSetUp() {
-	echo "----------------------------------------"
-	echo " UNIT TEST (Main Routine) : $0"
-	echo "----------------------------------------"
+	shtracer_test_header "UNIT TEST (Main Routine)"
 }
 
 ##
@@ -109,7 +111,7 @@ test_load_functions() {
 
 		# Assert ----------
 		(
-			echo "$_SHTRACER_FUNC_SH" >/dev/null
+			echo "$_SHTRACER_CONFIG_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 	)
@@ -300,7 +302,7 @@ test_parse_arguments_normal_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$SELF_PATH"
+		parse_arguments "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 	)
@@ -314,7 +316,7 @@ test_parse_arguments_verify_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$SELF_PATH" "-v"
+		parse_arguments "$VALID_CONFIG" "-v"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -328,7 +330,7 @@ test_parse_arguments_verify_mode_long() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$SELF_PATH" "--verify"
+		parse_arguments "$VALID_CONFIG" "--verify"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -342,7 +344,7 @@ test_parse_arguments_summary_mode() {
 		load_functions
 		EXPORT_SUMMARY='false'
 		# Act -------------
-		parse_arguments "$SELF_PATH" "--summary"
+		parse_arguments "$VALID_CONFIG" "--summary"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 		assertEquals "$EXPORT_SUMMARY" "true"
@@ -357,7 +359,7 @@ test_parse_arguments_change_mode() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$SELF_PATH" "-c" "old_tag" "new_tag"
+		parse_arguments "$VALID_CONFIG" "-c" "old_tag" "new_tag"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "CHANGE"
 	)
@@ -386,10 +388,10 @@ test_parse_arguments_with_config_file() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "$SELF_PATH"
+		parse_arguments "$VALID_CONFIG"
 		# Assert ----------
-		_DIRNAME=$(cd "$(dirname "$SELF_PATH")" && pwd)
-		assertEquals "$SELF_PATH" "$CONFIG_PATH"
+		_DIRNAME=$(cd "$(dirname "$VALID_CONFIG")" && pwd)
+		assertEquals "$(basename "$VALID_CONFIG")" "$(basename "$CONFIG_PATH")"
 		assertEquals "${_DIRNAME%/}" "$CONFIG_DIR"
 		assertEquals "${CONFIG_DIR%/}/shtracer_output/" "$OUTPUT_DIR"
 		assertNotEquals "" "$CONFIG_OUTPUT"
@@ -405,7 +407,7 @@ test_parse_arguments_html_before_config() {
 		load_functions
 		EXPORT_HTML='false'
 		# Act -------------
-		parse_arguments "--html" "$SELF_PATH"
+		parse_arguments "--html" "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 		assertEquals "$EXPORT_HTML" "true"
@@ -420,7 +422,7 @@ test_parse_arguments_verify_before_config() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "-v" "$SELF_PATH"
+		parse_arguments "-v" "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -434,7 +436,7 @@ test_parse_arguments_verify_before_config_long() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "--verify" "$SELF_PATH"
+		parse_arguments "--verify" "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "VERIFY"
 	)
@@ -449,7 +451,7 @@ test_parse_arguments_summary_before_config() {
 		load_functions
 		EXPORT_SUMMARY='false'
 		# Act -------------
-		parse_arguments "--summary" "$SELF_PATH"
+		parse_arguments "--summary" "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "NORMAL"
 		assertEquals "$EXPORT_SUMMARY" "true"
@@ -464,7 +466,7 @@ test_parse_arguments_change_before_config() {
 		# Arrange ---------
 		load_functions
 		# Act -------------
-		parse_arguments "-c" "old_tag" "new_tag" "$SELF_PATH"
+		parse_arguments "-c" "old_tag" "new_tag" "$VALID_CONFIG"
 		# Assert ----------
 		assertEquals "$SHTRACER_MODE" "CHANGE"
 		assertEquals "$BEFORE_TAG" "old_tag"
@@ -480,7 +482,7 @@ test_parse_arguments_multiple_options() {
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			parse_arguments "--html" "--summary" "$SELF_PATH" 2>&1
+			parse_arguments "--html" "--summary" "$VALID_CONFIG" 2>&1
 		)"
 		# Assert ----------
 		assertEquals 1 "$?"
@@ -497,7 +499,7 @@ test_parse_arguments_mode_with_export() {
 		# Arrange ---------
 		# Act -------------
 		_RETURN_VALUE="$(
-			parse_arguments "-v" "--html" "$SELF_PATH" 2>&1
+			parse_arguments "-v" "--html" "$VALID_CONFIG" 2>&1
 		)"
 		# Assert ----------
 		assertEquals 1 "$?"
@@ -564,7 +566,7 @@ test_main_routine() {
 
 		# load_functions
 		(
-			echo "$_SHTRACER_FUNC_SH" >/dev/null
+			echo "$_SHTRACER_CONFIG_SH" >/dev/null
 		) 2>/dev/null
 		assertEquals 0 "$?"
 
@@ -606,7 +608,7 @@ test_main_routine_output_isolated() {
 		IFS=' '
 
 		# Assert ----------
-		assertEquals "[shtracer_main_unittest.sh][error][make_tag_table]: No linked tags found." "$(echo "$_RETURN" | sed -n '1p')"
+		assertEquals "[shtracer_main_unittest.sh][error][make_tag_table]: No tags found. Check config file paths and tag patterns." "$(echo "$_RETURN" | sed -n '1p')"
 
 	)
 }
@@ -624,8 +626,8 @@ test_main_routine_invalid_config_paths() {
 		IFS=' '
 
 		# Assert ----------
-		# Should output error about no linked tags found
-		echo "$_RETURN" | grep -q "No linked tags found"
+		# Should output error about no tags found
+		echo "$_RETURN" | grep -q "No tags found"
 		assertEquals 0 "$?"
 
 		# Should output find errors for nonexistent paths
