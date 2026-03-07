@@ -49,7 +49,7 @@ OUTPUT_DIR_DEFAULT_NAME='shtracer_output'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
 # Version information (single source of truth for version bumping)
-SHTRACER_VERSION='0.1.4'
+SHTRACER_VERSION='0.1.5'
 SCRIPT_DIR=${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}
 
 # Export variables used in external scripts
