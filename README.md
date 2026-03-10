@@ -218,8 +218,8 @@ Options:
   --html                           Generate standalone HTML report to stdout
   --markdown                       Generate markdown report to stdout
   --summary                        Print traceability summary (direct links only)
-  -c <old_tag> <new_tag>           Rename/swap tags across all traced files
-  -v                               Verify mode: detect duplicate or orphaned tags
+  -c, --change <old_tag> <new_tag> [--dry-run] Rename/swap tags across all traced files
+  -v, --verify                     Verify mode: detect duplicate or orphaned tags
   -t                               Run unit tests
   -h, --help                       Show this help message
 

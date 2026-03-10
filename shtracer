@@ -45,6 +45,7 @@ EXPORT_SUMMARY='false'
 EXPORT_HTML='false'
 EXPORT_MARKDOWN='false'
 SHTRACER_DEBUG='false'
+DRY_RUN='false'
 OUTPUT_DIR_DEFAULT_NAME='shtracer_output'
 SHTRACER_SEPARATOR="<shtracer_separator>"
 CURRENT_DIR="$(pwd)"
@@ -93,7 +94,7 @@ print_usage() {
 		Usage: shtracer <configfile> [options]
 
 		Options:
-		  -c <old_tag> <new_tag>           Change mode: swap or rename trace target tags
+		  -c, --change <old_tag> <new_tag> [--dry-run] Change mode: swap or rename trace target tags
 		  -v, --verify                     Verify mode: detect duplicate or isolated tags
 		  -t, --test                       Test mode: execute unit tests
 		  --html                           Export a single HTML document to stdout (JSON -> viewer)
@@ -109,6 +110,8 @@ print_usage() {
 
 		  2. Change mode (swap or rename tags)
 		     $ ./shtracer -c old_tag new_tag ./sample/config.md
+		     $ ./shtracer --change old_tag new_tag ./sample/config.md
+		     $ ./shtracer --dry-run -c old_tag new_tag ./sample/config.md
 
 		  3. Verify mode (check for duplicate or isolated tags)
 		     $ ./shtracer -v ./sample/config.md
@@ -166,7 +169,7 @@ parse_arguments() {
 	# Special case: single argument (help, version, test, or config only)
 	if [ "$#" -eq 1 ]; then
 		case "$1" in
-			-h | -v | --verify | --help | --version)
+			-h | -v | --verify | -c | --change | --help | --version)
 				# Note: -v/--verify alone prints usage (backward compatibility)
 				# -v/--verify with config file activates verify mode
 				print_usage
@@ -206,12 +209,12 @@ parse_arguments() {
 					_opt_flag="$1"
 					shift
 					;;
-				-c)
+				-c | --change)
 					_found_option=$((_found_option + 1))
 					_opt_mode="CHANGE"
-					_opt_flag="-c"
+					_opt_flag="$1"
 					if [ $# -lt 3 ]; then
-						error_exit "$EXIT_USAGE" "parse_arguments" "-c requires <before_tag> <after_tag>"
+						error_exit "$EXIT_USAGE" "parse_arguments" "-c/--change requires <before_tag> <after_tag>"
 					fi
 					shift
 					_change_before="$1"
@@ -237,6 +240,10 @@ parse_arguments() {
 				--summary)
 					_found_option=$((_found_option + 1))
 					_export_flag="--summary"
+					shift
+					;;
+				--dry-run)
+					DRY_RUN='true'
 					shift
 					;;
 				--debug)
@@ -292,6 +299,11 @@ parse_arguments() {
 		if [ "$SHTRACER_MODE" = "CHANGE" ]; then
 			BEFORE_TAG="$_change_before"
 			AFTER_TAG="$_change_after"
+		fi
+
+		# Validate --dry-run is only used with -c
+		if [ "$DRY_RUN" = 'true' ] && [ "$SHTRACER_MODE" != "CHANGE" ]; then
+			error_exit "$EXIT_USAGE" "parse_arguments" "--dry-run can only be used with -c"
 		fi
 	fi
 
@@ -415,7 +427,7 @@ main_routine() {
 
 	# Tag change mode
 	if [ "$SHTRACER_MODE" = 'CHANGE' ]; then
-		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG"
+		swap_tags "$CONFIG_OUTPUT" "$BEFORE_TAG" "$AFTER_TAG" "$DRY_RUN"
 		_cleanup_output_dir
 		return 0
 

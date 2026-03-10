@@ -24,6 +24,7 @@ esac
 # @param  $1 : CONFIG_OUTPUT_DATA
 # @param  $2 : BEFORE_TAG
 # @param  $3 : AFTER_TAG
+# @param  $4 : DRY_RUN ('true' to preview changes without writing)
 # @tag    @IMP2.6@ (FROM: @ARC2.4@)
 swap_tags() {
 	# Note: Using global escape_sed_pattern() and escape_sed_replacement()
@@ -78,6 +79,7 @@ swap_tags() {
 				done
 		)"
 
+		_dry_run="$4"
 		(
 			cd "$CONFIG_DIR" || error_exit 1 "swap_tags" "Cannot change directory to config path"
 			_before_pat="$(escape_sed_pattern "$2")"
@@ -90,20 +92,36 @@ swap_tags() {
 				| sort -u \
 				| while IFS= read -r t; do
 					[ -n "$t" ] || continue
-					_tmp_file="$(shtracer_tmpfile)" || exit 1
-					sed \
-						-e "s|${_before_pat}|${_tmp_rep}|g" \
-						-e "s|${_after_pat}|${_before_rep}|g" \
-						-e "s|${_tmp_pat}|${_after_rep}|g" \
-						"$t" >"$_tmp_file" || {
+					if [ "$_dry_run" = 'true' ]; then
+						# Preview mode: show matching lines without writing
+						grep -n "$2\|$3" "$t" 2>/dev/null \
+							| while IFS= read -r _match; do
+								_lineno="${_match%%:*}"
+								_content="${_match#*:}"
+								# Apply the same swap to show the result
+								_new_content="$(printf '%s' "$_content" \
+									| sed \
+										-e "s|${_before_pat}|${_tmp_rep}|g" \
+										-e "s|${_after_pat}|${_before_rep}|g" \
+										-e "s|${_tmp_pat}|${_after_rep}|g")"
+								printf '%s:%s: %s -> %s\n' "$t" "$_lineno" "$_content" "$_new_content"
+							done
+					else
+						_tmp_file="$(shtracer_tmpfile)" || exit 1
+						sed \
+							-e "s|${_before_pat}|${_tmp_rep}|g" \
+							-e "s|${_after_pat}|${_before_rep}|g" \
+							-e "s|${_tmp_pat}|${_after_rep}|g" \
+							"$t" >"$_tmp_file" || {
+							rm -f "$_tmp_file"
+							exit 1
+						}
+						cat "$_tmp_file" >"$t" || {
+							rm -f "$_tmp_file"
+							exit 1
+						}
 						rm -f "$_tmp_file"
-						exit 1
-					}
-					cat "$_tmp_file" >"$t" || {
-						rm -f "$_tmp_file"
-						exit 1
-					}
-					rm -f "$_tmp_file"
+					fi
 				done
 		)
 	)
