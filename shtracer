@@ -433,7 +433,7 @@ main_routine() {
 
 	# Test mode
 	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-		PATH="$_user_path" sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./run_all_tests.sh"
+		PATH="$_user_path" sh -c 'cd "$1/scripts/test/" && ./run_all_tests.sh' _ "${SCRIPT_DIR%/}"
 		return 0
 	fi
 
