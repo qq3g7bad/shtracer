@@ -45,20 +45,39 @@ EOF
 _generate_markdown_toc() {
 	_json="$1"
 
-	# TODO: Generate dynamic TOC
-	cat <<'EOF'
+	# Generate dynamic TOC from JSON layer data
+	_layers=$(json_get_layer_order "$_json")
 
-## Table of Contents
+	printf '\n## Table of Contents\n\n'
 
-1. [Executive Summary](#executive-summary)
-2. [Traceability Health](#traceability-health)
-3. [Requirement traceability matrix](#requirement-traceability-matrix)
-4. [Cross-Reference Details](#cross-reference-details)
-5. [Tag Index](#tag-index)
+	_toc_num=1
 
----
+	# Executive Summary with layer subsections
+	printf '%s. [Executive Summary](#executive-summary)\n' "$_toc_num"
+	printf '%s\n' "$_layers" | while IFS= read -r _layer_name; do
+		[ -z "$_layer_name" ] && continue
+		# Convert layer name to anchor (lowercase, spaces to hyphens)
+		_anchor=$(printf '%s' "$_layer_name" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
+		printf '   - [%s](#%s)\n' "$_layer_name" "$_anchor"
+	done
+	_toc_num=$((_toc_num + 1))
 
-EOF
+	# Traceability Health
+	printf '%s. [Traceability Health](#traceability-health)\n' "$_toc_num"
+	_toc_num=$((_toc_num + 1))
+
+	# Requirement traceability matrix
+	printf '%s. [Requirement traceability matrix](#requirement-traceability-matrix)\n' "$_toc_num"
+	_toc_num=$((_toc_num + 1))
+
+	# Cross-Reference Details
+	printf '%s. [Cross-Reference Details](#cross-reference-details)\n' "$_toc_num"
+	_toc_num=$((_toc_num + 1))
+
+	# Tag Index
+	printf '%s. [Tag Index](#tag-index)\n' "$_toc_num"
+
+	printf '\n---\n\n'
 }
 
 ##

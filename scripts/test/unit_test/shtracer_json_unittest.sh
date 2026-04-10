@@ -122,7 +122,7 @@ test_make_json_metadata() {
 	_CONFIG_TABLE="${SHUNIT_TMPDIR}/01_config_table_test"
 
 	cat >"$_TAG_OUTPUT_DATA" <<'EOF'
-:Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/home/qq3g7bad/Desktop/repo/shtracer/scripts/main/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1<shtracer_separator>unknown
+:Main scripts:Implementation<shtracer_separator>@IMP2.1@<shtracer_separator>@ARC2.1@<shtracer_separator>check_configfile() {<shtracer_separator>/path/to/shtracer_func.sh<shtracer_separator>122<shtracer_separator>1<shtracer_separator>unknown
 Requirement<shtracer_separator>@REQ1.1@<shtracer_separator>NONE<shtracer_separator>Test<shtracer_separator>/file<shtracer_separator>1<shtracer_separator>1<shtracer_separator>unknown
 EOF
 

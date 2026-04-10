@@ -215,29 +215,48 @@ The `config.md` file defines which files to trace and how to organize traceabili
 Usage: shtracer <configfile> [options]
 
 Options:
-  --html                           Generate standalone HTML report to stdout
-  --markdown                       Generate markdown report to stdout
-  --summary                        Print traceability summary (direct links only)
-  -c, --change <old_tag> <new_tag> [--dry-run] Rename/swap tags across all traced files
-  -v, --verify                     Verify mode: detect duplicate or orphaned tags
-  -t                               Run unit tests
+  -c, --change <old_tag> <new_tag> [--dry-run] Change mode: swap or rename trace target tags
+  -v, --verify                     Verify mode: detect duplicate or isolated tags
+  -t, --test                       Test mode: execute unit tests
+  --html                           Export a single HTML document to stdout (JSON -> viewer)
+  --markdown                       Export a print-friendly Markdown report to stdout (JSON -> markdown)
+  --summary                        Print traceability summary to stdout (direct links only)
+  --debug                          Keep temp files and output tag table to stderr
   -h, --help                       Show this help message
 
 Examples:
-  # Generate traceability matrix
-  ./shtracer ./sample/config.md
+  1. Normal mode (JSON output)
+     $ ./shtracer ./sample/config.md
+     $ ./shtracer ./sample/config.md > output.json
 
-  # CI/CD pipeline integration
-  ./shtracer ./sample/config.md | jq '.chains'
+  2. Change mode (swap or rename tags)
+     $ ./shtracer -c old_tag new_tag ./sample/config.md
+     $ ./shtracer --change old_tag new_tag ./sample/config.md
+     $ ./shtracer --dry-run -c old_tag new_tag ./sample/config.md
 
-  # Create HTML report
-  ./shtracer --html ./sample/config.md > report.html
+  3. Verify mode (check for duplicate or isolated tags)
+     $ ./shtracer -v ./sample/config.md
+     $ ./shtracer --verify ./sample/config.md
 
-  # Refactor: rename tags across entire project
-  ./shtracer -c @OLD-001@ @NEW-001@ ./sample/config.md
+  4. Test mode
+     $ ./shtracer -t
+     $ ./shtracer --test
 
-  # Quality check: find broken traceability
-  ./shtracer -v ./sample/config.md
+  5. Summary mode
+     $ ./shtracer --summary ./sample/config.md
+
+  6. HTML mode
+     $ ./shtracer --html ./sample/config.md > output.html
+
+  7. Markdown mode
+     $ ./shtracer --markdown ./sample/config.md > report.md
+
+  8. Debug mode (JSON + tag table to stderr)
+     $ ./shtracer --debug ./sample/config.md > output.json
+
+Note:
+  - Arguments can be specified in any order.
+  - Only one option can be used at a time.
 ```
 
 ---
@@ -255,10 +274,13 @@ Examples:
 - `12` - Failed to generate JSON
 - `13` - Viewer script execution failed
 - `20` - Found isolated tags (verify mode)
-- `21` - Found duplicate tags (verify mode)
+- `21` - Found duplicate tags (verify mode - highest priority)
 - `22` - Found dangling FROM tag references (verify mode)
 - `30` - Internal error
 - `31` - Viewer script not found
+
+Note (verify mode): If multiple issues exist, all are reported to stderr
+                    but exit code reflects highest-priority error (21 > 22 > 20)
 
 ### Automated Documentation
 
