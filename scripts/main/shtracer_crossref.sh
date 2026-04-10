@@ -224,7 +224,7 @@ _generate_cross_reference_matrix() {
 
 	# First pass: Read 01_tags to build tag metadata
 	# Field separator for this file is <shtracer_separator>
-	ARGIND == 1 {
+	FNR == NR {
 		# Manually split by separator
 		n = split($0, fields, tags_sep)
 		if (n >= 6) {
@@ -248,11 +248,12 @@ _generate_cross_reference_matrix() {
 				}
 			}
 		}
+		next
 	}
 
 	# Second pass: Read 02_tag_pairs to build matrix
 	# Field separator for this file is space
-	ARGIND == 2 && NF >= 2 {
+	NF >= 2 {
 		# Space-separated: @REQ1.1@ @ARC2.1@
 		parent_tag = $1
 		child_tag = $2
