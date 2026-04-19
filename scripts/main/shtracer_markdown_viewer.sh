@@ -45,6 +45,7 @@ _md_ver_display() {
 # @brief Print one section from tags/health_summary
 # @param $1 : section name (without brackets), e.g. "SUMMARY", "LAYERS"
 _md_read_section() {
+	[ -r "${_MD_HEALTH:-}" ] || return 0
 	awk -v tag="[$1]" '
 		$0 == tag { on=1; next }
 		on && /^\[/ { on=0; exit }
@@ -55,6 +56,7 @@ _md_read_section() {
 ##
 # @brief Print unique layer names in config-file order
 _md_layer_order() {
+	[ -r "${_MD_CONFIG_TABLE:-}" ] || return 0
 	awk -F"$SHTRACER_SEP" '
 		NF >= 1 && $1 != "" {
 			layer = $1
@@ -75,6 +77,10 @@ _md_layer_order() {
 #          lowercased abbreviation. Falls back to the abbreviation itself.
 _md_layer_display_name() {
 	_abbrev="$1"
+	if [ ! -r "${_MD_CONFIG_TABLE:-}" ]; then
+		printf '%s' "$_abbrev"
+		return 0
+	fi
 	_result=$(awk -F"$SHTRACER_SEP" -v abbrev="$_abbrev" '
 		BEGIN { want = tolower(abbrev) }
 		NF >= 1 && $1 != "" {

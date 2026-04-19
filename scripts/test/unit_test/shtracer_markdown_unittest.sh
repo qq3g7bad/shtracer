@@ -66,6 +66,29 @@ setUp() {
 	_MD_VERSION="0.2.0"
 	_MD_GENERATED="2026-01-15T10:30:00Z"
 	_MD_CONFIG_PATH="/path/to/config.md"
+
+	# Empty fixture files for intermediate-file-based viewer helpers.
+	# Without these, awk reads from stdin and hangs the test.
+	_MD_FIXTURE_DIR=$(mktemp -d 2>/dev/null)
+	mkdir -p "${_MD_FIXTURE_DIR}/config" "${_MD_FIXTURE_DIR}/tags"
+	_MD_TAGS_DIR="${_MD_FIXTURE_DIR}/tags"
+	_MD_CONFIG_TABLE="${_MD_FIXTURE_DIR}/config/01_config_table"
+	_MD_TAGS_FILE="${_MD_TAGS_DIR}/01_tags"
+	_MD_TAG_TABLE="${_MD_TAGS_DIR}/04_tag_table"
+	_MD_HEALTH="${_MD_TAGS_DIR}/health_summary"
+	: >"$_MD_CONFIG_TABLE"
+	: >"$_MD_TAGS_FILE"
+	: >"$_MD_TAG_TABLE"
+	: >"$_MD_HEALTH"
+}
+
+##
+# @brief TearDown — remove per-test fixture directory
+#
+tearDown() {
+	if [ -n "${_MD_FIXTURE_DIR:-}" ] && [ -d "$_MD_FIXTURE_DIR" ]; then
+		rm -rf "$_MD_FIXTURE_DIR"
+	fi
 }
 
 # ============================================================================
