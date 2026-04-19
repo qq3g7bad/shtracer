@@ -19,8 +19,6 @@ cd "${TEST_ROOT}" || exit 1
 
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
-# shellcheck source=../../main/shtracer_json_parser.sh
-. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 # shellcheck source=../../main/shtracer_markdown_viewer.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 # shellcheck source=../test_helper.sh
@@ -64,6 +62,10 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	# Globals expected by new intermediate-file viewer functions.
+	_MD_VERSION="0.2.0"
+	_MD_GENERATED="2026-01-15T10:30:00Z"
+	_MD_CONFIG_PATH="/path/to/config.md"
 }
 
 # ============================================================================
