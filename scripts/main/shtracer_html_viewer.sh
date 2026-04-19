@@ -414,268 +414,6 @@ _html_generate_cross_ref_table() {
 }
 
 ##
-# @brief   Generate HTML cross-reference table from JSON cross_reference object
-# @param   $1 : JSON cross_reference object (single object from cross_references array)
-# @param   $2 : table_id for HTML table element
-# @param   $3 : TAG_INFO_TABLE string (tag<sep>line<sep>path<sep>trace_target per line)
-# @return  Echoes HTML table to stdout
-# @tag     @IMP2.6.2@ (FROM: @ARC2.6@)
-_html_generate_cross_ref_table_from_json() {
-	_json_xref="$1"
-	_table_id="$2"
-	_tag_info_table="$3"
-	_sep="$SHTRACER_SEPARATOR"
-
-	# Error handling: empty JSON
-	if [ -z "$_json_xref" ]; then
-		printf '<table id="%s" class="matrix-table"><tbody><tr><td>Error: Empty cross-reference data</td></tr></tbody></table>\n' "$_table_id"
-		return 1
-	fi
-
-	# Parse JSON and TAG_INFO_TABLE, then generate HTML table
-	{
-		# TAG_INFO_TABLE is a string containing the data
-		printf '%s\n' "$_tag_info_table"
-		printf '%s\n' "__SHTRACER_TAG_INFO_END__"
-		printf '%s' "$_json_xref"
-	} | awk -v sep="$_sep" -v table_id="$_table_id" \
-		"$AWK_FN_COMMON"'
-		'"$AWK_FN_FIELD_EXTRACTORS"'
-		BEGIN {
-			mode = "tag_info"
-			row_count = 0
-			col_count = 0
-			in_source_tags = 0
-			in_target_tags = 0
-			in_links = 0
-			in_tag_obj = 0
-			in_link_obj = 0
-			in_source_section = 0
-			in_target_section = 0
-		}
-		function badge(tag, typ, line, fileId, ext,   safeTyp, safeTag, safeId, safeExt, safeDesc, safeFromTags, desc, from_tags) {
-			safeTyp = escape_html(typ)
-			safeTag = escape_html(tag)
-			safeId = escape_html(fileId)
-			safeExt = escape_html(ext)
-			desc = tagDescription[tag]
-			from_tags = tagFromTags[tag]
-			safeDesc = escape_html(desc)
-			gsub(/"/, "\\&quot;", safeDesc)
-			safeFromTags = escape_html(from_tags)
-			gsub(/"/, "\\&quot;", safeFromTags)
-			return "<span class=\"matrix-tag-badge\" data-type=\"" safeTyp "\">" \
-				"<a href=\"#\" onclick=\"showText(event, &quot;" safeId "&quot;, " line ", &quot;" safeExt "&quot;, &quot;" safeTag "&quot;, &quot;" safeDesc "&quot;, &quot;" safeTyp "&quot;, &quot;" safeFromTags "&quot;)\" " \
-				"onmouseover=\"showTooltip(event, &quot;" safeId "&quot;)\" onmouseout=\"hideTooltip()\">" safeTag "</a></span>"
-		}
-		function extract_json_string(line, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*\""
-			if (match(line, r)) {
-				v = line
-				sub(".*" r, "", v)
-				# Handle escaped quotes and extract until unescaped quote
-				gsub(/\\"/, "\x01", v)  # Temporarily replace escaped quotes
-				sub(/".*/, "", v)
-				gsub(/\x01/, "\\", v)   # Restore escaped quotes
-				return v
-			}
-			return ""
-		}
-		function extract_json_int(line, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*"
-			if (match(line, r)) {
-				v = line
-				sub(".*" r, "", v)
-				sub(/[^0-9].*/, "", v)
-				return v
-			}
-			return ""
-		}
-
-		# Read TAG_INFO_TABLE to build tag type mapping
-		$0 == "__SHTRACER_TAG_INFO_END__" {
-			mode = "json"
-			next
-		}
-		mode == "tag_info" {
-			if ($0 == "") next
-			tag = trim(field1($0, sep))
-			if (tag == "") next
-			line_num = trim(field2($0, sep))
-			file_path = trim(field3($0, sep))
-			trace_target = trim(field4($0, sep))
-			description = trim(field5($0, sep))
-			from_tags_raw = trim(field6($0, sep))
-			typ = type_from_trace_target(trace_target)
-			tagType[tag] = typ
-			tagLine[tag] = line_num
-			tagFile[tag] = file_path
-			tagDescription[tag] = description
-			tagFromTags[tag] = from_tags_raw
-			next
-		}
-
-		# Parse JSON cross_reference object
-		mode == "json" {
-			# Detect source_layer.tag_ids array
-			if ($0 ~ /"source_layer"/) {
-				in_source_section = 1
-			}
-			if (in_source_section && $0 ~ /"tag_ids"[[:space:]]*:[[:space:]]*\[/) {
-				in_source_tags = 1
-			}
-			if (in_source_tags && $0 ~ /\]/) {
-				in_source_tags = 0
-				in_source_section = 0
-			}
-
-			# Detect target_layer.tag_ids array
-			if ($0 ~ /"target_layer"/) {
-				in_target_section = 1
-			}
-			if (in_target_section && $0 ~ /"tag_ids"[[:space:]]*:[[:space:]]*\[/) {
-				in_target_tags = 1
-			}
-			if (in_target_tags && $0 ~ /\]/) {
-				in_target_tags = 0
-				in_target_section = 0
-			}
-
-			# Detect links array
-			if ($0 ~ /"links"[[:space:]]*:[[:space:]]*\[/) {
-				in_links = 1
-			}
-			if (in_links && $0 ~ /\]/) {
-				in_links = 0
-			}
-
-			# Parse source_layer.tag_ids array (string values)
-			if (in_source_tags && $0 ~ /"@[^"]+@"/) {
-				v = extract_json_string($0, "")
-				if (v !~ /^@.*@$/) {
-					# Try another method - extract quoted string
-					if (match($0, /"(@[^"]+@)"/)) {
-						v = substr($0, RSTART+1, RLENGTH-2)
-					}
-				}
-				if (v ~ /^@.*@$/) {
-					tag = v
-					file = tagFile[tag]
-					line = tagLine[tag]
-					if (file == "") file = "/unknown"
-					if (line == "" || line + 0 < 1) line = 1
-					typ = (tag in tagType) ? tagType[tag] : "Unknown"
-					row_tags[row_count] = tag
-					row_files[tag] = file
-					row_lines[tag] = line
-					row_types[tag] = typ
-					base = basename(file)
-					row_exts[tag] = ext_from_basename(base)
-					row_fileids[tag] = fileid_from_path(file)
-					row_count++
-				}
-			}
-
-			# Parse target_layer.tag_ids array (string values)
-			if (in_target_tags && $0 ~ /"@[^"]+@"/) {
-				v = extract_json_string($0, "")
-				if (v !~ /^@.*@$/) {
-					# Try another method - extract quoted string
-					if (match($0, /"(@[^"]+@)"/)) {
-						v = substr($0, RSTART+1, RLENGTH-2)
-					}
-				}
-				if (v ~ /^@.*@$/) {
-					tag = v
-					file = tagFile[tag]
-					line = tagLine[tag]
-					if (file == "") file = "/unknown"
-					if (line == "" || line + 0 < 1) line = 1
-					typ = (tag in tagType) ? tagType[tag] : "Unknown"
-					col_tags[col_count] = tag
-					col_files[tag] = file
-					col_lines[tag] = line
-					col_types[tag] = typ
-					base = basename(file)
-					col_exts[tag] = ext_from_basename(base)
-					col_fileids[tag] = fileid_from_path(file)
-					col_count++
-				}
-			}
-
-			# Parse links objects
-			if (in_links && $0 ~ /\{/) {
-				in_link_obj = 1
-				source = ""
-				target = ""
-			}
-			if (in_links && in_link_obj) {
-				v = extract_json_string($0, "source")
-				if (v != "") source = v
-				v = extract_json_string($0, "target")
-				if (v != "") target = v
-
-				if ($0 ~ /\}/) {
-					if (source != "" && target != "") {
-						matrix[source "," target] = 1
-					}
-					in_link_obj = 0
-				}
-			}
-		}
-
-		END {
-			# Generate HTML table (same structure as _html_generate_cross_ref_table)
-			printf "<table id=\"%s\" class=\"matrix-table\">\n", table_id
-			printf "<thead>\n  <tr>\n"
-
-			# Header: first cell is empty (corner cell)
-			printf "    <th>.</th>\n"
-
-			# Column headers with badges
-			for (c = 0; c < col_count; c++) {
-				tag = col_tags[c]
-				typ = col_types[tag]
-				line = col_lines[tag]
-				fileid = col_fileids[tag]
-				ext = col_exts[tag]
-				badge_html = badge(tag, typ, line, fileid, ext)
-				printf "    <th>%s</th>\n", badge_html
-			}
-			printf "  </tr>\n</thead>\n"
-
-			# Table body
-			printf "<tbody>\n"
-			for (r = 0; r < row_count; r++) {
-				row_tag = row_tags[r]
-				row_typ = row_types[row_tag]
-				row_line = row_lines[row_tag]
-				row_fileid = row_fileids[row_tag]
-				row_ext = row_exts[row_tag]
-				row_badge = badge(row_tag, row_typ, row_line, row_fileid, row_ext)
-
-				printf "  <tr>\n"
-				printf "    <td>%s</td>\n", row_badge
-
-				# Data cells: "x" if link exists, empty otherwise
-				for (c = 0; c < col_count; c++) {
-					col_tag = col_tags[c]
-					key = row_tag "," col_tag
-					if (key in matrix) {
-						printf "    <td class=\"xref-link\">x</td>\n"
-					} else {
-						printf "    <td class=\"xref-empty\"></td>\n"
-					}
-				}
-				printf "  </tr>\n"
-			}
-			printf "</tbody>\n"
-			printf "</table>\n"
-		}
-	'
-}
-
-##
 # @brief   Insert file information into HTML with proper indentation
 # @param   $1 : HTML_CONTENT (template HTML to modify)
 # @param   $2 : INFORMATION (file list HTML)
@@ -786,237 +524,121 @@ convert_template_html() {
 		_TABLES_HTML="$_TABLES_HTML$_TABLE_HTML"
 		_TABLES_HTML="$_TABLES_HTML</table>"
 
-		# Check if JSON has cross_references field (new format)
-		_HAS_JSON_XREFS=0
-		if [ -f "$_JSON_FILE" ] && grep -q '"cross_references"' "$_JSON_FILE" 2>/dev/null; then
-			_HAS_JSON_XREFS=1
+		# Cross-reference tables are always built from intermediate files
+		# (tags/[0-9][0-9]_cross_ref_matrix_*). The internal matrix file format
+		# is the source of truth; JSON's cross_references field is a derivative.
+		_XREF_DIR="${OUTPUT_DIR%/}/tags/"
+		_XREF_FILES=""
+		if [ -d "$_XREF_DIR" ]; then
+			for _f in "$_XREF_DIR"[0-9][0-9]_cross_ref_matrix_*; do
+				[ -f "$_f" ] || continue
+				_XREF_FILES="$_XREF_FILES$(basename "$_f")
+"
+			done
 		fi
 
-		if [ "$_HAS_JSON_XREFS" -eq 1 ]; then
-			# JSON-based approach: extract cross_references from JSON
-			# Extract each cross_reference object from JSON and generate tables
-			_xref_objects_file=$(shtracer_tmpfile) || error_exit 1 "convert_template_html" "Failed to create temporary file"
-			trap 'rm -f "$_xref_objects_file" 2>/dev/null || true' EXIT INT TERM
+		# Generate tabs for each cross-reference file
+		if [ -n "$_XREF_FILES" ]; then
+			# Extract known layer names from TAG_INFO_TABLE
+			_LAYER_MAP=$(
+				{
+					if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
+						cat "$_TAG_INFO_TABLE"
+					else
+						printf '%s\n' "$_TAG_INFO_TABLE"
+					fi
+				} | awk -F"$SHTRACER_SEPARATOR" \
+					"$AWK_FN_GET_LAST_SEGMENT"'
+				NF >= 4 && $4 != "" {
+					display_name = get_last_segment($4)
+					# Convert display name to filename pattern (spaces to underscores)
+					pattern = display_name
+					gsub(/ /, "_", pattern)
+					if (pattern != "" && !seen[pattern]++) {
+						# Output: filename_pattern => display_name
+						print pattern "=>" display_name
+					}
+				}
+			'
+			)
 
-			awk '
-				BEGIN {
-					in_cross_refs = 0
-					in_obj = 0
-					brace_depth = 0
-					obj_content = ""
-				}
-				# Detect cross_references array
-				/"cross_references"[[:space:]]*:/ {
-					seen_cross_refs_key = 1
-				}
-				seen_cross_refs_key && /\[/ {
-					in_cross_refs = 1
-					seen_cross_refs_key = 0
+			for _xref_file in $_XREF_FILES; do
+				# Extract layer identifiers from filename: 06_cross_ref_matrix_LAYER1_LAYER2
+				_base_name="${_xref_file#*_cross_ref_matrix_}"
+
+				# Use AWK to find matching layer pair
+				_layer_pair=$(printf '%s\n%s' "$_LAYER_MAP" "$_base_name" | awk -F'=>' '
+				BEGIN { n_layers = 0 }
+				/=>/ {
+					# Store layer mappings: pattern => display_name
+					layer_map[$1] = $2
+					pattern_len[$1] = length($1)
+					n_layers = n_layers + 1
+					layers[n_layers] = $1
 					next
 				}
-				in_cross_refs {
-					# Track brace depth to detect object boundaries
-					line = $0
-					for (i = 1; i <= length(line); i++) {
-						c = substr(line, i, 1)
-						if (c == "{") {
-							if (brace_depth == 0) {
-								in_obj = 1
-								obj_content = "{"
-							} else {
-								obj_content = obj_content c
-							}
-							brace_depth++
-						} else if (c == "}") {
-							brace_depth--
-							if (brace_depth == 0 && in_obj) {
-								obj_content = obj_content "}"
-								# Output complete object with marker
-								print "__XREF_OBJECT_START__"
-								print obj_content
-								print "__XREF_OBJECT_END__"
-								obj_content = ""
-								in_obj = 0
-							} else {
-								obj_content = obj_content c
-							}
-						} else if (in_obj) {
-							obj_content = obj_content c
-						}
+				{
+					# This is the filename to parse
+					filename = $0
+					found = 0
 
-						# Detect end of cross_references array
-						if (c == "]" && brace_depth == 0 && in_cross_refs) {
-							in_cross_refs = 0
-							exit
+					# Sort layers by length (descending) for longest match first
+					for (i = 1; i < n_layers; i++) {
+						for (j = i + 1; j <= n_layers; j++) {
+							if (pattern_len[layers[i]] < pattern_len[layers[j]]) {
+								tmp = layers[i]
+								layers[i] = layers[j]
+								layers[j] = tmp
+							}
 						}
 					}
-					# Add newline at end of each line to preserve formatting
-					if (in_obj) {
-						obj_content = obj_content "\n"
+
+					# Try all possible split points with longest match first
+					for (i = 1; i <= n_layers; i++) {
+						pattern1 = layers[i]
+						if (index(filename, pattern1 "_") == 1) {
+							# filename starts with this pattern
+							remaining = substr(filename, length(pattern1) + 2)
+							# Check if remaining matches another pattern (try longest first)
+							for (j = 1; j <= n_layers; j++) {
+								pattern2 = layers[j]
+								if (remaining == pattern2) {
+									# Found a match!
+									print layer_map[pattern1] "\t" layer_map[pattern2]
+									found = 1
+									exit
+								}
+							}
+						}
+					}
+
+					# No match found - skip this file
+					if (!found) {
+						print "NOMATCH\tNOMATCH"
 					}
 				}
-			' <"$_JSON_FILE" >"$_xref_objects_file"
+			')
 
-			# Process each cross_reference object
-			_current_obj=""
-			_in_obj=0
-			while IFS= read -r _line; do
-				if [ "$_line" = "__XREF_OBJECT_START__" ]; then
-					_in_obj=1
-					_current_obj=""
-				elif [ "$_line" = "__XREF_OBJECT_END__" ]; then
-					_in_obj=0
+				_row_layer=$(printf '%s' "$_layer_pair" | cut -f1)
+				_col_layer=$(printf '%s' "$_layer_pair" | cut -f2)
 
-					# Extract layer names from JSON object (multi-line safe)
-					_source_name=$(printf '%s\n' "$_current_obj" | awk '
-						BEGIN { in_source = 0 }
-						/"source_layer"/ { in_source = 1 }
-						in_source && /"name"[[:space:]]*:/ {
-							line=$0; sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line)
-							if (line != "") { print line; exit }
-						}
-					')
-					_target_name=$(printf '%s\n' "$_current_obj" | awk '
-						BEGIN { in_target = 0 }
-						/"target_layer"/ { in_target = 1 }
-						in_target && /"name"[[:space:]]*:/ {
-							line=$0; sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line)
-							if (line != "") { print line; exit }
-						}
-					')
-
-					# Generate tab ID and label
-					_tab_id=$(printf '%s-%s' "$_source_name" "$_target_name" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
-					_tab_label="$_source_name↔$_target_name"
-
-					# Append tab button
-					_TABS_HTML="$_TABS_HTML<button class=\"matrix-tab\" data-matrix=\"$_tab_id\" onclick=\"switchMatrixTab(event, '$_tab_id')\">$_tab_label</button>"
-
-					# Generate table from JSON object
-					_table_html=$(_html_generate_cross_ref_table_from_json "$_current_obj" "tag-table-$_tab_id" "$_TAG_INFO_TABLE")
-					_TABLES_HTML="$_TABLES_HTML$_table_html"
-				elif [ "$_in_obj" -eq 1 ]; then
-					_current_obj="${_current_obj}${_line}
-"
+				# Skip if no match was found
+				if [ "$_row_layer" = "NOMATCH" ] || [ "$_col_layer" = "NOMATCH" ]; then
+					continue
 				fi
-			done <"$_xref_objects_file"
 
-			rm -f "$_xref_objects_file"
-		else
-			# Fallback: File-based approach (backward compatibility)
-			_XREF_DIR="${OUTPUT_DIR%/}/tags/"
-			_XREF_FILES=""
-			if [ -d "$_XREF_DIR" ]; then
-				for _f in "$_XREF_DIR"[0-9][0-9]_cross_ref_matrix_*; do
-					[ -f "$_f" ] || continue
-					_XREF_FILES="$_XREF_FILES$(basename "$_f")
-"
-				done
-			fi
+				# Generate tab ID and label
+				_tab_id=$(printf '%s-%s' "$_row_layer" "$_col_layer" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+				_tab_label="$_row_layer↔$_col_layer"
 
-			# Generate tabs for each cross-reference file
-			if [ -n "$_XREF_FILES" ]; then
-				# Extract known layer names from TAG_INFO_TABLE
-				_LAYER_MAP=$(
-					{
-						if [ -n "$_TAG_INFO_TABLE" ] && [ -r "$_TAG_INFO_TABLE" ]; then
-							cat "$_TAG_INFO_TABLE"
-						else
-							printf '%s\n' "$_TAG_INFO_TABLE"
-						fi
-					} | awk -F"$SHTRACER_SEPARATOR" \
-						"$AWK_FN_GET_LAST_SEGMENT"'
-					NF >= 4 && $4 != "" {
-						display_name = get_last_segment($4)
-						# Convert display name to filename pattern (spaces to underscores)
-						pattern = display_name
-						gsub(/ /, "_", pattern)
-						if (pattern != "" && !seen[pattern]++) {
-							# Output: filename_pattern => display_name
-							print pattern "=>" display_name
-						}
-					}
-				'
-				)
+				# Append tab button
+				_TABS_HTML="$_TABS_HTML<button class=\"matrix-tab\" data-matrix=\"$_tab_id\" onclick=\"switchMatrixTab(event, '$_tab_id')\">$_tab_label</button>"
 
-				for _xref_file in $_XREF_FILES; do
-					# Extract layer identifiers from filename: 06_cross_ref_matrix_LAYER1_LAYER2
-					_base_name="${_xref_file#*_cross_ref_matrix_}"
-
-					# Use AWK to find matching layer pair
-					_layer_pair=$(printf '%s\n%s' "$_LAYER_MAP" "$_base_name" | awk -F'=>' '
-					BEGIN { n_layers = 0 }
-					/=>/ {
-						# Store layer mappings: pattern => display_name
-						layer_map[$1] = $2
-						pattern_len[$1] = length($1)
-						n_layers = n_layers + 1
-						layers[n_layers] = $1
-						next
-					}
-					{
-						# This is the filename to parse
-						filename = $0
-						found = 0
-
-						# Sort layers by length (descending) for longest match first
-						for (i = 1; i < n_layers; i++) {
-							for (j = i + 1; j <= n_layers; j++) {
-								if (pattern_len[layers[i]] < pattern_len[layers[j]]) {
-									tmp = layers[i]
-									layers[i] = layers[j]
-									layers[j] = tmp
-								}
-							}
-						}
-
-						# Try all possible split points with longest match first
-						for (i = 1; i <= n_layers; i++) {
-							pattern1 = layers[i]
-							if (index(filename, pattern1 "_") == 1) {
-								# filename starts with this pattern
-								remaining = substr(filename, length(pattern1) + 2)
-								# Check if remaining matches another pattern (try longest first)
-								for (j = 1; j <= n_layers; j++) {
-									pattern2 = layers[j]
-									if (remaining == pattern2) {
-										# Found a match!
-										print layer_map[pattern1] "\t" layer_map[pattern2]
-										found = 1
-										exit
-									}
-								}
-							}
-						}
-
-						# No match found - skip this file
-						if (!found) {
-							print "NOMATCH\tNOMATCH"
-						}
-					}
-				')
-
-					_row_layer=$(printf '%s' "$_layer_pair" | cut -f1)
-					_col_layer=$(printf '%s' "$_layer_pair" | cut -f2)
-
-					# Skip if no match was found
-					if [ "$_row_layer" = "NOMATCH" ] || [ "$_col_layer" = "NOMATCH" ]; then
-						continue
-					fi
-
-					# Generate tab ID and label
-					_tab_id=$(printf '%s-%s' "$_row_layer" "$_col_layer" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
-					_tab_label="$_row_layer↔$_col_layer"
-
-					# Append tab button
-					_TABS_HTML="$_TABS_HTML<button class=\"matrix-tab\" data-matrix=\"$_tab_id\" onclick=\"switchMatrixTab(event, '$_tab_id')\">$_tab_label</button>"
-
-					# Generate table
-					_table_html=$(_html_generate_cross_ref_table "${_XREF_DIR}${_xref_file}" "tag-table-$_tab_id" "$_TAG_INFO_TABLE")
-					_TABLES_HTML="$_TABLES_HTML$_table_html"
-				done
-			fi
-		fi # End of else block (file-based approach)
+				# Generate table
+				_table_html=$(_html_generate_cross_ref_table "${_XREF_DIR}${_xref_file}" "tag-table-$_tab_id" "$_TAG_INFO_TABLE")
+				_TABLES_HTML="$_TABLES_HTML$_table_html"
+			done
+		fi
 
 		# Combine into final structure
 		# Check if we have cross-reference tables (count tabs)
@@ -1126,285 +748,98 @@ convert_template_html() {
 }
 
 ##
-# @brief   Build TAG_INFO_TABLE from shtracer JSON output
-# @param   $1 : JSON_FILE
-# @return  Echoes TAG_INFO_TABLE to stdout (tag<sep>line<sep>path per line)
-tag_info_table_from_json_file() {
-	_JSON_FILE="$1"
-	if [ -z "$_JSON_FILE" ] || [ ! -r "$_JSON_FILE" ]; then
-		error_exit 1 "tag_info_table_from_json_file" "JSON file not readable"
+# @brief   Build TAG_INFO_TABLE from shtracer intermediate files
+# @param   $1 : TAGS_FILE  (tags/01_tags)
+# @param   $2 : CONFIG_TABLE_FILE  (config/01_config_table)
+# @param   $3 : CONFIG_PATH  (used for synthetic @CONFIG@ row; empty to omit)
+# @return  Echoes TAG_INFO_TABLE to stdout
+#          Each row: tag<sep>line<sep>path<sep>trace_target<sep>desc<sep>from_tags
+#          Rows are ordered by trace-target appearance in CONFIG_TABLE.
+# @details
+#   Reads 01_tags (fields: trace_target, tag, from_tags, description,
+#   file_path, line, ...) and emits the same 6-field SEP-delimited layout
+#   previously produced from JSON. An optional synthetic @CONFIG@ row
+#   appended at the end carries the config_path for downstream consumers.
+tag_info_table_from_files() {
+	_tags_file="$1"
+	_config_table_file="$2"
+	_config_path="${3:-}"
+
+	if [ -z "$_tags_file" ] || [ ! -r "$_tags_file" ]; then
+		error_exit 1 "tag_info_table_from_files" "01_tags not readable"
 	fi
+	if [ -z "$_config_table_file" ] || [ ! -r "$_config_table_file" ]; then
+		error_exit 1 "tag_info_table_from_files" "01_config_table not readable"
+	fi
+
 	_sep="${SHTRACER_SEPARATOR}"
-	_tmp_file="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	_tmp_sort="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	_tmp_config_order="$(shtracer_tmpfile)" || error_exit 1 "tag_info_table_from_json_file" "Failed to create temporary file"
-	trap 'rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true' EXIT INT TERM
 
-	# Extract trace target order from config.md (both ## and ### headings)
-	_config_path="$(extract_json_string_field "$_JSON_FILE" "config_path")"
-	if [ -n "$_config_path" ] && [ -r "$_config_path" ]; then
-		awk '
-			/^##+ / {
-				heading = $0
-				sub(/^##+ /, "", heading)
-				sub(/[[:space:]]*$/, "", heading)
-				if (heading !~ /^[[:space:]]*$/ && !(heading in seen)) {
-					print ++order_idx, heading
-					seen[heading] = 1
-				}
-			}
-		' <"$_config_path" >"$_tmp_config_order"
-	fi
-
-	awk '
-		BEGIN {
-			in_files = 0
-			in_file_obj = 0
-			seen_files_key = 0
-			in_layers = 0
-			in_layer_obj = 0
-			seen_layers_key = 0
-			in_nodes = 0
-			in_obj = 0
-			seen_nodes_key = 0
-		}
-		function grab_str(s, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*\""
-			if (match(s, r)) {
-				v = s
-				sub(".*" r, "", v)
-				sub("\".*", "", v)
-				return v
-			}
-			return ""
-		}
-		function grab_int(s, key,   r, v) {
-			r = "\"" key "\"[[:space:]]*:[[:space:]]*"
-			if (match(s, r)) {
-				v = s
-				sub(".*" r, "", v)
-				sub("[^0-9].*", "", v)
-				return v
-			}
-			return ""
-		}
-		{
-			line = $0
-			gsub(/[\{\}\[\],]/, "&\n", line)
-			n = split(line, a, /\n/)
-
-			for (i = 1; i <= n; i++) {
-				t = a[i]
-				if (t == "") { continue }
-
-				# Parse files array
-				if (!in_files && t ~ /"files"[[:space:]]*:/) { seen_files_key = 1 }
-				if (!in_files && seen_files_key && t ~ /\[/) { in_files = 1; seen_files_key = 0 }
-				if (in_files && !in_file_obj && t ~ /\{/) { in_file_obj = 1; file_id = ""; file = "" }
-				if (in_file_obj) {
-					v = grab_int(t, "file_id"); if (v != "") { file_id = v }
-					v = grab_str(t, "file"); if (v != "") { file = v }
-					if (t ~ /\}/) {
-						if (file_id != "" && file != "") { file_map[file_id] = file }
-						in_file_obj = 0
-					}
-				}
-				if (in_files && !in_file_obj && t ~ /\]/) { in_files = 0 }
-
-				# Parse layers array
-				if (!in_layers && t ~ /"layers"[[:space:]]*:/) { seen_layers_key = 1 }
-				if (!in_layers && seen_layers_key && t ~ /\[/) { in_layers = 1; seen_layers_key = 0 }
-				if (in_layers && !in_layer_obj && t ~ /\{/) { in_layer_obj = 1; layer_id = ""; layer_name = "" }
-				if (in_layer_obj) {
-					v = grab_int(t, "layer_id"); if (v != "") { layer_id = v }
-					v = grab_str(t, "name"); if (v != "") { layer_name = v }
-					if (t ~ /\}/) {
-						if (layer_id != "" && layer_name != "") { layer_map[layer_id] = layer_name }
-						in_layer_obj = 0
-					}
-				}
-				if (in_layers && !in_layer_obj && t ~ /\]/) { in_layers = 0 }
-
-				# Parse trace_tags array
-				if (!in_nodes && t ~ /"trace_tags"[[:space:]]*:/) {
-					seen_nodes_key = 1
-				}
-				if (!in_nodes && seen_nodes_key && t ~ /\[/) {
-					in_nodes = 1
-					seen_nodes_key = 0
-				}
-
-				if (in_nodes && !in_obj && t ~ /\{/) {
-					in_obj = 1
-					id = ""
-					file_id = ""
-					layer_id = ""
-					ln = ""
-					idx = ""
-				}
-
-				if (in_obj) {
-					v = grab_str(t, "id"); if (v != "") { id = v }
-					v = grab_int(t, "file_id"); if (v != "") { file_id = v }
-					v = grab_int(t, "layer_id"); if (v != "") { layer_id = v }
-					v = grab_int(t, "line"); if (v != "") { ln = v }
-					v = grab_int(t, "index"); if (v != "") { idx = v }
-					v = grab_str(t, "description"); if (v != "") { desc = v }
-
-					# Collect from_tags array elements
-					if (t ~ /"from_tags"[[:space:]]*:/) { in_from_tags = 1; from_tags = ""; from_tag_sep = "" }
-					if (in_from_tags && t ~ /"@[^"]*@"/) {
-						v = grab_str(t, "");
-						if (v ~ /@[^@]*@/ && v != "NONE") {
-							from_tags = from_tags from_tag_sep v
-							from_tag_sep = ","
-						}
-					}
-					if (in_from_tags && t ~ /\]/) { in_from_tags = 0 }
-
-					if (t ~ /\}/) {
-						if (idx == "") { idx = 999999999 }
-						# Resolve file_id and layer_id to actual values
-						file = file_map[file_id]
-						trace_target = layer_map[layer_id]
-						if (id != "" && file != "" && ln != "") {
-							print idx "\t" id "\t" ln "\t" file "\t" trace_target "\t" desc "\t" from_tags
-						}
-						in_obj = 0
-						desc = ""
-						from_tags = ""
-					}
-				}
-
-				if (in_nodes && !in_obj && t ~ /\]/) {
-					in_nodes = 0
-				}
-			}
-		}
-	' <"$_JSON_FILE" \
-		| sort -k1,1n \
-			>"$_tmp_sort"
-
-	# Assign trace target order based on config.md heading order
-	awk -F '\t' -v sep="$_sep" -v config_order_file="$_tmp_config_order" \
+	# Emit rows sorted by config-table layer appearance order. The last
+	# segment of `trace_target` (after the trailing ":") is the "type" label
+	# that viewers use for sorting (e.g. "Requirement", "Architecture").
+	awk -F"$_sep" \
+		-v sep="$_sep" \
+		-v config_table="$_config_table_file" \
 		"$AWK_FN_GET_LAST_SEGMENT"'
 		BEGIN {
-			# Load config.md heading order
-			old_fs = FS
-			FS = " "
-			while ((getline line < config_order_file) > 0) {
-				split(line, parts, " ")
-				order_num = parts[1]
-				heading = parts[2]
-				for (i = 3; i in parts; i++) heading = heading " " parts[i]
-				config_order[heading] = order_num
+			# Build layer-order map from the config table. First appearance
+			# of each distinct layer name wins.
+			order_idx = 0
+			while ((getline line < config_table) > 0) {
+				n = split(line, f, sep)
+				if (n < 1 || f[1] == "") continue
+				name = get_last_segment(f[1])
+				if (name != "" && !(name in seen_layer)) {
+					seen_layer[name] = 1
+					layer_order[name] = ++order_idx
+				}
 			}
-			close(config_order_file)
-			FS = old_fs
+			close(config_table)
 		}
-		{
+		NF >= 6 && $2 != "" {
+			trace_target = $1
 			tag = $2
-			line = $3
-			file = $4
-			trace_target = $5
-			desc = $6
-			from_tags = $7
-
-			# Extract type from trace_target (last segment)
+			from_tags = $3
+			desc = $4
+			path = $5
+			line = $6
+			if (line == "" || line + 0 < 1) line = 1
+			# Root-layer tags have from_tags == "NONE"; flatten to empty so
+			# consumers do not render "NONE" as a parent tag.
+			if (from_tags == "NONE") from_tags = ""
 			type = get_last_segment(trace_target)
-
-			# Get order from config.md
-			order = config_order[type]
-			if (order == "") order = 999
-
-			# Output with order prefix for sorting
-			print order "\t" tag "\t" line "\t" file "\t" trace_target "\t" desc "\t" from_tags
-		}
-	' <"$_tmp_sort" \
-		| sort -k1,1n \
-		| awk -F '\t' -v sep="$_sep" -v OFS="" '
-			!seen[$2]++ {
-				print $2, sep, $3, sep, $4, sep, $5, sep, $6, sep, $7
+			order = (type in layer_order) ? layer_order[type] : 999
+			# Dedupe by tag (first row wins); preserve layer order.
+			if (!(tag in seen_tag)) {
+				seen_tag[tag] = 1
+				printf "%d\t%s%s%s%s%s%s%s%s%s%s\n", order, tag, sep, line, sep, path, sep, trace_target, sep, desc, sep from_tags
 			}
-		' >"$_tmp_file"
+		}
+	' "$_tags_file" \
+		| sort -k1,1n \
+		| cut -f2-
 
+	# Optional synthetic @CONFIG@ row so consumers can discover the config
+	# file from TAG_INFO_TABLE alone (mirrors the legacy JSON-based format).
 	if [ -n "$_config_path" ]; then
-		printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" '' >>"$_tmp_file"
+		printf '%s%s%s%s%s%s%s\n' '@CONFIG@' "$_sep" '1' "$_sep" "$_config_path" "$_sep" ''
 	fi
-
-	cat "$_tmp_file"
-	rm -f "$_tmp_file" "$_tmp_sort" "$_tmp_config_order" 2>/dev/null || true
-	trap - EXIT INT TERM
 }
 
 ##
-# @brief   Build TAG_TABLE from shtracer JSON output (chains)
-# @param   $1 : JSON_FILE
-# @return  Echoes TAG_TABLE rows to stdout (space-separated tags per line)
-tag_table_from_json_file() {
-	_JSON_FILE="$1"
-	if [ -z "$_JSON_FILE" ] || [ ! -r "$_JSON_FILE" ]; then
-		error_exit 1 "tag_table_from_json_file" "JSON file not readable"
+# @brief   Build TAG_TABLE (traceability chains) from intermediate file
+# @param   $1 : TAG_TABLE_FILE  (tags/04_tag_table)
+# @return  Echoes TAG_TABLE rows to stdout verbatim.
+# @details
+#   The 04_tag_table intermediate file already has the exact format the
+#   viewer expects (space-separated tags per chain, trailing "NONE" padding).
+#   This is a thin passthrough kept for symmetry with tag_info_table_from_files.
+tag_table_from_file() {
+	_tag_table="$1"
+	if [ -z "$_tag_table" ] || [ ! -r "$_tag_table" ]; then
+		error_exit 1 "tag_table_from_file" "04_tag_table not readable"
 	fi
-
-	awk '
-		BEGIN {
-			in_chains = 0
-			in_chain = 0
-			seen_chains_key = 0
-			out = ""
-		}
-		function grab_str(s,   v) {
-			v = s
-			sub(/^[[:space:]]*"/, "", v)
-			sub(/".*$/, "", v)
-			return v
-		}
-		{
-			line = $0
-			gsub(/[\{\}\[\],]/, "&\n", line)
-			n = split(line, a, /\n/)
-			for (i = 1; i <= n; i++) {
-				t = a[i]
-				if (t == "") { continue }
-
-				if (!in_chains && t ~ /"chains"[[:space:]]*:/) {
-					seen_chains_key = 1
-				}
-				if (!in_chains && seen_chains_key && t ~ /\[/) {
-					in_chains = 1
-					seen_chains_key = 0
-					continue
-				}
-
-				if (in_chains && !in_chain && t ~ /\[/) {
-					in_chain = 1
-					out = ""
-					continue
-				}
-
-				if (in_chain) {
-					if (t ~ /^[[:space:]]*"/) {
-						v = grab_str(t)
-						if (v != "") {
-							if (out == "") out = v
-							else out = out " " v
-						}
-					}
-					if (t ~ /\]/) {
-						if (out != "") print out
-						in_chain = 0
-						out = ""
-						continue
-					}
-				}
-
-				if (in_chains && !in_chain && t ~ /\]/) {
-					in_chains = 0
-				}
-			}
-		}
-	' <"$_JSON_FILE"
+	cat "$_tag_table"
 }
 
 ##
@@ -1583,7 +1018,6 @@ shtracer_viewer_main() {
 	}
 	_json_tmp="${_tmp_dir%/}/input.json"
 	_html_tmp="${_tmp_dir%/}/base.html"
-	_tag_table_tmp="${_tmp_dir%/}/tag_table"
 	_show_text_tmp="${_tmp_dir%/}/show_text.js"
 	_trace_js_tmp="${_tmp_dir%/}/traceability_diagrams.js"
 
@@ -1605,32 +1039,44 @@ shtracer_viewer_main() {
 		exit 1
 	fi
 
-	if [ -z "$TAG_TABLE_FILE" ]; then
-		_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
-		if [ -n "$_config_path" ]; then
-			_config_dir="$(dirname "$_config_path")"
-			_inferred_table="${_config_dir%/}/shtracer_output/tags/04_tag_table"
-			if [ -r "$_inferred_table" ]; then
-				TAG_TABLE_FILE="$_inferred_table"
-			fi
+	# Resolve OUTPUT_DIR from stdin JSON's metadata.config_path (Option B).
+	# The HTML viewer now reads everything but metadata from intermediate
+	# files; JSON is only used for (a) this lookup and (b) client-side
+	# embedding into the final HTML (traceabilityData).
+	_config_path="$(extract_json_string_field "$_json_tmp" "config_path")"
+	if [ -n "${OUTPUT_DIR:-}" ]; then
+		_HV_OUTPUT_DIR="${OUTPUT_DIR%/}"
+	elif [ -n "$_config_path" ]; then
+		_HV_OUTPUT_DIR="$(dirname "$_config_path")/shtracer_output"
+	else
+		_HV_OUTPUT_DIR="./shtracer_output"
+	fi
+	OUTPUT_DIR="$_HV_OUTPUT_DIR"
+	export OUTPUT_DIR
+
+	_HV_TAGS_FILE="${_HV_OUTPUT_DIR}/tags/01_tags"
+	_HV_CONFIG_TABLE="${_HV_OUTPUT_DIR}/config/01_config_table"
+	_HV_TAG_TABLE="${_HV_OUTPUT_DIR}/tags/04_tag_table"
+
+	# Sanity-check required intermediate files
+	for _f in "$_HV_TAGS_FILE" "$_HV_CONFIG_TABLE" "$_HV_TAG_TABLE"; do
+		if [ ! -r "$_f" ]; then
+			echo "[shtracer_html_viewer.sh][error]: required intermediate file missing: $_f" 1>&2
+			exit 1
 		fi
+	done
+
+	# --tag-table override still honored for debugging / custom layouts.
+	if [ -z "$TAG_TABLE_FILE" ]; then
+		TAG_TABLE_FILE="$_HV_TAG_TABLE"
 	fi
 
-	if [ -n "$TAG_TABLE_FILE" ] && [ ! -r "$TAG_TABLE_FILE" ]; then
+	if [ ! -r "$TAG_TABLE_FILE" ]; then
 		echo "[shtracer_html_viewer.sh][error]: tag table not readable: $TAG_TABLE_FILE" 1>&2
 		exit 1
 	fi
 
-	if [ -z "$TAG_TABLE_FILE" ]; then
-		tag_table_from_json_file "$_json_tmp" >"$_tag_table_tmp"
-		if [ ! -s "$_tag_table_tmp" ]; then
-			echo "[shtracer_html_viewer.sh][error]: cannot build tag table from JSON (missing/empty chains)" 1>&2
-			exit 1
-		fi
-		TAG_TABLE_FILE="$_tag_table_tmp"
-	fi
-
-	_TAG_INFO_TABLE="$(tag_info_table_from_json_file "$_json_tmp")"
+	_TAG_INFO_TABLE="$(tag_info_table_from_files "$_HV_TAGS_FILE" "$_HV_CONFIG_TABLE" "$_config_path")"
 
 	convert_template_html "$TAG_TABLE_FILE" "$_TAG_INFO_TABLE" "$_json_tmp" >"$_html_tmp"
 	convert_template_js "$_TAG_INFO_TABLE" >"$_show_text_tmp"
