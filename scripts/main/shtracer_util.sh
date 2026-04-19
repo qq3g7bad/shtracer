@@ -514,9 +514,3 @@ _UTIL_SCRIPT_DIR="${_UTIL_SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 if [ -f "${_UTIL_SCRIPT_DIR}/shtracer_awk_helpers.sh" ]; then
 	. "${_UTIL_SCRIPT_DIR}/shtracer_awk_helpers.sh"
 fi
-
-# Source JSON parser functions (provides json_parse_* functions for JSON processing)
-# shellcheck source=scripts/main/shtracer_json_parser.sh
-if [ -f "${_UTIL_SCRIPT_DIR}/shtracer_json_parser.sh" ]; then
-	. "${_UTIL_SCRIPT_DIR}/shtracer_json_parser.sh"
-fi

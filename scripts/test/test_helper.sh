@@ -86,18 +86,12 @@ shtracer_test_source_modules() {
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 				;;
 			markdown_viewer)
-				# shellcheck source=../main/shtracer_json_parser.sh
-				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 				# shellcheck source=../main/shtracer_markdown_viewer.sh
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 				;;
 			awk_helpers)
 				# shellcheck source=../main/shtracer_awk_helpers.sh
 				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_awk_helpers.sh"
-				;;
-			json_parser)
-				# shellcheck source=../main/shtracer_json_parser.sh
-				. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 				;;
 			*)
 				echo "[WARNING] Unknown module: $_module" >&2
