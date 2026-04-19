@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/qq3g7bad/shtracer/blob/main/docs/output.schema.json",
+  "title": "shtracer output",
+  "description": "Public JSON contract for the stdout of `shtracer <config>`. External consumers (jq, CI gates, custom tooling) depend on this shape; intermediate files under OUTPUT_DIR are a separate, private contract used by viewers.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "verificationErrors",
+    "files",
+    "layers",
+    "trace_tags",
+    "chains",
+    "health"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "generated", "config_path"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "shtracer version that produced this output."
+        },
+        "generated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp (RFC 3339 / ISO 8601) when the output was produced."
+        },
+        "config_path": {
+          "type": "string",
+          "description": "Absolute path to the config.md used for this run."
+        }
+      }
+    },
+
+    "verificationErrors": {
+      "type": "object",
+      "description": "Tag-level verification problems detected during extraction.",
+      "required": ["isolated", "duplicates", "dangling"],
+      "additionalProperties": false,
+      "properties": {
+        "isolated": {
+          "type": "array",
+          "description": "Tags with no upstream or downstream link.",
+          "items": { "$ref": "#/$defs/tagLocation" }
+        },
+        "duplicates": {
+          "type": "array",
+          "description": "Tag IDs that appear in more than one location.",
+          "items": { "$ref": "#/$defs/tagLocation" }
+        },
+        "dangling": {
+          "type": "array",
+          "description": "Tags that reference a parent tag that does not exist.",
+          "items": { "$ref": "#/$defs/danglingReference" }
+        }
+      }
+    },
+
+    "files": {
+      "type": "array",
+      "description": "Files scanned during this run. `file_id` is the stable handle used everywhere else in the document.",
+      "items": {
+        "type": "object",
+        "required": ["file_id", "file", "version"],
+        "additionalProperties": false,
+        "properties": {
+          "file_id": { "$ref": "#/$defs/fileId" },
+          "file": {
+            "type": "string",
+            "description": "Absolute filesystem path."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version stamp. `git:<sha>` for files tracked in git, `mtime:<iso8601>` otherwise.",
+            "pattern": "^(git:[0-9a-f]+|mtime:.+)$"
+          }
+        }
+      }
+    },
+
+    "layers": {
+      "type": "array",
+      "description": "Ordered layers (Requirement, Architecture, Implementation, ...). Order matches config.md.",
+      "items": {
+        "type": "object",
+        "required": [
+          "layer_id",
+          "name",
+          "pattern",
+          "file_ids",
+          "total_tags",
+          "upstream_layers",
+          "downstream_layers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "layer_id": { "$ref": "#/$defs/layerId" },
+          "name": { "type": "string" },
+          "pattern": {
+            "type": "string",
+            "description": "Regex pattern that matches tags in this layer (as written in config.md, minus surrounding backticks/quotes)."
+          },
+          "file_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/fileId" }
+          },
+          "total_tags": { "type": "integer", "minimum": 0 },
+          "upstream_layers": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "downstream_layers": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "trace_tags": {
+      "type": "array",
+      "description": "Every extracted tag with its parent links and source location.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "from_tags",
+          "description",
+          "file_id",
+          "line",
+          "layer_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/tagId" },
+          "from_tags": {
+            "type": "array",
+            "description": "Parent (upstream) tag IDs. Empty array for root-layer tags.",
+            "items": { "$ref": "#/$defs/tagId" }
+          },
+          "description": { "type": "string" },
+          "file_id": { "$ref": "#/$defs/fileId" },
+          "line": { "type": "integer", "minimum": 1 },
+          "layer_id": { "$ref": "#/$defs/layerId" }
+        }
+      }
+    },
+
+    "chains": {
+      "type": "array",
+      "description": "Fully expanded root-to-leaf tag chains. Short chains are right-padded with the literal string \"NONE\" so every row has the same length.",
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "oneOf": [
+            { "$ref": "#/$defs/tagId" },
+            { "const": "NONE" }
+          ]
+        }
+      }
+    },
+
+    "health": {
+      "type": "object",
+      "description": "Aggregated health + coverage figures. Mirrors `verificationErrors` but includes counts and coverage percentages.",
+      "required": [
+        "total_tags",
+        "tags_with_links",
+        "isolated_tags",
+        "isolated_tag_list",
+        "duplicate_tags",
+        "duplicate_tag_list",
+        "dangling_references",
+        "dangling_reference_list",
+        "coverage"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "total_tags": { "type": "integer", "minimum": 0 },
+        "tags_with_links": { "type": "integer", "minimum": 0 },
+        "isolated_tags": { "type": "integer", "minimum": 0 },
+        "isolated_tag_list": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tagLocation" }
+        },
+        "duplicate_tags": { "type": "integer", "minimum": 0 },
+        "duplicate_tag_list": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tagLocation" }
+        },
+        "dangling_references": { "type": "integer", "minimum": 0 },
+        "dangling_reference_list": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/danglingReference" }
+        },
+        "coverage": {
+          "type": "object",
+          "required": ["layers"],
+          "additionalProperties": false,
+          "properties": {
+            "layers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "layer_id",
+                  "name",
+                  "total",
+                  "upstream",
+                  "downstream",
+                  "files"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "layer_id": { "$ref": "#/$defs/layerId" },
+                  "name": { "type": "string" },
+                  "total": { "type": "integer", "minimum": 0 },
+                  "upstream": { "$ref": "#/$defs/coverageSide" },
+                  "downstream": { "$ref": "#/$defs/coverageSide" },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "file_id",
+                        "total",
+                        "upstream",
+                        "downstream",
+                        "version"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "file_id": { "$ref": "#/$defs/fileId" },
+                        "total": { "type": "integer", "minimum": 0 },
+                        "upstream": { "$ref": "#/$defs/coverageSide" },
+                        "downstream": { "$ref": "#/$defs/coverageSide" },
+                        "version": {
+                          "type": "string",
+                          "pattern": "^(git:[0-9a-f]+|mtime:.+)$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "tagId": {
+      "type": "string",
+      "description": "A tag identifier as written in source, e.g. \"@REQ1.1@\".",
+      "pattern": "^@.+@$"
+    },
+    "fileId": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based index into the top-level `files` array. -1 is reserved for \"unknown file\" in error records."
+    },
+    "layerId": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based index into the top-level `layers` array."
+    },
+    "tagLocation": {
+      "type": "object",
+      "required": ["id", "file_id", "line"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/tagId" },
+        "file_id": {
+          "type": "integer",
+          "minimum": -1,
+          "description": "Usually a valid file_id; -1 means the source file could not be resolved."
+        },
+        "line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "danglingReference": {
+      "type": "object",
+      "required": ["child_tag", "missing_parent", "file_id", "line"],
+      "additionalProperties": false,
+      "properties": {
+        "child_tag": { "$ref": "#/$defs/tagId" },
+        "missing_parent": { "$ref": "#/$defs/tagId" },
+        "file_id": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "coverageSide": {
+      "type": "object",
+      "description": "Per-direction coverage (upstream = has parent links, downstream = has child links).",
+      "required": ["count", "percent"],
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    }
+  }
+}
