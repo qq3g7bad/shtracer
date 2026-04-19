@@ -48,8 +48,10 @@ fi
 echo ""
 
 # Run integration tests
+# Match only *_test.sh — excludes utilities like validate_schema.sh that read
+# stdin and would hang when stdin is a terminal.
 shtracer_test_section_header "Running Integration Tests"
-for test_file in ./integration_test/*.sh; do
+for test_file in ./integration_test/*_test.sh; do
 	if [ -f "$test_file" ] && [ -x "$test_file" ]; then
 		sh -c "$test_file"
 		EXIT_CODE=$?
