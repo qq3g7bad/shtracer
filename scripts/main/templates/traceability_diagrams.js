@@ -664,6 +664,7 @@ function renderHealth(data) {
             const tagId = item.id || '';
             const fileId = item.file_id;
             const line = item.line || 1;
+            let layerName = '';
 
             // Resolve file path
             let filePath = 'unknown';
@@ -679,7 +680,6 @@ function renderHealth(data) {
 
                 // Get tag info from traceabilityData
                 let tagDescription = '';
-                let layerName = '';
                 let fromTags = '';
                 const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === tagId);
                 if (tagNode) {
@@ -797,6 +797,7 @@ function renderHealth(data) {
             const missingParent = item.missing_parent || '';
             const fileId = item.file_id;
             const line = item.line || 1;
+            let layerName = '';
 
             // Resolve file path
             let filePath = 'unknown';
@@ -812,7 +813,6 @@ function renderHealth(data) {
 
                 // Get tag info from traceabilityData
                 let tagDescription = '';
-                let layerName = '';
                 let fromTags = '';
                 const tagNode = (data.trace_tags || data.nodes || []).find(t => t.id === childTag);
                 if (tagNode) {
