@@ -81,6 +81,19 @@ test_remove_comments_strips_bullet_points() {
 	assertEquals "Bullet points should be removed" "0" "$_bullet_count"
 }
 
+test_remove_comments_strips_hyphen_bullet_points() {
+	_test_config="${OUTPUT_DIR%/}/config_hyphen_bullets.md"
+	cat >"$_test_config" <<'EOF'
+## Requirement
+- **PATH**: "./requirements.md"
+  - **TAG FORMAT**: `@REQ[0-9\.]+@`
+EOF
+
+	_result=$(_check_config_remove_comments "$_test_config")
+	_bullet_count=$(echo "$_result" | grep -c '^[[:space:]]*[-*] ' || true)
+	assertEquals "Hyphen and asterisk bullet points should be removed" "0" "$_bullet_count"
+}
+
 test_remove_comments_empty_config() {
 	_result=$(_check_config_remove_comments "./unit_test/testdata/config_empty.md")
 	# Should have only the heading, no fields

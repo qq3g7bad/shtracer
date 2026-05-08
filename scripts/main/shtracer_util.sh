@@ -213,7 +213,7 @@ remove_empty_lines() {
 # @return Cleaned lines via stdout (reads stdin)
 # @example echo "* item" | remove_leading_bullets returns "item"
 remove_leading_bullets() {
-	sed 's/^[[:space:]]*\* //'
+	sed 's/^[[:space:]]*[-*] //'
 }
 
 ##
