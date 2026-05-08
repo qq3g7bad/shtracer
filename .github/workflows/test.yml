@@ -94,6 +94,13 @@ jobs:
           grep -q "traceabilityData" ./sample/shtracer_output/output.html || exit 1
           echo "HTML generation verified."
 
+      # Step 6b: Validate JSON output against docs/output.schema.json
+      - name: Validate JSON output matches public schema
+        run: |
+          ./shtracer ./sample/config.md 2>/dev/null \
+            | ./scripts/test/integration_test/validate_schema.sh
+          echo "Public JSON schema conformance verified."
+
       # Step 7: Upload logs if tests fail
       - name: Upload test logs on failure
         if: failure()

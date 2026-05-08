@@ -481,6 +481,72 @@ describe('calculateSankeyDimensions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// renderHealth
+// ---------------------------------------------------------------------------
+describe('renderHealth', () => {
+  it('renders isolated tags even when file_id cannot be resolved', () => {
+    const localCtx = loadDiagramFunctions({
+      traceabilityData: {
+        layers: [{ name: 'Requirement' }],
+        files: [{ file_id: 0, file: 'docs/req.md' }],
+        trace_tags: [{ id: 'REQ-001', description: 'Requirement', layer_id: 0, from_tags: [] }],
+      },
+    });
+    const element = { innerHTML: '' };
+    localCtx.document.getElementById = (id) => (id === 'traceability-health' ? element : null);
+
+    assert.doesNotThrow(() => {
+      localCtx.renderHealth({
+        files: [{ file_id: 0, file: 'docs/req.md' }],
+        layers: [{ name: 'Requirement' }],
+        trace_tags: [{ id: 'REQ-001', description: 'Requirement', layer_id: 0, from_tags: [] }],
+        health: {
+          total_tags: 1,
+          tags_with_links: 0,
+          isolated_tags: 1,
+          isolated_tag_list: [{ id: 'REQ-001', file_id: 99, line: 3 }],
+          duplicate_tags: 0,
+          dangling_references: 0,
+        },
+      });
+    });
+
+    assert.match(element.innerHTML, /REQ-001/);
+  });
+
+  it('renders dangling references even when file_id cannot be resolved', () => {
+    const localCtx = loadDiagramFunctions({
+      traceabilityData: {
+        layers: [{ name: 'Architecture' }],
+        files: [{ file_id: 0, file: 'docs/arc.md' }],
+        trace_tags: [{ id: 'ARC-002', description: 'Architecture item', layer_id: 0, from_tags: ['REQ-001'] }],
+      },
+    });
+    const element = { innerHTML: '' };
+    localCtx.document.getElementById = (id) => (id === 'traceability-health' ? element : null);
+
+    assert.doesNotThrow(() => {
+      localCtx.renderHealth({
+        files: [{ file_id: 0, file: 'docs/arc.md' }],
+        layers: [{ name: 'Architecture' }],
+        trace_tags: [{ id: 'ARC-002', description: 'Architecture item', layer_id: 0, from_tags: ['REQ-001'] }],
+        health: {
+          total_tags: 1,
+          tags_with_links: 0,
+          isolated_tags: 0,
+          duplicate_tags: 0,
+          dangling_references: 1,
+          dangling_reference_list: [{ child_tag: 'ARC-002', missing_parent: 'REQ-404', file_id: 99, line: 8 }],
+        },
+      });
+    });
+
+    assert.match(element.innerHTML, /ARC-002/);
+    assert.match(element.innerHTML, /REQ-404/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // reorderNodesByBarycenter
 // ---------------------------------------------------------------------------
 describe('reorderNodesByBarycenter', () => {

@@ -19,8 +19,6 @@ cd "${TEST_ROOT}" || exit 1
 
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
-# shellcheck source=../../main/shtracer_json_parser.sh
-. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_json_parser.sh"
 # shellcheck source=../../main/shtracer_markdown_viewer.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_markdown_viewer.sh"
 # shellcheck source=../test_helper.sh
@@ -64,6 +62,33 @@ oneTimeSetUp() {
 setUp() {
 	set +u
 	export SHTRACER_IS_PROFILE_ENABLE="$SHTRACER_FALSE"
+	# Globals expected by new intermediate-file viewer functions.
+	_MD_VERSION="0.2.0"
+	_MD_GENERATED="2026-01-15T10:30:00Z"
+	_MD_CONFIG_PATH="/path/to/config.md"
+
+	# Empty fixture files for intermediate-file-based viewer helpers.
+	# Without these, awk reads from stdin and hangs the test.
+	_MD_FIXTURE_DIR=$(mktemp -d 2>/dev/null)
+	mkdir -p "${_MD_FIXTURE_DIR}/config" "${_MD_FIXTURE_DIR}/tags"
+	_MD_TAGS_DIR="${_MD_FIXTURE_DIR}/tags"
+	_MD_CONFIG_TABLE="${_MD_FIXTURE_DIR}/config/01_config_table"
+	_MD_TAGS_FILE="${_MD_TAGS_DIR}/01_tags"
+	_MD_TAG_TABLE="${_MD_TAGS_DIR}/04_tag_table"
+	_MD_HEALTH="${_MD_TAGS_DIR}/health_summary"
+	: >"$_MD_CONFIG_TABLE"
+	: >"$_MD_TAGS_FILE"
+	: >"$_MD_TAG_TABLE"
+	: >"$_MD_HEALTH"
+}
+
+##
+# @brief TearDown — remove per-test fixture directory
+#
+tearDown() {
+	if [ -n "${_MD_FIXTURE_DIR:-}" ] && [ -d "$_MD_FIXTURE_DIR" ]; then
+		rm -rf "$_MD_FIXTURE_DIR"
+	fi
 }
 
 # ============================================================================

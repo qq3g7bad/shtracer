@@ -719,13 +719,19 @@ END { printf "\n" }
 		#       needed by HTML/Markdown viewers for cross-reference tables
 
 		# STEP 9: Generate health section with restructured coverage
+		# Also writes intermediate file ${OUTPUT_DIR}/tags/health_summary used
+		# by viewers (markdown/html) as their stable input contract.
 		_FILE_MAPPING_TEMP2="${OUTPUT_DIR%/}/file_mapping.tmp"
+		_HEALTH_SUMMARY_FILE="${OUTPUT_DIR%/}/tags/health_summary"
+		[ -d "${OUTPUT_DIR%/}/tags" ] || mkdir -p "${OUTPUT_DIR%/}/tags"
+		rm -f "$_HEALTH_SUMMARY_FILE"
 		awk -v tag_output_data="$_TAG_OUTPUT_DATA" \
 			-v tag_pairs="$_TAG_PAIRS" \
 			-v tag_pairs_downstream="$_TAG_PAIRS_DOWNSTREAM" \
 			-v config_table="$_CONFIG_TABLE" \
 			-v file_mapping="$_FILE_MAPPING_TEMP2" \
 			-v output_dir="${OUTPUT_DIR%/}" \
+			-v hs_file="$_HEALTH_SUMMARY_FILE" \
 			-v sep="$SHTRACER_SEPARATOR" \
 			"$AWK_FN_JSON_ESCAPE"'
 
@@ -1002,6 +1008,75 @@ END { printf "\n" }
 				if (has_up) file_up[file_key] = (file_up[file_key] + 0) + 1
 				if (has_down) file_down[file_key] = (file_down[file_key] + 0) + 1
 			}
+
+			# Emit intermediate file tags/health_summary (viewer contract)
+			# Uses file_path directly so viewers do not need a file_id map.
+			print "[SUMMARY]" > hs_file
+			printf "%d%s%d%s%d%s%d%s%d\n", total_tags, sep, tags_with_links_count, sep, isolated_count, sep, duplicate_count, sep, dangling_count > hs_file
+
+			print "[LAYERS]" > hs_file
+			hs_layer_id = 0
+			for (hs_i = 0; hs_i < n_layers; hs_i++) {
+				hs_layer = ordered_layers[hs_i]
+				if (!(hs_layer in layer_total)) continue
+				hs_total = layer_total[hs_layer]
+				hs_up = layer_up_count[hs_layer] + 0
+				hs_down = layer_down_count[hs_layer] + 0
+				hs_up_pct = (hs_total > 0) ? (hs_up * 100.0 / hs_total) : 0.0
+				hs_down_pct = (hs_total > 0) ? (hs_down * 100.0 / hs_total) : 0.0
+				printf "%d%s%s%s%d%s%d%s%.1f%s%d%s%.1f\n", hs_layer_id, sep, hs_layer, sep, hs_total, sep, hs_up, sep, hs_up_pct, sep, hs_down, sep, hs_down_pct > hs_file
+				hs_layer_out_id[hs_layer] = hs_layer_id
+				hs_layer_id++
+			}
+
+			print "[LAYER_FILES]" > hs_file
+			for (hs_fk in file_total) {
+				hs_nsplit = split(hs_fk, hs_parts, "|")
+				if (hs_nsplit < 2) continue
+				hs_layer = hs_parts[1]
+				hs_path = hs_parts[2]
+				if (!(hs_layer in hs_layer_out_id)) continue
+				hs_out_lid = hs_layer_out_id[hs_layer]
+				hs_ft = file_total[hs_fk]
+				hs_fu = file_up[hs_fk] + 0
+				hs_fd = file_down[hs_fk] + 0
+				hs_fu_pct = (hs_ft > 0) ? (hs_fu * 100.0 / hs_ft) : 0.0
+				hs_fd_pct = (hs_ft > 0) ? (hs_fd * 100.0 / hs_ft) : 0.0
+				hs_ver = file_version[hs_fk]
+				if (hs_ver == "") hs_ver = "unknown"
+				printf "%d%s%s%s%d%s%d%s%.1f%s%d%s%.1f%s%s\n", hs_out_lid, sep, hs_path, sep, hs_ft, sep, hs_fu, sep, hs_fu_pct, sep, hs_fd, sep, hs_fd_pct, sep, hs_ver > hs_file
+			}
+
+			print "[ISOLATED]" > hs_file
+			for (hs_i = 0; hs_i < isolated_count; hs_i++) {
+				hs_tag = isolated_tags[hs_i]
+				hs_path = tag_file[hs_tag]
+				if (hs_path == "") hs_path = "unknown"
+				hs_ln = isolated_line[hs_i]
+				if (hs_ln == "" || hs_ln + 0 < 1) hs_ln = 1
+				printf "%s%s%s%s%d\n", hs_tag, sep, hs_path, sep, hs_ln > hs_file
+			}
+
+			print "[DUPLICATE]" > hs_file
+			for (hs_i = 0; hs_i < duplicate_count; hs_i++) {
+				hs_tag = duplicate_tags[hs_i]
+				hs_path = tag_file[hs_tag]
+				if (hs_path == "") hs_path = "unknown"
+				hs_ln = duplicate_line[hs_i]
+				if (hs_ln == "" || hs_ln + 0 < 1) hs_ln = 1
+				printf "%s%s%s%s%d\n", hs_tag, sep, hs_path, sep, hs_ln > hs_file
+			}
+
+			print "[DANGLING]" > hs_file
+			for (hs_i = 0; hs_i < dangling_count; hs_i++) {
+				hs_path = dangling_file_path[hs_i]
+				if (hs_path == "") hs_path = "unknown"
+				hs_ln = dangling_line[hs_i]
+				if (hs_ln == "" || hs_ln + 0 < 1) hs_ln = 1
+				printf "%s%s%s%s%s%s%d\n", dangling_child[hs_i], sep, dangling_parent[hs_i], sep, hs_path, sep, hs_ln > hs_file
+			}
+
+			close(hs_file)
 
 			# Output health section
 			printf "  \"health\": {\n"

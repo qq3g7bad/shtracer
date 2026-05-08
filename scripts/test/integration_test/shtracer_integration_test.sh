@@ -966,6 +966,47 @@ EOF
 	)
 }
 
+##
+# @brief Output JSON conforms to docs/output.schema.json (required-key structure).
+test_json_output_schema_conformance() {
+	(
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		_JSON_OUT=$("${SHTRACER_BIN}" ./config_integration.md 2>/dev/null)
+		assertEquals "shtracer should exit 0" 0 $?
+
+		printf '%s' "${_JSON_OUT}" \
+			| "${SCRIPT_DIR%/}/validate_schema.sh" >/tmp/shtracer_schema_err.$$ 2>&1
+		_VALIDATE_EXIT=$?
+		if [ "${_VALIDATE_EXIT}" -ne 0 ]; then
+			echo "--- validator output ---"
+			cat /tmp/shtracer_schema_err.$$
+		fi
+		rm -f /tmp/shtracer_schema_err.$$
+		assertEquals "JSON output must conform to docs/output.schema.json" \
+			0 "${_VALIDATE_EXIT}"
+	)
+}
+
+##
+# @brief Validator detects schema drift (regression guard for the validator itself).
+test_schema_validator_detects_drift() {
+	(
+		cd "${TEST_DATA_DIR}" || exit 1
+
+		_JSON_OUT=$("${SHTRACER_BIN}" ./config_integration.md 2>/dev/null)
+
+		# Drop a required top-level key — validator must fail.
+		_DRIFTED=$(printf '%s' "${_JSON_OUT}" \
+			| awk 'BEGIN{skip=0} /^  "health":/{skip=1} skip==0{print} skip==1 && /^  }/{skip=0; next}')
+		printf '%s' "${_DRIFTED}" \
+			| "${SCRIPT_DIR%/}/validate_schema.sh" >/dev/null 2>&1
+		_DRIFT_EXIT=$?
+		assertNotEquals "validator must reject JSON missing required keys" \
+			0 "${_DRIFT_EXIT}"
+	)
+}
+
 # zsh compatibility: shunit2 requires shwordsplit and SHUNIT_PARENT in zsh
 if [ -n "${ZSH_VERSION:-}" ]; then
 	setopt shwordsplit

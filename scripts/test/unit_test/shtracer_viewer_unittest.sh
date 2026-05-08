@@ -22,6 +22,10 @@ export SHTRACER_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
 # shellcheck source=../../main/shtracer_util.sh
 . "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_util.sh"
+# AWK helpers resolve their lib dir from $0; set it explicitly so sourcing works.
+_UTIL_SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}/scripts/main"
+# shellcheck source=../../main/shtracer_awk_helpers.sh
+. "${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_awk_helpers.sh"
 
 # Version to use in test fixtures (should match SHTRACER_VERSION in main script)
 SHTRACER_VERSION='0.1.3'
@@ -61,134 +65,138 @@ tearDown() {
 # @brief  Test for convert_template_html with valid inputs
 # @tag    @UT3.4@ (FROM: @IMP3.1.1@)
 test_convert_template_html_with_valid_inputs() {
-	(
-		# Arrange ---------
-		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		mkdir -p "$OUTPUT_DIR/tags"
-		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
-		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
+	# Arrange ---------
+	SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
+	mkdir -p "$OUTPUT_DIR/tags"
+	echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
+	echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}./test.md" >"$OUTPUT_DIR/tags/test_info"
 
-		# Act -------------
-		_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info")"
+	# Act -------------
+	_RESULT="$(convert_template_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_info")"
 
-		# Assert ----------
-		assertEquals 0 "$?"
-		assertNotEquals "" "$_RESULT"
-		assertNotEquals "" "$(echo "$_RESULT" | grep "<table")"
-	)
+	# Assert ----------
+	assertEquals 0 "$?"
+	assertNotEquals "" "$_RESULT"
+	assertNotEquals "" "$(echo "$_RESULT" | grep "<table")"
 }
 
 ##
 # @brief  Test for convert_template_js with valid inputs
 # @tag    @UT3.5@ (FROM: @IMP3.1.2@)
 test_convert_template_js_with_valid_inputs() {
-	(
-		# Arrange ---------
-		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		mkdir -p "$OUTPUT_DIR/test_dir"
-		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
+	# Arrange ---------
+	SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
+	mkdir -p "$OUTPUT_DIR/test_dir"
+	echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
 
-		# Use absolute path for test file
-		_TEST_FILE="$(
-			unset CDPATH
-			cd "$OUTPUT_DIR/test_dir" && pwd -P
-		)/test_file.md"
-		echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
+	# Use absolute path for test file
+	_TEST_FILE="$(
+		unset CDPATH
+		cd "$OUTPUT_DIR/test_dir" && pwd -P
+	)/test_file.md"
+	echo "@TAG1@${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}${_TEST_FILE}" >"$OUTPUT_DIR/test_info"
 
-		# Act -------------
-		_RESULT="$(convert_template_js "$OUTPUT_DIR/test_info" 2>&1)"
+	# Act -------------
+	_RESULT="$(convert_template_js "$OUTPUT_DIR/test_info" 2>&1)"
 
-		# Assert ----------
-		# Check if function completes (may have warnings but should produce output)
-		assertNotEquals "" "$_RESULT"
-		# Check if output contains expected patterns
-		if echo "$_RESULT" | grep -q "Target_"; then
-			assertTrue "Output contains Target_ prefix" "true"
-		else
-			# Function may have different output format, which is acceptable
-			assertTrue "Function completed" "true"
-		fi
-	)
+	# Assert ----------
+	# Check if function completes (may have warnings but should produce output)
+	assertNotEquals "" "$_RESULT"
+	# Check if output contains expected patterns
+	if echo "$_RESULT" | grep -q "Target_"; then
+		assertTrue "Output contains Target_ prefix" "true"
+	else
+		# Function may have different output format, which is acceptable
+		assertTrue "Function completed" "true"
+	fi
 }
 
 ##
 # @brief  Test for make_html with valid inputs
 # @tag    @UT3.6@ (FROM: @IMP3.1.3@)
 test_make_html_with_valid_inputs() {
-	(
-		# Arrange ---------
-		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		export CONFIG_PATH="./unit_test/testdata/config_minimal_single_file.md"
-		mkdir -p "$OUTPUT_DIR/tags"
-		mkdir -p "$OUTPUT_DIR/uml"
-		echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
-		echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./unit_test/testdata/requirements_minimal.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
-		echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
+	# Arrange ---------
+	SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
+	export CONFIG_PATH="./unit_test/testdata/config_minimal_single_file.md"
+	mkdir -p "$OUTPUT_DIR/tags"
+	mkdir -p "$OUTPUT_DIR/uml"
+	echo "@TAG1@ @TAG2@" >"$OUTPUT_DIR/tags/test_table"
+	echo ":Test${SHTRACER_SEPARATOR}@TAG1@${SHTRACER_SEPARATOR}NONE${SHTRACER_SEPARATOR}Title${SHTRACER_SEPARATOR}./unit_test/testdata/requirements_minimal.md${SHTRACER_SEPARATOR}1${SHTRACER_SEPARATOR}1" >"$OUTPUT_DIR/tags/test_tags"
+	echo "flowchart TB" >"$OUTPUT_DIR/uml/test_uml"
 
-		# Act -------------
-		make_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_tags"
+	# Act -------------
+	make_html "$OUTPUT_DIR/tags/test_table" "$OUTPUT_DIR/tags/test_tags"
 
-		# Assert ----------
-		assertEquals 0 "$?"
-		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/output.html" ]
-			echo "$?"
-		)"
-		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/assets/show_text.js" ]
-			echo "$?"
-		)"
-		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/assets/template.css" ]
-			echo "$?"
-		)"
-		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/assets/traceability_diagrams.js" ]
-			echo "$?"
-		)"
+	# Assert ----------
+	assertEquals 0 "$?"
+	assertEquals 0 "$(
+		[ -f "$OUTPUT_DIR/output.html" ]
+		echo "$?"
+	)"
+	assertEquals 0 "$(
+		[ -f "$OUTPUT_DIR/assets/show_text.js" ]
+		echo "$?"
+	)"
+	assertEquals 0 "$(
+		[ -f "$OUTPUT_DIR/assets/template.css" ]
+		echo "$?"
+	)"
+	assertEquals 0 "$(
+		[ -f "$OUTPUT_DIR/assets/traceability_diagrams.js" ]
+		echo "$?"
+	)"
 
-		# Check HTML content
-		grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should have DOCTYPE" 0 $?
+	# Check HTML content
+	grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should have DOCTYPE" 0 $?
 
-		grep -q "Traceability Report" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should have unified title" 0 $?
+	grep -q "Traceability Report" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should have unified title" 0 $?
 
-		grep -q "Executive Summary" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should have Executive Summary section" 0 $?
+	grep -q "Executive Summary" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should have Executive Summary section" 0 $?
 
-		grep -q "Traceability Health" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should have Traceability Health section" 0 $?
+	grep -q "Traceability Health" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should have Traceability Health section" 0 $?
 
-		grep -q "<table" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should contain table" 0 $?
+	grep -q "<table" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should contain table" 0 $?
 
-		grep -q "d3js.org" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should include D3.js" 0 $?
+	grep -q "d3js.org" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should include D3.js" 0 $?
 
-		grep -q "sankey-diagram" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should contain Sankey diagram container" 0 $?
+	grep -q "sankey-diagram" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should contain Sankey diagram container" 0 $?
 
-		grep -q "traceability_diagrams.js" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should include traceability_diagrams.js" 0 $?
+	grep -q "traceability_diagrams.js" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should include traceability_diagrams.js" 0 $?
 
-		# Regression: file list links must not contain invalid ""1"" token
-		grep -q '""1""' "$OUTPUT_DIR/output.html"
-		assertNotEquals "Trace target links should use numeric line 1" 0 $?
-	)
+	# Regression: file list links must not contain invalid ""1"" token
+	grep -q '""1""' "$OUTPUT_DIR/output.html"
+	assertNotEquals "Trace target links should use numeric line 1" 0 $?
 }
 
 ##
-# @brief  Test for shtracer_html_viewer.sh (stdin JSON -> stdout HTML)
+# @brief  Test for shtracer_html_viewer.sh (stdin JSON + intermediate files -> stdout HTML)
 test_shtracer_viewer_single_file_output() {
-	(
-		# Arrange ---------
-		SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
-		SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
-		mkdir -p "$OUTPUT_DIR/test_dir"
-		echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
-		_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
-		cat >"$OUTPUT_DIR/output.json" <<EOF
+	# Arrange ---------
+	SHTRACER_VIEWER="${SHTRACER_ROOT_DIR%/}/scripts/main/shtracer_html_viewer.sh"
+	SCRIPT_DIR="${SHTRACER_ROOT_DIR%/}"
+	mkdir -p "$OUTPUT_DIR/test_dir" "$OUTPUT_DIR/tags" "$OUTPUT_DIR/config"
+	echo "test content" >"$OUTPUT_DIR/test_dir/test_file.md"
+	_TEST_FILE="$(cd "$OUTPUT_DIR/test_dir" && pwd)/test_file.md"
+
+	# Stage minimal intermediate files (viewer reads these directly post-refactor)
+	_SEP="$SHTRACER_SEPARATOR"
+	printf '%s\n' \
+		":Requirement${_SEP}@TAG1@${_SEP}NONE${_SEP}desc${_SEP}${_TEST_FILE}${_SEP}1${_SEP}0${_SEP}unknown" \
+		>"$OUTPUT_DIR/tags/01_tags"
+	printf '%s\n' \
+		":Requirement${_SEP}./path${_SEP}${_SEP}${_SEP}Requirement${_SEP}@TAG[0-9]+@${_SEP}--${_SEP}1" \
+		>"$OUTPUT_DIR/config/01_config_table"
+	printf '%s\n' "@TAG1@ NONE NONE NONE NONE" >"$OUTPUT_DIR/tags/04_tag_table"
+
+	cat >"$OUTPUT_DIR/output.json" <<EOF
 {
 	"metadata": {"version": "$SHTRACER_VERSION", "generated": "2025-01-01T00:00:00Z", "config_path": "$_TEST_FILE"},
 	"files": [
@@ -207,28 +215,27 @@ test_shtracer_viewer_single_file_output() {
 }
 EOF
 
-		# Act -------------
-		"$SHTRACER_VIEWER" <"$OUTPUT_DIR/output.json" >"$OUTPUT_DIR/output.html"
+	# Act -------------
+	"$SHTRACER_VIEWER" <"$OUTPUT_DIR/output.json" >"$OUTPUT_DIR/output.html"
 
-		# Assert ----------
-		assertEquals 0 "$?"
-		assertEquals 0 "$(
-			[ -f "$OUTPUT_DIR/output.html" ]
-			echo "$?"
-		)"
-		grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should have DOCTYPE" 0 "$?"
-		grep -q "const files =" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should inline show_text.js" 0 "$?"
-		grep -q "traceabilityData" "$OUTPUT_DIR/output.html"
-		assertEquals "HTML should embed JSON" 0 "$?"
-		grep -q "\./assets/show_text.js" "$OUTPUT_DIR/output.html"
-		assertNotEquals "HTML should not reference external assets" 0 "$?"
+	# Assert ----------
+	assertEquals 0 "$?"
+	assertEquals 0 "$(
+		[ -f "$OUTPUT_DIR/output.html" ]
+		echo "$?"
+	)"
+	grep -q "<!DOCTYPE html>" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should have DOCTYPE" 0 "$?"
+	grep -q "const files =" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should inline show_text.js" 0 "$?"
+	grep -q "traceabilityData" "$OUTPUT_DIR/output.html"
+	assertEquals "HTML should embed JSON" 0 "$?"
+	grep -q "\./assets/show_text.js" "$OUTPUT_DIR/output.html"
+	assertNotEquals "HTML should not reference external assets" 0 "$?"
 
-		# Regression: Trace targets list should call showText(..., 1, ...)
-		grep -q '""1""' "$OUTPUT_DIR/output.html"
-		assertNotEquals "Trace target links should use numeric line 1" 0 "$?"
-	)
+	# Regression: Trace targets list should call showText(..., 1, ...)
+	grep -q '""1""' "$OUTPUT_DIR/output.html"
+	assertNotEquals "Trace target links should use numeric line 1" 0 "$?"
 }
 
 # ============================================================================

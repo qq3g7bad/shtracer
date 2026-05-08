@@ -15,7 +15,6 @@
     │   ├── shtracer_verify.sh      Verification output and summary
     │   ├── shtracer_json_export.sh JSON generation and cross-ref matrix
     │   ├── shtracer_crossref.sh    Cross-reference tables and tag swapping
-    │   ├── shtracer_json_parser.sh Shared JSON parsing module
     │   ├── shtracer_html_viewer.sh HTML report generation
     │   ├── shtracer_markdown_viewer.sh Markdown report generation
     │   ├── awk/                    Standalone AWK library files
@@ -306,13 +305,6 @@ All detected issues are reported, enabling easy filtering with grep/awk/cut for 
   * Matrix generation between adjacent layers
   * Markdown table formatting with hyperlinks
   * Relative path computation for cross-references
-
-<!-- @ARC5.3@ (FROM: @REQ3.1@, @REQ3.2@) -->
-### 📄 `shtracer_json_parser.sh`
-
-* Shared POSIX-compatible JSON field extraction module (no GNU awk `match()` with 3 args).
-* Provides `json_parse_metadata`, `json_parse_files`, `json_parse_layers`, `json_parse_trace_tags`, `json_parse_chains`, `json_parse_health`, and `json_parse_coverage`.
-* Required by both `shtracer_html_viewer.sh` and `shtracer_markdown_viewer.sh`; sourced via `shtracer_util.sh` at startup.
 
 <!-- @ARC3.1@ (FROM: @REQ1.3@, @REQ3.2@, @REQ3.4.2@) -->
 ### 📄 `shtracer_html_viewer.sh`

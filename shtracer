@@ -323,17 +323,14 @@ parse_arguments() {
 		CONFIG_DIR="$(cd "$(dirname "$_config_file")" && pwd)"
 		# OUTPUT_DIR override semantics:
 		# - If unset/empty: use default name under CONFIG_DIR
-		# - If contains '/': treat as path (absolute, or relative to CONFIG_DIR)
-		# - Else: treat as directory name under CONFIG_DIR
+		# - If absolute (starts with /): use as-is
+		# - Otherwise: treat as relative to CONFIG_DIR
 		if [ -z "${OUTPUT_DIR:-}" ]; then
 			OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR_DEFAULT_NAME}/"
 		else
 			case "${OUTPUT_DIR}" in
 				/*)
 					OUTPUT_DIR="${OUTPUT_DIR%/}/"
-					;;
-				*/*)
-					OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR%/}/"
 					;;
 				*)
 					OUTPUT_DIR="${CONFIG_DIR%/}/${OUTPUT_DIR%/}/"
@@ -433,7 +430,7 @@ main_routine() {
 
 	# Test mode
 	elif [ "$SHTRACER_MODE" = 'TEST' ]; then
-		PATH="$_user_path" sh -c "cd ${SCRIPT_DIR%/}/scripts/test/; ./run_all_tests.sh"
+		PATH="$_user_path" sh -c 'cd "$1/scripts/test/" && ./run_all_tests.sh' _ "${SCRIPT_DIR%/}"
 		return 0
 	fi
 
