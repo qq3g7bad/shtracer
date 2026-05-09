@@ -294,6 +294,22 @@ test_remove_leading_bullets_spaces() {
 }
 
 ##
+# @brief Test remove_leading_bullets with hyphen marker
+#
+test_remove_leading_bullets_hyphen() {
+	result=$(echo "- item" | remove_leading_bullets)
+	assertEquals "item" "$result"
+}
+
+##
+# @brief Test remove_leading_bullets with spaces and hyphen marker
+#
+test_remove_leading_bullets_hyphen_spaces() {
+	result=$(echo "  - item" | remove_leading_bullets)
+	assertEquals "item" "$result"
+}
+
+##
 # @brief Test extract_from_delimiters with double quotes
 #
 test_extract_from_delimiters_quotes() {

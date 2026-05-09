@@ -181,6 +181,7 @@ test_authenticate_user() {
 ### Configuration File Format
 
 The `config.md` file defines which files to trace and how to organize traceability links. Each section header defines a traceability level (e.g., `## Requirement`, `## Architecture`), and properties specify paths, tag patterns, and filters.
+List markers can use either `*` or `-`.
 
 **Quick Example:**
 
