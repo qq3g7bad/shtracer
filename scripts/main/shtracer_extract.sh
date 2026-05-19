@@ -88,9 +88,18 @@ _extract_tags_discover_files() {
 			if (tag_format == "") { next }
 
 			escaped_path = shell_escape(path)
-			cmd = "test -f \""escaped_path"\"; echo $?"; cmd | getline is_file_exist; close(cmd);
-			if (is_file_exist == 0) {
+			cmd = "if [ -f \"" escaped_path "\" ]; then echo F; elif [ -d \"" escaped_path "\" ]; then echo D; else echo X; fi"
+			cmd | getline path_kind; close(cmd);
+			if (path_kind == "F") {
 				print title, path, extension, ignore, brief, tag_format, tag_line_format, tag_title_offset
+			}
+			else if (path_kind == "X") {
+				# Missing path: never run find() here. find writes its
+				# "No such file or directory" message to stderr, which
+				# bypasses `cmd | getline` (stdout only) and leaks to
+				# the terminal locale-mangled. Report it ourselves so
+				# the (possibly non-ASCII) name stays readable.
+				printf "[extract_tags][warn]: Configured PATH does not exist (check config.md): %s\n", path > "/dev/stderr"
 			}
 			else {
 				# for multiple extension filter
