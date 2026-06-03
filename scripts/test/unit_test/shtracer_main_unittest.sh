@@ -623,16 +623,28 @@ test_main_routine_invalid_config_paths() {
 
 		# Act -------------
 		_RETURN="$(main_routine "./unit_test/testdata/config_invalid_paths.md" 2>&1)"
+		_EXIT_CODE=$?
 		IFS=' '
 
 		# Assert ----------
-		# Should output error about no tags found
-		echo "$_RETURN" | grep -q "No tags found"
-		assertEquals 0 "$?"
+		# A configured trace target that does not exist is now reported by
+		# shtracer itself at config-validation time: a readable message
+		# naming the section and the path as written, with the historical
+		# "no tags / table build failed" exit code (contract unchanged).
+		# It must NOT leak find(1)'s locale-mangled "No such file or
+		# directory" stderr (the original motivation for this change:
+		# unreadable garbled paths, especially on Windows/Git Bash).
+		assertEquals "Should fail with the make-table exit code" \
+			"$EXIT_MAKE_TABLE_FAILED" "$_EXIT_CODE"
 
-		# Should output find errors for nonexistent paths
+		echo "$_RETURN" | grep -q "does not exist"
+		assertEquals "Should report the missing PATH readably" 0 "$?"
+
+		echo "$_RETURN" | grep -q "check_configfile"
+		assertEquals "Error should originate from config validation" 0 "$?"
+
 		echo "$_RETURN" | grep -q "No such file or directory"
-		assertEquals 0 "$?"
+		assertNotEquals "Must not leak find's locale-mangled stderr" 0 "$?"
 
 	)
 }

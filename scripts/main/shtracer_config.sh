@@ -161,6 +161,47 @@ _check_config_validate() {
 			echo "[check_configfile][warn]: Section \"$_title\" has no TAG FORMAT (tags will not be extracted)" 1>&2
 		fi
 
+		# Validate that the configured PATH actually exists, but only for
+		# sections that will be extracted. Sections without a TAG FORMAT are
+		# intentionally skipped during extraction (mirrors the
+		# `tag_format == ""` skip in _extract_tags_discover_files), so a
+		# missing path there is not an error. Checking here means a
+		# misconfigured PATH is reported by shtracer itself -- readable, with
+		# the section name and the path as written -- instead of leaking
+		# find(1)'s locale-mangled stderr during extraction.
+		if [ -n "$_tag_format" ]; then
+			# PATH is stored quoted in the config table ("..."); unwrap it
+			# the same way _extract_tags_discover_files does.
+			_check_path="$_path"
+			case "$_check_path" in
+				\"*\")
+					_check_path="${_check_path#\"}"
+					_check_path="${_check_path%\"}"
+					;;
+			esac
+
+			# Resolve relative paths against the config.md directory
+			# (CONFIG_DIR), exactly as extraction does via cd "$CONFIG_DIR".
+			case "$_check_path" in
+				/* | [A-Za-z]:[/\\]*)
+					_resolved_path="$_check_path"
+					;;
+				*)
+					_resolved_path="${CONFIG_DIR:-.}/$_check_path"
+					;;
+			esac
+
+			if [ ! -e "$_resolved_path" ]; then
+				# Same exit code the pipeline historically produced for a
+				# missing trace target (no tags -> table build fails), so
+				# the public contract is unchanged; only the message
+				# becomes readable. Literal fallback keeps this correct
+				# even if a caller sources this file without the full
+				# shtracer environment.
+				error_exit "${EXIT_MAKE_TABLE_FAILED:-11}" "check_configfile" "Section \"$_title\": PATH \"$_check_path\" does not exist (resolved: \"$_resolved_path\")"
+			fi
+		fi
+
 		_has_valid_section="$SHTRACER_TRUE"
 	done <"$_CONFIG_TABLE"
 
